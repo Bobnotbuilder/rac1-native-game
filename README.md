@@ -1,8 +1,8 @@
 # rac1-native
 
 > **Current state:** apart from a few small bugs and glitches, the game is playable without major
-> problems up to **Umbris** (included). On arrival at **Batalia** the game crashes, because the
-> functions it needs there are not ported yet. Everything after Umbris is work in progress.
+> problems up to **Umbris** (included). **Batalia** and the planets after it are only partly ported,
+> so they are not playable end to end yet. Everything after Umbris is work in progress.
 > See [Status](docs/status.md).
 
 A native PC port of **Ratchet & Clank** (PlayStation 2, 2002), for Linux.
@@ -19,8 +19,8 @@ changing how the game behaves.
 
 **Milestone 1 is reached: the game is playable up to Umbris.** Veldin, Novalis, Aridia, Kerwan,
 Eudora, Rilgar, Blarg / Nebula G34 and Umbris, the eight planets, have been played through, apart from a few small bugs
-and glitches. Batalia crashes on arrival (functions not ported yet); the planets after it are only partly
-ported or not yet. The port as a whole is still in progress. See [Status](docs/status.md) (which also maps the names
+and glitches. Batalia and the planets after it are only partly ported or not yet, so they are not playable end to
+end yet. The port as a whole is still in progress. See [Status](docs/status.md) (which also maps the names
 the code uses for the levels to the names in the game), the [Roadmap](docs/roadmap.md) and the
 [History](docs/history.md).
 

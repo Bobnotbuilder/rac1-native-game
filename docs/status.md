@@ -43,7 +43,7 @@ The rest of this page uses the in-game name first and the code's name in bracket
 
 ## The planets
 
-Levels 0 to 7 are Milestone 1, and the whole milestone has been played through from Veldin to Umbris (included): apart from a few small bugs and glitches it plays without major problems. After Umbris the game takes the player to Batalia, where it crashes on arrival because functions it needs there are not ported yet. Bug reports are welcome.
+Levels 0 to 7 are Milestone 1, and the whole milestone has been played through from Veldin to Umbris (included): apart from a few small bugs and glitches it plays without major problems. After Umbris the game takes the player to Batalia, which runs but is only partly ported, as are the planets after it: they are not playable end to end yet. Bug reports are welcome.
 
 Every one of the game's 19 levels (0 to 18) loads and runs on its own overlay (the level's own build of the
 engine, see [Architecture](architecture.md#per-level-overlays-and-the-ov-macros)), without crashing,
@@ -61,7 +61,7 @@ nothing, so an object whose class is not ported stands still or does not appear.
 | 5 | Rilgar | Complete, including the hoverboard race. | |
 | 6 | Nebula G34 (Blarg's station; see [names](#level-names)) | Complete, including the boss fight. | |
 | 7 | Umbris | Complete, including the Snagglebeast. | |
-| 8 | Batalia | First part ported: 58 of its own classes. | **Crashes on arrival** (functions not ported yet). Some draw callbacks not ported; some class states differ from the original. |
+| 8 | Batalia | First part ported: 58 of its own classes. | Not playable end to end yet: some moby callbacks and draw callbacks not ported; some class states differ from the original. |
 | 9 | Gaspar | First part ported: 40 class update functions. | Draw callbacks not ported. |
 | 10 | Orxon | First part ported: 62 classes, 8 draw callbacks. | The O2 mask and the Pilot's Helmet not ported. |
 | 11 | Pokitaru | First part ported. | Weapons and gadgets bought there not ported. |
