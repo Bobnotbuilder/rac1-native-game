@@ -36,8 +36,8 @@ noting and shadows where they should be; it does not mean every lamp is lit.
 | Novalis | Works. Sun checked against the level's look. Few automatic lights. |
 | Aridia | Works. |
 | Kerwan | Works. Few automatic lights. |
-| Eudora | Works. The heaviest level for the lighting (its forest has many shadow casters; roughly twice the frame time of the lighting off in the survey, on an integrated GPU). Trees and woodwork glow bright orange in the textures: they are recognised as materials and not turned into lights. |
-| Rilgar | Works. Same warm-material handling as Eudora. |
+| Eudora | Works. The heaviest level for the lighting (its forest has many shadow casters; roughly twice the frame time of the lighting off in the survey, on an integrated GPU). Trees and woodwork glow bright orange in the textures: they are recognised as materials and not turned into lights. Need some works. |
+| Rilgar | Works. Same warm-material handling as Eudora. Needs some works, some automatic lights are a bit non-sense |
 | Blarg (Nebula G34, Blarg's station) | **Still a mess.** Playtesting found some zones pitch dark. The station's closed zones are lit by a light that reaches the floor only through the geometry above it, so the sun's shadow covers the whole zone and darkens it. The likely cause is known but not fixed. The hangar has only a faint, low blue sun. |
 | Umbris | Works outdoors: the dead trees cast long shadows. Near the lava the zone's light comes from below, so there is no sun there and the shadows fade out. No automatic lights are found on this level. |
 
