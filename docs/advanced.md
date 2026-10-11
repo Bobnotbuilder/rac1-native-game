@@ -1,0 +1,225 @@
+# Advanced options
+
+Options > Advanced holds the settings that change how the game plays. They are different in kind
+from the PS2 compromises the port removes (see [Overview](overview.md#faithful-to-the-games-code-not-to-the-ps2s-limits)):
+
+- **A removed compromise** keeps the game's behaviour and state exactly the original's and only drops
+  something the console needed, such as fades that hid disc loading. It is on by default, with the
+  original's way kept as an option.
+- **An enhancement** changes the game's behaviour or state: how Ratchet moves, how the controls map,
+  whether the world pauses. Enhancements are **optional, off by default, and labelled as changes to
+  the game**. With all of them off, the game plays as the original.
+
+The Advanced page has four rows:
+
+| Row | Values (default first) | Kind |
+|---|---|---|
+| Quick Select | Normal, Pause | enhancement |
+| Aiming | Original, Modern | enhancement |
+| Movement | Original, RAC 3 | enhancement |
+| Fades | Fast, Original | a removed compromise: Fast is the port's default, Original the PS2's |
+
+All of it is in `src/game/enhance/advanced.{h,cpp}`. None of it is a port: every function there is
+annotated `// orig: (none) — enhancement`.
+
+## How the page is built
+
+The page is made from the game's own menu data, so it looks and behaves like the game's pages. When
+the pause menu opens (`menu_open`, 0x276190, calls `advanced_menu_install`), the port copies the
+original's Camera page (0x1b5a60), its title and its "settings" widget (the widget at 0x27ef00 whose
+rows are a name, the byte it sets and up to four value texts; Cross cycles the value) into a block
+of EE memory the game never uses (0xf0000 to 0xf2000, inside the PS2 kernel's first megabyte, which
+the port does not use since its kernel is the host). It then writes its own rows and texts there and
+inserts Graphics, Controls and Advanced into the Options list before Quit Game. The main menu gets
+the same pages (`title_menu_page_start`). The game's text lookup (0x203ad8) asks `advanced_text`
+first for the page's own text ids (0x7f00 and up), in English, German, Spanish and Italian (French
+shows English for now).
+
+Each setting is one byte in that block, and value 0 is the original's behaviour (for Fades, the
+port's fast fades). Left and right on a row step the value (`advanced_settings_dpad`).
+
+**Where the settings are kept:**
+
+- as the player's preferences, in `~/.config/rac1-native/advanced_options.txt` (or
+  `$XDG_CONFIG_HOME/rac1-native/`, or `$RAC1_ADVANCED_FILE`), one `name value` line per setting,
+  written whenever a setting changes;
+- with each save, in a `save<N>.pc` file next to the game's own `save<N>.bin` (see
+  [Saves](saves.md#the-pc-settings-next-to-each-save)), so each playthrough keeps its own.
+
+**The New Game choice.** Picking "Modern mode" at New Game turns Quick Select, Aiming and Movement
+on; "Original mode" turns them off (`advanced_apply_mode`). Fades is left as it is. Every setting can
+be changed at any time afterwards.
+
+**Linked settings.** Modern aiming is built on the RAC 3 strafe, so turning Aiming to Modern turns
+Movement to RAC 3, and turning Movement back to Original turns Aiming back to Original
+(`advanced_setting_changed`).
+
+## Quick Select: Pause
+
+In the original, the world keeps moving while the quick-select ring is open (Triangle held). With
+Pause, it holds still.
+
+`advanced_world_paused` is true when the setting is on, Triangle is held and the HUD's quick-select
+element is the one open (its update function is 0x237ba0, or 0x238b80 for the variant the hero opens
+in his other mode). `gameplay_frame` (0x297f78, `src/game/ovl/game_frame.cpp`) then skips the hero,
+the mobys, the particles and the camera for that frame, and the play-time statistic does not count it.
+
+## Fades: Fast or Original
+
+The game's screen fade (0x1f9838) waited for n + 2 vsyncs, hiding the PS2's disc loading. By default
+the port runs the fade's loop whole, with the same memory writes and the frame counter moving by
+n + 2, but inside one host frame: the screen cuts. With Original, each of its frames is shown, as on
+the PS2.
+
+The fade's vsync wait is `fade_vsync` in `src/game/ovl/screen_fade.cpp`, which calls
+`ee_thread_vsync(kind, advanced_original_fades())`: when the second argument is false, the game's
+coroutine does not suspend there (see
+[Game logic](game-logic.md#the-game-frame-on-a-coroutine)). `RAC1_FADES=original` or `fast` sets
+it from the environment.
+
+## Movement: RAC 3
+
+Ratchet & Clank 3 (Up Your Arsenal, UYA) moves Ratchet differently from the first game: the run
+follows the stick's tilt, he turns and stops quicker, his jumps leave the ground sooner, and L2 or R2
+held makes him strafe. Movement = RAC 3 brings that feel to the first game's hero code.
+
+### How it was built: a study of UYA's code
+
+The values and rules were taken from a study of UYA's own hero code, on the project owner's own
+NTSC-U disc of Up Your Arsenal (`SCUS-97353`):
+
+- UYA's level overlays were extracted from the disc and its boot executable unpacked; one ELF was
+  built from the core sections and level 1's overlay and loaded into Ghidra with the Emotion Engine
+  plugin.
+- UYA's hero functions were found by their constants and callers. The stick-to-movement function was
+  recognised by the same axis-snap constants as R&C1's, and the rest followed from its callers. Each
+  was matched to its R&C1 counterpart:
+
+  | Role | UYA (level 1 overlay) | R&C1 (Veldin) |
+  |---|---|---|
+  | the hero's per-frame tick | 0x4ea708 | 0x211670 |
+  | the state update | 0x4f2090 | 0x217970 |
+  | the input transitions | 0x503b68 | 0x229b70 |
+  | entering a state | 0x4fc518 | 0x2223f8 |
+  | the stick's tilt | 0x4ea9a8 | 0x211830 |
+
+  plus UYA's stick speed (0x4eadd0), turn spring (0x4eaff8), horizontal and vertical velocity
+  (0x4ede80, 0x4ed860), gait (0x5024b8), the strafe's functions (0x4ea5b0, 0x4ea628), and its wrench
+  combo table (0x2f6310).
+- The turn springs were modelled numerically to compare turn times, and R&C1's own speeds were checked
+  against RAM snapshots of the game running in PCSX2.
+
+**Nothing from UYA is in this repository.** No code or data of the other game was copied. What was
+taken are **numbers and rules**, quoted in `advanced.cpp`'s comments with the UYA address they were
+read at. UYA's code is not ported: R&C1's ported functions are given UYA's values or rule at a few
+specific points, and with Movement = Original those points run the original's code untouched.
+
+### What changes, R&C1 against UYA
+
+| | R&C1 (Original) | UYA (RAC 3) |
+|---|---|---|
+| Stick tilt | the stick's length, at most 1 | the mean of its square and round lengths, at most 1: full tilt sooner on the diagonals |
+| Run speed | two steps: 0.9 or 5.7 units/s | proportional to the tilt, 6.17 units/s at full tilt |
+| Acceleration / deceleration factors (/3600) | 7.5 / 8.5 (46 frames to top speed) | 37 / 30 (about 10 frames) |
+| Run turn spring (stiffness, damping, max speed) | 0.008, 0.15, 0.1658 | 0.037, 0.13, 0.2036 (walking: stiffness and max speed scale with the stick) |
+| Moving along the stick instead of the facing | below 0.3 units/s with the stick past 0.85, until within 3° | below 1.7 units/s, until within 5° |
+| Letting go of the stick while running | a skid state, or 25 more frames of running | straight to standing, speed and drift capped at 1.5 units/s |
+| Jump take-off | 5 frames after the press | 1 frame |
+| Jump height (base, rising to, over frames held) | 1.47, 2.62, 15 | 1.42, 2.70, 17 |
+| Air speed | 5.7 | 6.17 |
+| Double jump air speed | 3.5 | 4.75 |
+| Air braking with the stick released (/3600) | 2 | 8 |
+| Running jump (the long one) | when running, facing within 60° of the stick and fast enough | when the tilt is past 0.85 and not strafing |
+
+**The wrench.** The animations, lunges and hit frames of the combo are identical in both games;
+only some timing fields of the combo table differ (rows 0 to 3: the next swing's window, the row's
+end, the throw's jump-cancel). With RAC 3 the current overlay's combo table (0x17bc28) holds UYA's
+values; the original values are put back when the setting is turned off, and a level load brings its
+own table (`combo_table_sync`). UYA also lets Ratchet run straight out of a swing or a throw late in
+its animation when the stick is pushed (`advanced_rac3_swing_exit`).
+
+### Where it plugs into R&C1's hero code
+
+Every hook is a call from a ported function into `advanced.cpp`, at the point where UYA's rule differs:
+
+| Ported function (orig address) | File | Hook | What it changes |
+|---|---|---|---|
+| `pad_build` (0x2671b0) | `src/game/input/pad_build.cpp` | `advanced_pad_remap` | takes L2 and R2 for the strafe (and R2 as Circle with modern aiming) before the game sees the pad |
+| `hero_stick_speed` (0x211be8) | `src/game/ovl/ovl_21.cpp` | `advanced_move_speed` | the run speed proportional to the tilt |
+| the velocity heading (0x2120d8) | `ovl_21.cpp` | `advanced_strafing` | while strafing, the velocity follows the stick, not the facing |
+| the turn spring (0x211e30) | `ovl_21.cpp` | `advanced_turn_target` | while strafing, the target heading is the camera's |
+| `hero_vertical_velocity` (0x214108) | `ovl_21.cpp` | `advanced_rac3_movement` | the double jump's kick always applied; the jump's rising time from the state's own ramp |
+| `hero_horizontal_velocity` (0x214658) | `ovl_21.cpp` | `advanced_strafe_flip_active`, `_speed` | the strafe flip's speed; stronger air braking |
+| `run_update` (0x217970, the run state's block) | `hero_state_update.cpp` | `advanced_rac3_along_stick`, `advanced_rac3_run_turn` | when to move along the stick; the turn springs; UYA's acceleration and deceleration |
+| `enter_jump` (in 0x2223f8) | `hero_state.cpp` | `advanced_rac3_jump` | take-off frame, heights, air speeds |
+| `run_jump`, `run_input`, `swing_input` (in 0x229b70) | `hero_transitions.cpp` | `advanced_rac3_running_jump`, `advanced_rac3_stop`, `advanced_strafe_flip`, `advanced_rac3_swing_exit` | the running jump's rule, the immediate stop, the strafe flip, running out of a swing |
+| `moby_skin_all` (0x2558e0) | `moby_skin.cpp` | `advanced_pose_hook` | the strafe's lower-body twist (below) |
+| `gameplay_frame` (0x297f78) | `game_frame.cpp` | `advanced_frame`, `advanced_aim_before_hero` / `_after_hero`, `advanced_aim_before_camera` / `_after_camera` | the combo table, the legs, the aim and the camera around the hero's and the camera's updates |
+
+Novalis, Aridia and Kerwan run their own build of the hero's state code (the `*_l1.cpp` files); the
+same hooks are in those copies.
+
+### The strafe
+
+With Movement = RAC 3, holding **L2 or R2** on the ground or in a jump makes Ratchet strafe, as in UYA
+(UYA's hero tick tests the same two buttons): he keeps facing the camera's heading and moves along
+the stick in any direction at full analog speed. The game no longer sees L2 and R2 as such; L1 keeps
+the first-person view and R1 the crouch. The right stick still turns the camera, and Ratchet turns
+with it.
+
+What comes from UYA and what is this project's own:
+
+- **From UYA:** the buttons, moving along the stick at full speed, no long running jump while
+  strafing, and the **strafe flip**: Cross with the stick pushed past 0.9 sideways or back performs a
+  flip along the stick (R&C1's flip state 0xb, its animation chosen by the stick's quadrant). As in
+  UYA it starts at 5 units/s and approaches max(5.5 x tilt, 2) units/s, along the stick only, taking
+  off one frame after the press; R&C1's own flip starts from 0 and covers about 3.2 units, UYA's about
+  5.2.
+- **This project's own:** how Ratchet is held on the camera's heading (a stiffer turn spring than the
+  crouch walk's, snapping onto the heading when close; UYA's own spring values were not used), and
+  turning him while he stands still.
+- **The legs, invented because R&C1 has no strafe animations.** R&C1 has no sideways or backwards run
+  clips (its clips 0x1c to 0x1f are the flips), and UYA's clips are another disc's data. So while
+  strafing, the run's animation is reused:
+  - **sideways**, after the game has posed the skeleton (`moby_skin_all`, 0x2558e0),
+    `advanced_pose_hook` turns the joint matrices of the pelvis (joint 1), the legs and the tail
+    (joints 92 to 110 of Ratchet's 111) about the vertical axis toward the direction of movement, by
+    an angle eased at 0.15 radians a frame, so the chest, arms and head stay on the aim;
+  - **backwards** (more than 2 radians from the facing), the run's frames are shown in reverse
+    (`backpedal_show` after the hero's update) and the real frames put back before the next update
+    (`backpedal_restore`), so the game's own animation stepping goes on forward. The legs are turned
+    onto the backward line.
+
+### Modern aiming
+
+Aiming = Modern (it needs Movement = RAC 3) is a modern shooter's aim, invented for this port, built
+on the strafe:
+
+- **L2 aims** (strafing as above), and **R2 fires**: the port turns it into Circle, the original's
+  fire button, which still works. In the menus nothing changes.
+- **The right stick turns the aim**, not the camera: its heading, and its pitch between looking down
+  0.75 and up 0.55 radians, held where it is let go. It follows the camera's own invert options.
+- **A view over the right shoulder** eases in over 8 frames: 3 units behind a point 1.2 above
+  Ratchet, 0.75 to the right. A collision test with the follow camera's own flags keeps it out of
+  walls. Only the view the renderer reads is moved; the follow camera's own state is turned onto the
+  aim once, when the aim ends, and the view is held on the aim until the camera catches up, so there
+  is no jolt.
+- **A reticle** at the screen's centre for every item but the wrench, through the game's own camera
+  effect (`cam_effect_add`); the Blaster draws its own.
+- **Shots along the screen's centre.** The Blaster's shots aim at the first thing the screen-centre
+  ray meets within 80 units (`advanced_aim_direction`). The gloves (Bomb, Mine, Doom) reuse the
+  original's own "aim along the camera" path, which R&C1 already takes when L1 or L2 is held
+  (`advanced_camera_aim` in `bomb_glove.cpp`, `mine_glove.cpp`, `doom_glove.cpp`).
+
+### What the RAC 3 movement measured
+
+In the project's automated runs: top running speed 6.17 units/s (Original 5.7), 95 % of
+it in 12 frames (46), a stop in 8 frames (29), lift-off 3 frames after the press (7).
+
+## Limits
+
+- **Not taken from UYA:** its quick-turn triggers, idle braking, crouch values and crouch high jump,
+  its strafe facing constants, the lock-strafe while firing, and its strafe flip's quadrant mapping
+  (the flip uses R&C1's own quadrants).
+- When backing into a wall while aiming, the camera can come very close.
+- The page's French texts are shown in English.

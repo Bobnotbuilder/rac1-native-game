@@ -1,0 +1,315 @@
+# Environment variables
+
+rac1-native reads a number of `RAC1_*` environment variables. This page lists all of them: 274 in
+total, in three groups.
+
+| Group | Count | Who it is for |
+|---|---|---|
+| [Player](#player-variables) | 18 | Settings a player may want to change: files, window, audio, the ISO |
+| [Debugging](#debugging-variables) | 202 | Developers: profilers, overlays, switching a renderer or an optimisation on or off to compare |
+| [Automated testing](#automated-testing-variables) | 54 | Scripted and headless runs: frame counts, screenshots, simulated input, self-checks |
+
+## When a variable is honoured
+
+- **Headless runs** (`RAC1_HEADLESS=1`): every variable is honoured. A headless run reads no controls file and
+  ignores the physical pads.
+- **Windowed runs started with `--debug-tools`** (or `RAC1_DEBUG_TOOLS=1`): every variable is honoured.
+- **Windowed runs without it** (the way a player runs the game): only the player variables below are kept. The others
+  are removed from the environment at start-up, each with a message on stderr, before any other code sees them. A
+  windowed test (for example `RAC1_SIM_INPUT` in a visible window) therefore needs `--debug-tools`.
+
+In the tables, "default" is what happens when the variable is unset. A flag variable is usually on when it is set to a
+non-zero number and off when it is `0`; where a variable reads its value differently, the table says so. The
+descriptions are written from the source; a few variables are used only by one narrow experiment and are described
+briefly.
+
+The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the code that reads one).
+
+## Player variables
+
+| Variable | Values and default | What it does |
+|---|---|---|
+| `RAC1_ADVANCED_FILE` | path; default $XDG_CONFIG_HOME/rac1-native/advanced_options.txt, else ~/.config/rac1-native/advanced_options.txt | Overrides the location of the text file where the Advanced (enhancement) settings are loaded from and saved to. |
+| `RAC1_AUDIO_DEVICE` | set (any value) = open the audio device in a headless run; default off in headless (a windowed run always opens it) | Lets a headless run open the real sound device (headless otherwise has no audio output), to test audio at a given frame rate. |
+| `RAC1_AUDIO_PERIODS` | integer N; default 3 | Number of periods in the audio device's buffer; with RAC1_AUDIO_PERIOD_MS it sets the output latency and can be raised if sound crackles. |
+| `RAC1_AUDIO_PERIOD_MS` | integer milliseconds; default 10 | Length of one period of the audio device's buffer; raise it together with or instead of the period count if sound crackles. |
+| `RAC1_CONTROLS_FILE` | path; default $XDG_CONFIG_HOME/rac1-native/controls.txt, else ~/.config/rac1-native/controls.txt | Overrides the location of the controls (key and pad bindings) file; in a headless run, setting it also makes control changes get saved there. |
+| `RAC1_DEBUG_TOOLS` | 1 = on; default off (same as the --debug-tools option) | Enables the developer tools (debug menu, hand-move Ratchet, and the other RAC1_* switches that a windowed run otherwise ignores). |
+| `RAC1_FPS_CAP` | integer frames per second, 0 = unlimited; default from Options > Graphics (a headless run is not paced unless this is greater than 0) | Overrides the frame-rate cap of the display settings; in a headless run it paces the run to that rate. |
+| `RAC1_FULLSCREEN` | 0 or 1; default from Options > Graphics | Forces a fullscreen window (1) or a normal window (0) on the primary monitor at its own video mode, overriding the setting. |
+| `RAC1_GRAPHICS_FILE` | path; default $XDG_CONFIG_HOME/rac1-native/graphics_options.txt, else ~/.config/rac1-native/graphics_options.txt | Overrides the location of the file where the Options > Graphics settings are loaded from and saved to. |
+| `RAC1_HEADLESS` | 1 = on; default off (a window opens) | Runs without a window or audio device (default 300 frames, writes screenshot.ppm at the end); other RAC1_* test variables are honoured in this mode. |
+| `RAC1_IOP_MIRROR` | 0 = use the game's own emulated IOP output; default on (the host's mirror of the IOP plays the sound) | Setting 0 turns off the host's low-latency mirror of the sound processor and plays the emulated IOP's output instead. |
+| `RAC1_ISO` | path to the NTSC-U ISO; default assets/iso/rac1-ntsc-u.iso | Path of the game disc image used by the game and by the setup tools. |
+| `RAC1_MEMCARD_DIR` | directory path; default $XDG_DATA_HOME/rac1-native/memcard, else ~/.local/share/rac1-native/memcard | Directory holding the virtual memory card's save files. Setting it also makes a headless run insert the card. |
+| `RAC1_MOVIE_VOLUME` | floating-point gain; default 1.0 | Volume multiplier applied to the audio of the pre-rendered movies. |
+| `RAC1_NO_AUDIO` | any value = on; default audio on | Turns the sound output off entirely. |
+| `RAC1_PRIORITY` | 0 = off, any other integer = on; default on except when headless | Requests raised host thread priority through the system's real-time kit, if available. |
+| `RAC1_VSYNC` | 0 = off, 1 = on; unset = the Options > Graphics setting | Forces vertical sync on or off for a windowed run, overriding the in-game display setting. |
+| `RAC1_WINDOW` | "WIDTHxHEIGHT", e.g. 1280x720; unset = the default window size | Sets the size of the game window at start. |
+
+## Debugging variables
+
+| Variable | Values and default | What it does |
+|---|---|---|
+| `RAC1_2D_EDGES` | integer pixels; default off | Prints the 2D drawn within that many pixels of the frame's edges that the overscan crop applies to, with its box (how the crop's margins were chosen). |
+| `RAC1_ANIM_FIRST` | integer; default 0 | Only in the "animsheet" simulated-input script: the number of the first hero animation set to play (each set runs 16 frames), used to make animation contact sheets. |
+| `RAC1_ANIM_FREEZE` | set (any value) = on; default off | Only in the "animsheet" script: at frame 200 switches off the hero's own update so the forced animations play without the game moving him. |
+| `RAC1_AO` | integer, 0 = off, non-zero = on (the Options menu uses levels); default 0 (the Options > Graphics Ambient Occlusion setting is used unless this is set) | Forces the screen-space ambient occlusion pass on or off, overriding the menu setting, for comparison and testing. |
+| `RAC1_AO_RADIUS` | integer in hundredths; default 90 | Sets the sampling radius of the ambient occlusion pass (value divided by 100) for tuning. |
+| `RAC1_AO_STRENGTH` | integer in hundredths; default 70 | Sets the darkening strength of the ambient occlusion pass (value divided by 100) for tuning. |
+| `RAC1_AUDIO_DUMP` | file path; unset = no dump | Writes the game's sound output to the file as raw 48 kHz stereo signed 16-bit PCM. |
+| `RAC1_AUDIO_LOG` | set (any value) = on; default off | Prints the audio queue's summary (underruns, skips, and so on) every 10 seconds. |
+| `RAC1_AUDIO_QUEUE` | 0354 = use the older fixed-queue policy; unset = current adaptive policy | Switches the audio queue to its earlier simple policy (fixed 2-frame start, no rate control, no fades) so the two can be compared. |
+| `RAC1_AUTOPILOT_LOG` | moby class number; default -1 = off | Every 10 frames prints the live mobys of that class, used to record a racer's line as waypoints for the autopilot. |
+| `RAC1_AUTOPILOT_TRACE` | integer N; default 0 = off | Prints the hero position, the aim point and the stick values every N frames while the autopilot runs. |
+| `RAC1_AUTO_LIGHTS` | integer, non-zero = on; default 1 (the Options > Graphics setting is used unless this is set) | Switches the automatically placed extra point lights (emitters derived from level lamps and glowing geometry) on or off, to compare. |
+| `RAC1_AUTO_LIGHTS_GAIN` | float; default 1.0 | Scales the colour intensity of the automatic emitter lights, for tuning. |
+| `RAC1_AUTO_LIGHTS_KINDS` | bit mask; default 3 | Chooses which geometry feeds the automatic lights: bit 1 = TIE objects, bit 2 = terrain fragments (tfrags); 1 = ties only, 2 = tfrags only. |
+| `RAC1_CAM_TRACE` | set (any value) = on; default off | Prints every camera switch to stderr. |
+| `RAC1_CARD_LOG` | set (any value) = on; default off | Prints a line whenever the memory card screens or machines change state (UI state, flags, level, slot, owned items, bolts). |
+| `RAC1_CHAIN_LOG` | set (any value) = on; default off | Every host frame prints the address range of the graphics DMA chain that is walked and whether it runs. |
+| `RAC1_EMIT_MAX_SHARE` | fraction 0 to 1; default 0.35 | The modern lighting's automatic emitters: a warm-coloured class glowing over more than this share of its surface is taken as a bright material, not a lamp. |
+| `RAC1_FADE_LOG` | set (any value) = on; default off | Prints the frames of the game's blocking loops (fades and waits) as they run. |
+| `RAC1_FPU_NEAREST` | 1 = host round-to-nearest; default off (round toward zero as the PS2) | Turns off the PS2-style float rounding so the host's normal rounding is used, only to compare behaviour. |
+| `RAC1_FRAME_PROF` | 1 or 2; default off | Turns on the per-stage frame profiler: 1 = CPU time per stage with a GPU wait, 2 = CPU time without waits plus GPU time per stage from timer queries and frame-period statistics. |
+| `RAC1_FRAME_PROF_LONG` | milliseconds (float); default 30 | With RAC1_FRAME_PROF, prints a stage-by-stage breakdown for each host frame longer than this. |
+| `RAC1_GS_AFAIL_SPLIT` | 0 = off; default on | Setting 0 turns off the two-pass handling of alpha-test-failing geometry that writes depth, going back to the old behaviour, to compare moby rendering. |
+| `RAC1_GS_DUMP` | file path prefix; unset = off | With RAC1_GS_TRACE, writes the textures of the first 12 primitives of each traced chain as PPM images named <prefix>_NN.ppm. |
+| `RAC1_GS_FOG` | set (any value) = on; default off | Turns on emulated GS fogging for the 2D/GS-path primitives that request it (off by default as in the shipped behaviour of this port). |
+| `RAC1_GS_PRIMDBG` | set (any value) = on; default off | Prints the extents of the frame's 3D primitives for debugging the GS draw path. |
+| `RAC1_GS_SCREEN_FILTER` | set (any value) = on; default off | Makes the screen copy used by the GS path use nearest filtering so it is a complete texture, to test the drop-shadow alpha counting. |
+| `RAC1_GS_THREAD` | 0 = off; default on | Setting 0 captures and runs the graphics chain on the main thread instead of a worker thread, for comparison or debugging. |
+| `RAC1_GS_TRACE` | set (any value) = on; default off | Prints, once a second, a summary of the GS packet chain (primitive count, display size, offsets) and pad presses; also forces the chain to run on the main thread. |
+| `RAC1_GS_ZTRACE` | game frame number; default off | At that frame prints the depth, scissor, test and vertex state of every GS primitive; also forces the chain to run on the main thread. |
+| `RAC1_HERO_TRACE` | set (any value) = on; default off | Prints the hero's state in the drawn scene each frame. |
+| `RAC1_LIGHTS_DIR` | directory; default data/lights | Directory of the per-level user light files (levelNN.txt) loaded and saved by the in-game light editor. |
+| `RAC1_LIGHTS_JUMPS` | set (any value) = on; default off | Prints a line whenever a point light's weight changes abruptly between two frames, to find lights popping on and off. |
+| `RAC1_LIGHTS_TRACE` | any value = on; default off | Prints a per-class trace of the light-emitting mobys (area of their emitters) when the modern lighting model is built. |
+| `RAC1_LOAD_PROF` | nonzero integer = on; default off | Prints "[load]" lines with the milliseconds each level-loading step takes. |
+| `RAC1_MEMCARD` | 0 = no memory card, nonzero = card inserted; unset = inserted in a windowed run, not inserted in a headless run unless RAC1_MEMCARD_DIR is set | Chooses whether a virtual memory card is plugged in at start-up. |
+| `RAC1_MOBY_BENCH` | any value = on; default off | Prints once a second the average time of the GPU moby pass per frame (with submesh and vertex counts); only applies to the GPU moby renderer. |
+| `RAC1_MOBY_DEBUG` | any value = on; default off | Prints the hero moby's joint count, first joint and model matrix every frame in the old host moby drawing path. |
+| `RAC1_MOBY_DIFF` | any value = on; default off | Compares the GPU moby renderer's draw state (prim, texture, clamp registers) with the GS's own for each draw and reports mismatches; it also turns the moby skip optimisation off. |
+| `RAC1_MOBY_GPU` | nonzero = use the GPU moby renderer; 0 = off; default off (the modern pipeline is used instead) | Selects the older GPU-based moby renderer in place of the default modern pipeline for mobys. |
+| `RAC1_MOBY_LIST` | any value = on; default off | Prints a list of the mobys in the level's moby pool (with their update function addresses) once after the level starts. |
+| `RAC1_MOBY_MRP` | nonzero = modern pipeline for mobys, 0 = faithful path; default follows RAC1_MRP (on) | Chooses whether mobys are drawn by the modern rendering pipeline or by the faithful path, independently of the world. |
+| `RAC1_MOBY_NEW_TRACE` | any value = on; default off | Prints each moby that appears for the first time and how it gets drawn. |
+| `RAC1_MOBY_TRACE` | any value = on; default off | Prints every packet kicked to the GPU moby renderer (GIF tag fields) for inspection. |
+| `RAC1_MOBY_VU1` | any value = on (when set, the modern pipeline's mobys stay off unless RAC1_MOBY_MRP says otherwise); 0 = off; default off | Selects the faithful path for mobys, running the original VU1 microcode through the host's VU1 pass instead of the modern pipeline. |
+| `RAC1_MRP` | 0 = off, anything else = on; default on | Master switch for the modern rendering pipeline (mobys, world, sky). 0 returns to the faithful reference path; the per-part variables RAC1_WORLD_MRP and RAC1_MOBY_MRP override it. |
+| `RAC1_MRPW_CAPTURE_STATS` | any value = on; default off | Prints statistics on the size of the world scene capture (packets, bytes, spans) as it is made. |
+| `RAC1_MRPW_CPU` | any value = on; default off | Draws every world packet through the CPU reference kicks instead of the GPU path, to compare the two. |
+| `RAC1_MRPW_DIR` | directory path; default assets/generated/mrp/world | Directory from which the modern pipeline's generated world assets are loaded. |
+| `RAC1_MRPW_FOG` | 0 = off, nonzero = on; unset = the built-in default | Switches the modern pipeline's own fog for the world on or off, to compare with the original look. |
+| `RAC1_MRPW_GIF` | 0 = world GIF vertex ranges not drawn; unset or other = drawn | Setting 0 skips drawing the world's GIF-path vertex ranges, for isolating what the other paths draw. |
+| `RAC1_MRPW_MERGE_AFAIL` | 0 = off, nonzero = on; default on when the frame has tie or shrub draws | Forces the merging of the alpha-test-fail second pass in the modern world renderer on or off, to compare images. |
+| `RAC1_MRPW_MIP` | "faithful" = the GS's mip level choice; anything else = full texture; default full texture | Chooses how the modern world renderer selects texture mip levels. |
+| `RAC1_MRPW_ONEPASS` | any value = on; default off | Skips the second (alpha-test failing pixels) pass in the modern world renderer, so those pixels are not drawn. |
+| `RAC1_MRPW_ONLY` | integer program index; default -1 = all | Draws only the packets of one VU1 world program, to isolate it. |
+| `RAC1_MRPW_PROJ` | "vu" = projection as the VU1 program does; anything else = the host's projection; default host projection | Chooses which projection the modern world renderer and sky use. |
+| `RAC1_MRPW_SKY_DUMP` | any value = on; default off | Prints the sky's GS register writes (excluding vertices), a few times per run. |
+| `RAC1_MRPW_SKY_NOSKIP` | any value = on; default off | Makes the replica run the sky's range as well, so the sky is drawn twice, for testing. |
+| `RAC1_MRPW_STATIC` | 0 = off, anything else = on; default on | Switches the resident (static) colour and geometry data path of the modern world renderer off, to compare with the older path. |
+| `RAC1_MRPW_STATIC_BOX43` | any value = on; default off | Uses the 4:3 clip matrix for the static box visibility test instead of the widened one, as an earlier version did, to compare. |
+| `RAC1_MRPW_STATIC_CHECK` | any value = on; default off | Enables self-checks of the static world data against the game's own, reporting differences. |
+| `RAC1_MRPW_STATIC_VERIFY` | any value = on; default off | Compares the resident colours with VU1 memory's at every GPU path instance and reports differences. |
+| `RAC1_MRPW_STATIC_WALK` | any value = on; default off | Walks all of the static world packets as if they were really drawn, instead of skipping those that are discarded. |
+| `RAC1_MRPW_TFRAG_CHECK` | any value = on; default off | Computes the host's tfrag decisions at the game's own distances and frustum and compares them with the game's draws, replacing nothing. |
+| `RAC1_MRPW_TFRAG_GPU` | 0 = off, anything else = on; default on | Switches the GPU tfrag (terrain fragment) path of the modern world renderer on or off. |
+| `RAC1_MRPW_TFRAG_HOST` | 0 = off, anything else = on; default on | Switches the host-side tfrag decision path on or off (for comparison with the game's own). |
+| `RAC1_MRPW_TFRAG_SELFCHECK` | any value = on; default off | Checks the tfrag colours against the values built for each draw while the scene is built. |
+| `RAC1_MRPW_TFRAG_SHADOW_BANDS` | any value = on; default off | Uses the tfrag LOD bands unscaled in widescreen, as an earlier version did, to compare. |
+| `RAC1_MRPW_TFRAG_VERIFY` | any value = on; default off | Verifies the GPU tfrag output against the CPU reference. |
+| `RAC1_MRPW_THREAD` | 0 = scene built on the host thread, anything else = built on a worker thread; default on (but off when a check or diff mode is active) | Chooses whether the modern world scene is built on a separate thread. |
+| `RAC1_MRPW_UNITKEY` | any value = on; default off | Includes the GPU path's texture in the draw batching key as well, for testing. |
+| `RAC1_MRP_CLASS_CHECK` | any value = on; default off | Counts and compares the moby classes the modern pipeline draws against the ones the game draws. |
+| `RAC1_MRP_DEBUG` | any value = on; default off | Enables debug output and extra checks in the modern moby renderer (also needed by RAC1_MRP_DIFF_SHOTS). |
+| `RAC1_MRP_DIFF_SHOTS` | string containing frame numbers of frame numbers; default off; only works together with RAC1_MRP_DEBUG | For the listed frames, prints where each moby's origin falls on the screen in the pixel comparison. |
+| `RAC1_MRP_DIR` | directory path; default assets/generated/mrp/moby | Directory from which the modern pipeline's generated moby assets are loaded. |
+| `RAC1_MRP_EFFECTS_SELFTEST` | any value = on; default off | Runs the widescreen effects shadow pass with nothing changed, to check that the pass itself alters nothing. |
+| `RAC1_MRP_EFFECTS_SKIP` | 0 = always run the effects shadow, 1 = skip it when nothing would change, 2 = run it and check that prediction; default 1 | Controls the skipping of the widescreen effects shadow pass when it would change nothing. |
+| `RAC1_MRP_FOG` | 0 = off, nonzero = on; unset = built-in default | Switches the modern pipeline's own fog for mobys on or off, to compare with the original look. |
+| `RAC1_MRP_FX` | 0 = off, anything else = on; default on | Switches the modern pipeline's handling of particle and effect drawing off to return to the original path for effects. |
+| `RAC1_MRP_FX_DEBUG` | any value = on; default off | Prints debug output from the modern effects (particles, glows) drawing. |
+| `RAC1_MRP_FX_HIDE` | any value = on; default off | Does not draw the effects the modern pipeline takes over, to see what they change in the image. |
+| `RAC1_MRP_FX_INVENTORY` | any value = on; default off | Takes an inventory of the producers (draw list functions) of effects as the game runs them and reports it. |
+| `RAC1_MRP_FX_KICKCHECK` | any value = on; default off | Checks the particle VU1 program's kicks against the modern effects' output and counts bad starts. |
+| `RAC1_MRP_FX_KICKCHECK_DUMP` | directory path; default off | Used with the kick check, writes the VU1 state of up to four bad starts as files in this directory. |
+| `RAC1_MRP_FX_KINDS` | integer bit mask (decimal or 0x hex); default all bits set | Chooses which kinds of effect producers the modern pipeline takes over (bit 1 << kind). |
+| `RAC1_MRP_FX_STATES` | any value = on; default off | Counts and reports the GS states used by the effects. |
+| `RAC1_MRP_FX_STREAKS` | 0 = off; unset or other = on | Setting 0 turns off the widening of the particle streak culling in widescreen, for comparison. |
+| `RAC1_MRP_FX_VERIFY` | any value = on; default off | Takes every drawn effect vertex back to the GS frame through the particle program's projection and compares it with what the original kicked. |
+| `RAC1_MRP_FX_VERIFY_LOG` | any value = on; default off | Together with RAC1_MRP_FX_VERIFY, logs the individual mismatches. |
+| `RAC1_MRP_HIDE` | integer moby class id; default none | Does not draw mobys of that class in the modern pipeline. |
+| `RAC1_MRP_LOD` | integer 0 to 100; default 0 (overridden by the Graphics options LOD setting) | Sets the level-of-detail slider (draw distance and detail scaling) of the modern pipeline from the environment. |
+| `RAC1_MRP_LOD_DIFF` | any value = on; default off | Reports how many words the LOD shadow pass changed in the game's data, once every 100 runs. |
+| `RAC1_MRP_LOD_DROPS` | any value = on; default off | Logs statistics on mobys that the LOD shadow pass drops compared with the real frame. |
+| `RAC1_MRP_LOD_KEEP_FADE` | any value = on; default off | Keeps the earlier behaviour in which the LOD fade switch is not scaled, for comparison. |
+| `RAC1_MRP_LOD_PROBE` | any value = on; default off | Prints, once per pass kind, some of the game's level-of-detail state (packet cursor and limit, tfrag bands and draw distance, tie classes) the first time the world shadow pass runs. |
+| `RAC1_MRP_LOD_ROOM` | 0 = off; default on | Switches off the extra packet room the modern renderer's shadow pass reserves, to compare behaviour with and without it. |
+| `RAC1_MRP_MIP` | faithful = the game's own mip selection; any other value or unset = modern mip selection; default modern | Chooses how the modern moby renderer picks texture mip levels, to compare against the original GS behaviour. Only read when the modern moby renderer is in use. |
+| `RAC1_MRP_MIP0` | any value = on; default off | Marks in magenta the moby textures whose largest mip level the frame did not upload, where the faithful path would sample stale GS memory. |
+| `RAC1_MRP_PROJ` | vu = project mobys with the VU1 programs' own path; anything else or unset = the modern projection; default modern | Selects how the modern moby renderer projects vertices, for comparison. Only read when the modern moby renderer is in use. |
+| `RAC1_MRP_SHADOWS` | 0 = off, any other integer = on; unset = the built-in default | Switches the modern renderer's handling of the game's drop shadows on or off, to compare against the original path. |
+| `RAC1_MRP_SHADOW_LOG` | any value = on; default off | Prints per frame how many marking and unmarking shadow triangles and tubes the modern shadow capture collected. |
+| `RAC1_MRP_SHADOW_SETUP` | 0 = off; default on | Setting 0 turns off giving the game's own projection back to its projection and view setup calls inside a shadow run (the fix for effects drifting in widescreen), to compare with before. |
+| `RAC1_MRP_SKIP` | 1 = skip the original GS/VU1 work the modern renderer makes redundant; 0 = off; verify = skip but also run the skinning and compare; default 1 with the modern moby renderer | Controls whether the work the original GS and VU1 path does for mobys is skipped when the modern renderer draws them. Forced to 0 when the renderer's own debug checks (diff, check, scene check) are on. |
+| `RAC1_MRP_SKIP_PARTS` | hexadecimal bit mask; default the built-in mask | Selects which parts of the moby GS/VU1 work are skipped when skipping is on; for isolating which skipped part causes a difference. |
+| `RAC1_MRP_TRACE_MOBY` | integer, 1 = on; default 0 (off) | With value 1 prints every moby's own GS registers as the modern moby renderer draws it. |
+| `RAC1_MRP_WIDEN` | 0 = widened culling off; default on | Switches off the widening of the game's culling when the view is wider than 4:3, so the original culling can be seen. |
+| `RAC1_MRP_WIDEN_0338` | any value = on; default off | Uses an earlier, simpler widescreen culling patch (only the tangent and one constant) instead of the current one, to compare. |
+| `RAC1_MRP_WIDEN_EFFECTS` | 0 = off; default on | Switches off the widescreen widening of the effects (particles and similar) so they are culled as in 4:3. |
+| `RAC1_MRP_WIDEN_GLOWS` | 0 = off; default on | Switches off the widening of the glows and other drawn-list objects at the sides of a widescreen view, to compare. |
+| `RAC1_MUSIC_TRACE` | set (any value) = on; default off | Prints the music streams' state (sequence step, tracks, music and dialogue slots) each frame it changes. |
+| `RAC1_OVERSCAN` | 0 = full frame, 1 = the TV's area, or `left,right,top,bottom` in pixels; unset = the Graphics page's Overscan row | Overrides the 2D overscan crop. |
+| `RAC1_OWN_OVERLAY` | 0 = run every level on Veldin's overlay image; anything else or unset = each level on its own overlay | For comparison, makes every level run on the first level's overlay instead of its own. |
+| `RAC1_PACE_GAME` | 0 = off; default on | When the frame cap is set, also paces the game to 60 Hz times the speed factor. Setting 0 stops the game loop being held to that rate; for timing comparisons. |
+| `RAC1_PACING` | 0 = the older pacing; default the current frame pacer | Switches the host frame pacer back to the older legacy mode, to compare. |
+| `RAC1_PART_TRACE` | any value = on; default off | Every 30 frames prints the live particles counted by type. |
+| `RAC1_PICKUP_LOG` | integer period in frames; unset = off | Every given number of frames prints the live item pickups and crates within 15 units of the hero (class, state, item, amount, timer, velocity). |
+| `RAC1_PIPELINE` | 0 = off, any other integer = on; unset = the saved setting | Forces the host's pipelining setting on or off, for comparison. |
+| `RAC1_POINTS` | 0 = off, 1 = on; default 1 | Forces the modern renderer's point lights on or off, overriding the Options setting. |
+| `RAC1_POINT_SHADOWS` | 0 = off, 1 = on; default 0 | Forces shadows from the dynamic point lights on or off, overriding the Options setting. |
+| `RAC1_POINT_TILES` | 0 = every light is applied everywhere; default per-tile light assignment | Switches off the per-tile selection of point lights, for comparing speed and look. |
+| `RAC1_POINT_TRACE` | any value = on; default off | Every 20 frames prints the game's 8 dynamic point lights. |
+| `RAC1_RENDER_SCALE` | integer percent; unset = the Options setting | Overrides the 3D render scale, as a percentage of the window. |
+| `RAC1_RENDER_SHADE` | integer; 1 = vertex colours alone; default 0 | Debug view that shades with the vertex colours alone. |
+| `RAC1_SAMPLE_FROM` | frame number; default 0 (sample from the start) | Used with RAC1_SAMPLE_PROF: sampling starts at this frame. |
+| `RAC1_SAMPLE_PROF` | output file path; unset = off | Turns on a built-in sampling profiler of the main thread (every 0.5 ms) and writes the samples to the given file at exit. |
+| `RAC1_SHADOWS` | 0 = off, 1 = on; default 0 (the Options Lighting setting applies unless this is set) | Forces the modern shadows and lighting on or off, overriding the Options setting. |
+| `RAC1_SHADOW_CACHE` | 0 = off, 1 = on; default 1 | Switches the static shadow cache off or on, to compare speed and look. |
+| `RAC1_SHADOW_CAST_KINDS` | bit mask: 1 ties, 2 shrubs, 4 tfrags; default 7 in the world renderer and 3 in the static caster code | Chooses which kinds of world geometry cast shadows, to find which one causes a problem. |
+| `RAC1_SHADOW_CAST_TRACE` | any value = on; default off | Prints which tie classes are chosen as shadow casters. |
+| `RAC1_SHADOW_COPY_WHOLE` | any value = on; default off | Copies the whole shadow cache every frame instead of only the parts the moving objects changed, to compare. |
+| `RAC1_SHADOW_DEBUG` | integer; 0 = off, 2 and 3 select shadow debug views; default 0 | Selects a debug visualisation in the lighting shader (2 shows shadow state, 3 shows only the added point light term). |
+| `RAC1_SHADOW_DUMP` | integer n; unset = off | Every n-th draw writes the shadow cascades' depth to shadow_casc<k>.pgm images in the current directory. |
+| `RAC1_SHADOW_EARLYZ` | 0 = off; default on | Switches off the depth-only program used for opaque shadow casters, to compare. |
+| `RAC1_SHADOW_FADE` | 0 = off, 1 = on; default 1 | Switches the distance fade of far shadows off or on. |
+| `RAC1_SHADOW_FADE_FROM` | integer world units; default 25 | Distance where the far-shadow fade starts. |
+| `RAC1_SHADOW_FADE_KEEP` | integer percent; default 35 | How much shadow strength is kept at the end of the far-shadow fade. |
+| `RAC1_SHADOW_FADE_TO` | integer world units; default 120 | Distance where the far-shadow fade ends. |
+| `RAC1_SHADOW_FBO_TRACE` | any value = on; default off | Prints (up to 5 times) when the read framebuffer differs from the draw framebuffer during the shadow pass. |
+| `RAC1_SHADOW_LIGHTS` | any value = on; default off | Prints the level's light sets once, when the lighting first reads them. |
+| `RAC1_SHADOW_MCACHE` | 0 = off; default on | Switches off the cache of moving shadow casters, to compare. |
+| `RAC1_SHADOW_MOBY_DIST` | number of world units; default 0 (the Options Shadow Distance setting applies) | Sets the distance up to which mobys cast shadows, overriding the Options setting. |
+| `RAC1_SHADOW_PROF` | any value = on; default off | Measures and prints the GPU time of the shadow pass (cascades and point cubes). |
+| `RAC1_SHADOW_REF` | x,y,z[,radius[,every]]; unset = off | Renders a depth image of a world-fixed box seen from the sun every frame (or every given number of frames) to shadow_ref_<n>.pgm, to check whether the set of shadow casters changes with the camera. Radius default 25. |
+| `RAC1_SHADOW_REF_NOMOBY` | any value = on; default off | With RAC1_SHADOW_REF, leaves the mobys out of the reference image. |
+| `RAC1_SHADOW_REF_PART` | 0, 1 or 2; default 0 | Restricts the shadow casters drawn: 1 only the frame's casters, 2 only the added ones, 0 all. |
+| `RAC1_SHADOW_RES` | 0, 1 or 2; default 1 | Shadow quality (resolution of the shadow maps), overriding the starting value; the Options Lighting setting still changes it unless RAC1_SHADOWS is also set. |
+| `RAC1_SHADOW_SHOW_CASTERS` | any value = on; default off | Draws the shadow casters' set in the normal view instead of the shadow maps, to see what casts shadows. |
+| `RAC1_SHADOW_SKIP` | 1 or 2; default 0 (off) | Testing switch for the modern shadow pass: 1 leaves the world out of the shadow maps, 2 leaves the mobys out, so the other contributes alone. |
+| `RAC1_SHADOW_SPLITS` | three comma-separated increasing positive floats "a,b,c"; unset = built-in cascade splits | Overrides the distances at which the modern shadow cascades split. Ignored if the three numbers are not valid and increasing. |
+| `RAC1_SHADOW_STRENGTH` | integer 0-100; default 55 | Darkness of the modern shadows (initial value of the shadow strength setting). |
+| `RAC1_SHADOW_TFRAG_HIGH` | any value = on; default off | Debug print for the shadow pass listing terrain (tfrag) entries lying high above the camera along the sun direction. |
+| `RAC1_SHADOW_TFRAG_KEEP` | any value = on; default off | Testing: in the shadow maps keep the terrain entries the frame already drew (at their view LOD) and add the rest, instead of rebuilding every entry at its own distance LOD. |
+| `RAC1_SHADOW_TFRAG_TRACE` | any value = on; default off | Prints, each frame, how many terrain (tfrag) packets were decided to cast shadows and how many were emitted. |
+| `RAC1_SHADOW_VOL_GAME` | any value = on; default off | Testing: the static shadow volume is built from the game's own view instead of the shadow passes' view (view tangents zeroed). |
+| `RAC1_SHADOW_ZONES` | integer; nonzero = on; default off | Testing: the shadow pass only keeps terrain entries whose zone is visible in the current zone mask. |
+| `RAC1_SKIP_DBG` | any value = on; default off | Prints to stderr, each frame, the display-list chain range and the moby skip ranges found when the mobys' draw packets are replaced by the host renderer. |
+| `RAC1_SKY_CHAIN` | any value = on; default off | Forces the sky to be drawn from the game's draw chain even when no modern or faithful world renderer is selected. |
+| `RAC1_SKY_ONLY` | any value = on; default off | Testing: the world draw chain is taken back after the sky, so only the sky is drawn. |
+| `RAC1_SND_TRACE` | any value = on; default off | Prints a trace of the sound-bank (989snd) events the game sends to the emulated IOP sound driver. |
+| `RAC1_STALL_LOG` | milliseconds as a number; default off (-1) | Logs every game step (a game frame or a blocking loop's frame) that takes longer than the given number of milliseconds, with the vsyncs it spanned. |
+| `RAC1_SUB_TRACE` | any value = on; default off | Prints, for each substituted draw range, how many substitute and real primitives the GS emulation kept or dropped. |
+| `RAC1_SUN_DIR` | three comma-separated floats "x,y,z"; unset = the level's own sun direction | Overrides the direction of the sun used by the modern lighting and shadows (normalised; ignored if near zero length). |
+| `RAC1_SUN_LEVEL` | set (any value) = on; default off | The modern lighting's sun always uses the level's light set 0 (the old way) instead of the light set the hero is lit with. See [Lighting](lighting.md). |
+| `RAC1_SUN_TRACE` | set (any value) = on; default off | Prints the light sets the hero is lit with, for the modern lighting's sun. See [Lighting](lighting.md). |
+| `RAC1_TF_HITS` | integer; default 2 | Testing threshold for the terrain shadow build: a candidate with fewer than this many hits is discarded. |
+| `RAC1_TITLE_TRACE` | any value = on; default off | Prints the title scene's state (frame, block, mobys, lists) about once every 100 frames while the title screen runs. |
+| `RAC1_VIEW_ANGLE` | angle in radians as a float; default 0 | With RAC1_VIEW_HERO_FRONT, the angle around the hero (from straight in front) at which the debug camera sits. |
+| `RAC1_VIEW_AT` | six comma-separated floats "ex,ey,ez,ax,ay,az"; unset = game camera | Forces a fixed host debug camera: eye position then target point, in world units. |
+| `RAC1_VIEW_DIST` | float; default 1.3 | With RAC1_VIEW_HERO_FRONT, the distance of the debug camera from the hero. |
+| `RAC1_VIEW_HERO_FRONT` | any value = on; default off | Debug camera that gives a close look at the hero's face, placed in front of the hero (see RAC1_VIEW_ANGLE and RAC1_VIEW_DIST). |
+| `RAC1_VIEW_MODE` | integer: 0 = widescreen, 1 = 4:3 with bars, 2 = fit to the window's aspect; default 0 until the Options > Graphics settings override it | Sets the host's view/aspect mode at start (as the aspect and fit options do). The exact meaning of 0 is inferred from the view code, treat as approximate. |
+| `RAC1_VIF_TRACE` | any value = on; default off | Prints every VIF1 code word (as [VIF1] lines on stderr) as the GS emulation processes the DMA chain. |
+| `RAC1_VU0_CAPTURE` | directory path; default off | Writes captures (code image, registers, memory) of VU0 program runs, spread over the calls, into that directory; used as inputs to prove the ported VU0 programs against the original. |
+| `RAC1_VU0_CHAIN` | any value = on; default off | At exit, prints a hash of everything VU0 computed during the run, to compare two runs for identical VU0 results. |
+| `RAC1_VU0_DUMP_SETS` | directory path; default off | Writes each distinct microprogram the game uploads to VU0 as a file named by address, length and hash. |
+| `RAC1_VU0_EXACT` | any value = on; default off | Runs the VU0 world lighting and moby programs on the slow exact step-by-step port instead of the fast port, to compare them. |
+| `RAC1_VU0_INTERP` | any value = on; default off | Runs every VU0 program on the generic VU interpreter instead of the native ports. |
+| `RAC1_VU0_LIGHT_INTERP` | any value = on; default off | Runs only the world static lighting VU0 set on the interpreter instead of its port. |
+| `RAC1_VU1_CAPTURE` | directory path; default off | Writes captures of VU1 program starts into that directory, as inputs to prove the ported VU1 programs against the original. |
+| `RAC1_VU1_CAPTURE_ALL` | integer n; default off | Captures n states per start of every VU1 program image (including world terrain, TIE and shrub programs) into the directory named by RAC1_VU1_CAPTURE. |
+| `RAC1_VU1_DUMP_SETS` | directory path; default off | Writes each distinct microprogram the game uploads to VU1 as one file named by instruction count and hash. |
+| `RAC1_VU1_EXACT` | any value = on; default off | Runs the VU1 world and moby programs on the slow exact step-by-step port instead of the fast port, to compare them. |
+| `RAC1_VU1_INTERP` | any value = on; default off | Runs VU1 programs that have no port on the interpreter instead of skipping them (also changes what the fallback report says). |
+| `RAC1_VU1_PKTDUMP` | directory path; default off | Dumps 60 consecutive VU1 kick packets to files pkt_<n>_s<start>_a<addr>.bin in that directory, starting at kick number RAC1_VU1_PKTFROM. |
+| `RAC1_VU1_PKTFROM` | integer; default 20000 | With RAC1_VU1_PKTDUMP, the number of the first VU1 kick to dump. |
+| `RAC1_VU1_PKTMIN` | integer quadword count; default 0 | With RAC1_VU1_PKTDUMP, only kicks of at least this many quadwords are dumped. |
+| `RAC1_VU1_PKTSTART` | hexadecimal VU1 start address; default any | With RAC1_VU1_PKTDUMP, only kicks of the VU1 program starting at this address are dumped. |
+| `RAC1_VU1_SKIP` | any value = on; default off | VU1 draws nothing (programs are not run), to see what the rest of the pipeline draws. |
+| `RAC1_VU1_TRACE` | any value = on; default off | Prints a trace of VU1 kicks on stderr, including a marker for each frame's draw chain and the pass marks in the VIF stream. |
+| `RAC1_VU_EXACT` | any value = on; default off | Runs all ported VU0 and VU1 programs on their exact step-by-step version instead of the fast one (both VU0 and VU1 at once). |
+| `RAC1_VU_FALLBACK` | any value = on; default off | At exit, reports which VU0 and VU1 programs ran on the interpreter or were skipped because no port exists, with counts and time. |
+| `RAC1_VU_HZ` | integer bitmask, decimal or 0x hex; default 3 | Selects which instruction kinds the VU interpreter treats with the hazard-accurate delayed register writes (bit values 1, 2, 4, 8, 16 for the different register-update kinds); for debugging interpreter timing. |
+| `RAC1_VU_PCTRACE` | any value = on; default off | Prints the VU interpreter's program counter and key integer registers for every instruction executed (very verbose). |
+| `RAC1_VU_PROF` | any value = on; default off | Profiles time and instruction counts per VU program and prints a report at exit. |
+| `RAC1_WIDEN_REF` | integer; nonzero = on; default off | Uses the reference (unwidened) culling and level-of-detail distances in the modern renderer, as a baseline to compare against the widened ones. |
+| `RAC1_WIDE_FILL` | 0 or 1; default 1 (on) | Whether the widescreen sides of the picture are filled with extra scene instead of left empty; 0 turns it off to compare. |
+| `RAC1_WORLD_CHAIN` | any value = on; default off | Keeps the world's draw chain (instead of letting the original VU1 world programs run) so a host world renderer can draw it; forced on automatically when the modern or faithful world renderer is active. |
+| `RAC1_WORLD_FAITHFUL` | 0 or 1; default 0 | 1 draws the world with the faithful GS-replica path (the reference) instead of the modern renderer, to compare. |
+| `RAC1_WORLD_MRP` | 0 or 1; unset = on, following the modern pipeline default | Switches the modern GPU world (terrain, TIE, shrub) and sky renderer on or off independently of the other parts of the modern pipeline. |
+| `RAC1_WORLD_MRP_DEBUG` | any value = on; default off | Prints extra diagnostics from the modern world renderer (per-draw and texture information). |
+| `RAC1_WORLD_MRP_DIFF` | any value = on; default off | Renders the world both with the modern renderer and the faithful GS path and computes their pixel difference, disabling the GPU fast paths. |
+| `RAC1_WORLD_MRP_DIFF_SHOTS` | comma-separated list of frame numbers; default none | With RAC1_WORLD_MRP_DIFF, saves the two images and their difference as pictures at the listed frames. |
+
+## Automated testing variables
+
+| Variable | Values and default | What it does |
+|---|---|---|
+| `RAC1_ADVANCED` | set (any value) = keep the player's Advanced settings in a headless run; unset = a headless run ignores them (all enhancements off) | Headless runs normally ignore the Advanced settings file and save-stored settings so tests stay deterministic; setting this keeps them, to test an enhancement headlessly. |
+| `RAC1_AMMO` | <item>:<n>,<item>:<n>,...; unset = nothing changed | Sets the ammo of the listed weapons (item id and count) a few frames after the item-giving frame (RAC1_GIVE_FRAME + 5); used by scripted runs. |
+| `RAC1_ARRIVE` | set (any value) = on; default off | Starts the game as if the ship's map had just chosen the starting planet, so the run begins with the landing cutscene; also counts as asking for a specific level start. |
+| `RAC1_AUTOPILOT` | <first>-<last>:class:<c>[:<n>] or <first>-<last>:wp:x,y[,j]/x,y... ; several separated by | ; unset = off\|Steers the left stick automatically during the given frame range, either toward the n-th live moby of a class or along a closed line of waypoints (j = also jump); used for scripted hoverboard-race runs. |
+| `RAC1_BOLTS` | integer (decimal or 0x hex); unset = unchanged | Sets the bolt count at the item-giving frame (RAC1_GIVE_FRAME), for scripted runs. |
+| `RAC1_BOOT` | 0 or 1; default depends on the start mode (the game's boot sequence with intro and menu runs in a normal window, not in headless runs or with a level request) | 1 forces the full game boot (title, main menu, New Game) even headless; 0 skips it and starts directly on the level. |
+| `RAC1_CLOCK` | integer Unix time (decimal or 0x hex); default fixed 1700000000 in headless, real clock otherwise | Fixes the clock the game sees to this time so runs are reproducible. |
+| `RAC1_DEVMENU_SHOT` | name of a debug-menu tab; unset = off | Opens the debug menu on the named tab even in a headless run, so a screenshot can capture it. |
+| `RAC1_DIE_AT` | game frame number; default off | At that game frame Ratchet is killed through the game's own death state. |
+| `RAC1_DJ_AT` | game frame number; default 216 | Only in the scripted "ship" input sequence: the frame at which the second double-jump press starts (a 12-frame hold). |
+| `RAC1_EQUIP` | item id (decimal or 0x hex); unset = unchanged | Puts that item in Ratchet's hand ten frames after the item-giving frame, as the quick select would. |
+| `RAC1_EQUIP_CYCLE` | <item>,<item>,...@<period>; unset = off | From ten frames after the item-giving frame, puts the next listed item in hand every <period> frames, round and round. |
+| `RAC1_FADES` | original or fast; default fast (screen fades run in a single host frame) | Chooses whether screen fades are shown frame by frame as on the PS2 (original) or completed instantly in one host frame; sets the Fades setting over the saved preference. |
+| `RAC1_FRAMES` | integer N; default 300 headless, 0 = run until closed in a window | Number of game frames to run before the program exits (screenshot.ppm is written at the last frame of a headless run). |
+| `RAC1_GIVE_FRAME` | game frame number; default 60 | The frame at which RAC1_GIVE_ITEMS, RAC1_BOLTS and the related item or ammo settings are applied (counted after a RAC1_GOTO level change). |
+| `RAC1_GIVE_ITEMS` | comma-separated item ids; unset = none | Gives Ratchet those items at the item-giving frame (RAC1_GIVE_FRAME), through the game's own item function. |
+| `RAC1_GOTO` | N@F (level number, frame; frame defaults to 60 if only N given); unset = off | At game frame F triggers the game's own level change to level N, as the debug menu's Levels tab does. |
+| `RAC1_HERO_AT` | <class>@<frame>[,dx,dy,dz[,yaw]] (several separated by /); unset = off | At that game frame places Ratchet through the game's own placement next to the first moby of that class (default offset 3 0 1, class -1 = the offset is an absolute position), without changing story flags. |
+| `RAC1_HOST_DELAY_MS` | integer milliseconds; default 0 | Makes each host frame this much longer by sleeping, to check that a slow host does not change the game's state. |
+| `RAC1_IOP_MIRROR_TEST` | `<vsync>:<n>,...` or 1; default off | Headless, without audio: drives the host's mirror of the IOP on the game's thread, rendering n frames by the mirror alone at the vsyncs listed (as during a load), and prints each change of the live streams of the game's IOP and of the mirror. |
+| `RAC1_IOP_VERIFY` | set (any value) = on; default off | Keeps the IOP mirror from ever playing alone so each of its vsync mixes can be compared with the emulated IOP's mix; the counts are reported at exit. |
+| `RAC1_KILL_AT` | game frame number; default off | At that game frame sets Ratchet's health to zero. |
+| `RAC1_KILL_UIDS` | <frame>:<uid>,<uid>,...; unset = off | At that game frame sets the state of the listed mobys (by unique id) to the dead state, so the things that watch for their death react. |
+| `RAC1_LANGUAGE` | 0 English, 2 French, 3 German, 4 Spanish, 5 Italian; unset = the game's own choice | Sets the game's language, also in headless runs. |
+| `RAC1_LEVEL` | level number; default 0 (Veldin); same as --level | Starts directly on the given level instead of the normal start. |
+| `RAC1_MENU_AT` | integer frame number; default 120 | In a scripted menu input run (simulated keys), the frame at which the simulated button press happens instead of the default, with Start also pressed at frame 120 to skip the arrival scene. |
+| `RAC1_MIRROR_DUMP` | file path; default none | With RAC1_IOP_MIRROR_TEST, writes the mirror's output (48 kHz stereo 16-bit) to the file. |
+| `RAC1_MRP_CHECK` | any value = on; default off | Checks the modern moby renderer's triangles against the CPU reference (slots and textures, in order); also turns the moby skip optimisation off. |
+| `RAC1_MRP_DIFF` | any value = on; default off | Renders the faithful image offscreen first and compares the modern pipeline's mobys against it, accumulating pixel difference statistics; the moby skip optimisation is turned off. |
+| `RAC1_MRP_LOD_KEEP_REAL` | 0 = off; default on (any other value or unset keeps it on) | Testing switch for the modern renderer's level-of-detail handling: setting it to 0 turns off the step that keeps the real scene's objects in the drawn scene, so that the drops they prevent can be seen. |
+| `RAC1_MRP_LOD_SELFTEST` | any value = on; default off | Self-check mode: runs the world shadow pass with nothing scaled, so the result can be compared against the normal path. |
+| `RAC1_MRP_LOD_VERIFY` | any value = on; default off | Verification mode: snapshots the whole EE memory and scratchpad around the world shadow pass and compares them afterwards to prove the pass changed only what it should. |
+| `RAC1_MRP_SCENE_CHECK` | any value = on; the value selftest additionally perturbs every 1000th expected vector; default off | Checking mode: the modern renderer's captured scene state is compared against what the original path produced and mismatches are reported. It also turns the skipping of the original GS/VU1 work off, since both paths must run. |
+| `RAC1_MRP_SCENE_HASH` | any value = on; default off | Computes a running hash of every scene drawn so two runs can be compared draw for draw. |
+| `RAC1_MRP_SHADOW_CHECK` | any value = on; default off | Checking mode: the modern shadow path is compared with the GS path's own shadow primitives (the GS path keeps drawing them while this is on). |
+| `RAC1_MUSIC_ON` | any value = on; default off | After a level starts, lifts the music pause at once, as closing a menu would, so music plays in scripted runs. |
+| `RAC1_NO_MOVIES` | any value = on; default movies on | Disables movie playback (the intro and story movies), so scripted runs do not wait on them. |
+| `RAC1_PACK` | integer item number; no default | Used with the double-jump simulated-input script: at frame 150 gives the character that pack item, so the script can test the jump physics. |
+| `RAC1_POKE8` | frame:address=byte pairs separated by commas, numbers decimal or 0x hex, e.g. 100:0x14bec0=1; unset = none | Writes the given bytes to EE RAM at the given frames, to set game state in scripted runs. |
+| `RAC1_RAMDUMP` | frame,filename | At the given frame writes the whole 32 MB of EE RAM plus the scratchpad to the file, for offline comparison. |
+| `RAC1_RAMHASH` | file path; unset = off | After each game frame appends per-page hashes of EE RAM and scratchpad to the file, so two runs can be compared. |
+| `RAC1_SEQ_TRACE` | integer n; default 0 (off) | During a simulated-input script, every n frames prints the hero state, position, game mode, level and bolts. |
+| `RAC1_SEQ_WATCH` | integer moby class; default off | During a simulated-input script, traces every moby of that class each frame (state, flags, position, first pvar words), plus the hero-freeze word and the active camera. |
+| `RAC1_SHOTS` | comma-separated list of frame numbers, e.g. 100,300; default none | Saves a screenshot shot_<frame>.ppm in the current directory when each listed game frame is shown, and prints a line with the game state at that frame. |
+| `RAC1_SIM_DELAY` | integer N frames; default 0 | Delays the RAC1_SIM_INPUT script by N frames (for example to skip a level's arrival scene). |
+| `RAC1_SIM_HOST` | comma-separated host input names (keys, mouse buttons, mouse axes); unset = none | Supplies the host-device inputs that the "h" keys of a menu: or title: RAC1_SIM_INPUT script press, in order. Unrecognised names are reported and skipped. |
+| `RAC1_SIM_INPUT` | script name: forward, jump, dive, turn, attack, throw, hud, quick, fire, shoot, hold, holdwalk, look, start, ship, shipskip, vendor, menu:<keys>, title:<keys> or seq:<script>; default unset = real input | Simulates the pad with a scripted input pattern. Also makes the run ignore physical gamepads so it is deterministic. |
+| `RAC1_STEPS` | integer >= 1; default 1 | In a headless run, the number of game frames run per host frame (exercises the catch-up path of a windowed run). Ignored in windowed runs. |
+| `RAC1_TITLE_HOST` | 0 or 1; unset = the title scene is drawn through the normal chain (modern or faithful) | 1 draws the title screen's scene with the older host renderers instead; 0 forces the normal chain. |
+| `RAC1_TITLE_WAIT` | integer frames; default 60 | With a RAC1_SIM_INPUT title: script, how many frames after the title appears before Start is pressed. |
+| `RAC1_UNLOCK_PLANETS` | comma-separated level numbers, e.g. 2,3,4; unset = none | At the first gameplay frame, makes those planets reachable from the ship by calling the game's own unlock routine, so the galactic map shows them. |
+| `RAC1_VENDOR_OPEN` | button bitmask (decimal or 0x hex); default 0x10 (triangle) | With the RAC1_SIM_INPUT vendor script, the button press used to open the vendor screens (for example 0x20 for circle). |
+| `RAC1_VU_SELFCHECK` | any value = on; default off | Runs each fast VU1 port and the exact port side by side and reports on stderr when their results differ; a progress line every 5000 programs. |
+| `RAC1_WORLD_MRP_CHECK` | any value = on; default off | Verification mode for the modern world renderer: it compares the triangles it builds against the CPU reference and also disables the GPU fast paths. |

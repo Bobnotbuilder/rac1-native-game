@@ -1,0 +1,152 @@
+# Input
+
+How the game reads its controller, and how the port maps a PC's keyboard, mouse and gamepads onto
+it.
+
+```mermaid
+flowchart LR
+    subgraph HOST["Host (src/host)"]
+        GP["Gamepad (GLFW,<br/>SDL controller database)"]
+        KB["Keyboard"]
+        MS["Mouse"]
+        B["Bindings<br/>(controls.txt)"]
+        PK["6-byte DualShock 2 packet"]
+    end
+    subgraph GAME["Game (ported)"]
+        PB["pad_read_packet, pad_build<br/>(src/game/input/pad_build.cpp)"]
+        ST["Pad state at 0x13c940:<br/>held, pressed, released, sticks, history"]
+        H["Hero, camera, menus"]
+    end
+    GP --> PK
+    KB --> PK
+    MS --> PK
+    B --> PK
+    PK --> PB --> ST --> H
+```
+
+## The pad as the game sees it
+
+On the PS2 the game reads a DualShock 2 through Sony's pad library. In the port the library is gone:
+each game frame the host builds the 6-byte packet a DualShock 2 returns, and the game's own code turns
+it into its pad state.
+
+**The packet** (`g_host_pad_packet`, `src/game/ovl/overlay_entry.cpp`): two bytes of buttons, active
+low, then the right stick's x and y and the left stick's x and y, each 0 to 255 with 0x7f at rest.
+The button bits:
+
+| Bit | Button | Bit | Button |
+|---|---|---|---|
+| 0x0001 | L2 | 0x0100 | Select |
+| 0x0002 | R2 | 0x0200 | L3 |
+| 0x0004 | L1 | 0x0400 | R3 |
+| 0x0008 | R1 | 0x0800 | Start |
+| 0x0010 | Triangle | 0x1000 | Up |
+| 0x0020 | Circle | 0x2000 | Right |
+| 0x0040 | Cross | 0x4000 | Down |
+| 0x0080 | Square | 0x8000 | Left |
+
+**The pad state** at 0x13c940 is filled by the ported `pad_read_packet` (0x266f50) and `pad_build`
+(0x2671b0) in `src/game/input/pad_build.cpp`. Some of its fields:
+
+| Offset | Contents |
+|---|---|
+| +0x100 to +0x10c | the sticks as floats: right x, right y, left x, left y |
+| +0x1a0 | buttons held (the left stick also sets the d-pad bits here) |
+| +0x1a4, +0x1c4 | buttons pressed this frame |
+| +0x1a8, +0x1c8 | buttons released this frame |
+| +0x1c0 | buttons held |
+
+The game applies its own dead zone: a stick byte within 0x30 of the centre reads as zero, and the
+rest is scaled to reach 1 at full deflection. It keeps a 30-frame history of presses and stick
+movements, which it uses to detect flicks and quick inputs.
+
+Which button does what in each situation (gameplay, menus, cutscenes) is decided by the game's own
+code reading these fields.
+
+## How the host builds the packet
+
+`host_input_poll` and `pad_packet` in `src/host/orig_main.cpp` read the devices through GLFW;
+`src/host/host_input.cpp` holds the bindings and turns the inputs into the packet
+(`host_input::compute`, `to_packet`).
+
+- **Gamepads.** The first joystick GLFW recognises as a gamepad is used; gamepads are polled every
+  frame, so one can be connected after the game has started. A round stick's range is mapped onto the
+  DualShock 2's square one (`stick_to_square`). The host adds no dead zone of its own: the game's
+  applies. An analog trigger counts as pressed past 0.1.
+- **The controller database.** GLFW recognises a gamepad from an SDL-format mapping. The game loads,
+  in order: `third_party/gamecontrollerdb/gamecontrollerdb.txt` (the community
+  [SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB), shipped with the source),
+  then a `gamecontrollerdb.txt` next to `controls.txt` (by default in `~/.config/rac1-native/`), then
+  the `SDL_GAMECONTROLLERCONFIG` environment variable (`load_controller_db`). A controller missing
+  from the database can be added in either of the last two places.
+- **Keyboard and mouse.** Bound like any other input. Stick directions can be bound to keys (full
+  deflection) or to mouse movement.
+- **Mouse look.** When the right stick is bound to the mouse and mouse look is on, a left click in the
+  window captures the cursor (raw motion when the system supports it); that click is not passed to
+  the game. Losing focus or opening the debug menu releases it. At sensitivity 1.0, 20 pixels of
+  movement in one game frame is a full stick deflection.
+
+### Default bindings
+
+| PS2 | Gamepad | Keyboard and mouse |
+|---|---|---|
+| Left stick | left stick | W A S D |
+| Right stick | right stick | mouse movement, I J K L |
+| Cross | A (bottom) | Space |
+| Circle | B (right) | left mouse button |
+| Square | X (left) | right mouse button, F |
+| Triangle | Y (top) | E |
+| L1 | left bumper | Q |
+| R1 | right bumper | Left Shift |
+| L2 | left trigger | Z |
+| R2 | right trigger | C |
+| L3 | left stick click | V |
+| R3 | right stick click | middle mouse button, B |
+| Start | Start | Escape, Enter |
+| Select | Back | Tab, Backspace |
+| D-pad | d-pad | arrow keys |
+
+What each button does in the game is the original's. The optional modern controls change L2 and R2
+in gameplay (see [Advanced options](advanced.md#modern-aiming)).
+
+## The bindings file, `controls.txt`
+
+The bindings are kept in `~/.config/rac1-native/controls.txt` (`$XDG_CONFIG_HOME/rac1-native/` if
+set, or the file named by `RAC1_CONTROLS_FILE`). If it does not exist, the defaults are written there
+at start. The Controls page saves it on every change.
+
+```
+mouse_sensitivity = 1
+mouse_look = 1
+invert_look_y = 0
+select = pad:back, key:tab, key:backspace
+l2 = pad:+lefttrigger, key:z
+cross = pad:a, key:space  # Jump
+right_stick_left = pad:-rightx, mouse:-x, key:j
+```
+
+- One `control = input, input, ...` line per control. A control left out keeps its default; a
+  control with nothing after `=` is unbound.
+- Inputs: `key:<name>`, `mouse:left`, `mouse:right`, `mouse:middle`, `mouse:button4` to `button8`,
+  `mouse:+x` / `-x` / `+y` / `-y`, `pad:<SDL button name>`, `pad:+<axis>` / `-<axis>`.
+- `#` starts a comment. Unknown lines are reported and ignored.
+
+## The Controls page
+
+Options > Controls (`src/game/enhance/controls.cpp`), in the pause menu and the main menu:
+
+- **Device**: Gamepad or Keyboard / Mouse, the set of bindings shown and edited.
+- One row per control: Cross, Circle, Square, Triangle, L1, R1, L2, R2, L3, R3, Start, Select,
+  D-pad, Left Stick, Right Stick.
+- **Invert Look**, **Mouse Sensitivity** (0.25 to 4), and **Reset to Defaults**.
+
+To rebind, select a row and press Cross: the page waits for every input to be released, then takes
+the next one (it gives up after 5 seconds). For the stick and d-pad rows on a gamepad, move a stick
+or press the d-pad; on the keyboard, press four keys in turn (up, down, left, right), or move the
+mouse to bind it as that stick. If the new input was already used by another control, the two swap,
+and the page says so.
+
+The bindings' column shows the connected gamepad's own labels: PlayStation symbols, Xbox's A, B, X,
+Y, LB, RB, LT, RT, or Nintendo's B, A, Y, X, L, R, ZL, ZR, recognised from the gamepad's name (with
+no gamepad connected, PlayStation's). The rows' names always use the PlayStation symbols, as the
+game does.

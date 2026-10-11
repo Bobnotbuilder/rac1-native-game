@@ -1,0 +1,512 @@
+# Lighting
+
+The game's own lighting, how the MRP reproduces it, and the optional modern lighting on top of it:
+point lights per pixel, cascaded sun shadows, ambient occlusion and an in-game light editor.
+
+> **The modern lighting is EXPERIMENTAL.** It is off by default and will stay off by default.
+> It is not yet fully usable on some planets, and it is not a porting priority: it will be
+> worked on later. With Options > Graphics > Lighting on Original (the default) the picture is
+> the original's lighting, pixel for pixel, and nothing here has any effect. The modern lighting
+> only changes the picture, never the game: it reads the game's memory and does not write to it,
+> so the game's state is the same with it on or off. It is a labelled enhancement (see
+> [Settings](settings.md)).
+
+**What it is today.** Its parts work and have been run on every level up to Umbris (Veldin,
+Novalis, Aridia, Kerwan, Eudora, Rilgar, Blarg, Umbris) without crashes or shader errors, but how
+good the result looks differs a lot between planets. Where each part comes from is described in
+[How a level is analysed](#how-a-level-is-analysed).
+
+- **The sun** is the light the game itself lights Ratchet with in the zone where he stands: the
+  hero's light sets, turned and faded as he moves from one zone to the next. It is not a fixed
+  per-level direction. Where the zone's light does not come from above, there is no sun and no sun
+  shadows there.
+- **The objects that glow** (lamps, screens, strips) are bright textures in the game, not lights.
+  When a level loads they are found automatically and turned into small point lights. This is
+  our own heuristic, not game data, and it can be wrong (see the table below).
+- **Lights placed by hand** with the [light editor](#the-light-editor) cover what the automatic
+  search can't find. No light files are shipped with the project.
+
+**State per level** (what the project's own survey found, levels 0 to 7, with the lighting set to
+Medium, point-light shadows and ambient occlusion on). "Works" means no crash, no artefact worth
+noting and shadows where they should be; it does not mean every lamp is lit.
+
+| Level | State |
+|---|---|
+| Veldin | Works. A low, warm sun outdoors; the lighting follows Ratchet into his house (a different light set). Glowing panels are found. |
+| Novalis | Works. Sun checked against the level's look. Few automatic lights. |
+| Aridia | Works. |
+| Kerwan | Works. Few automatic lights. |
+| Eudora | Works. The heaviest level for the lighting (its forest has many shadow casters; roughly twice the frame time of the lighting off in the survey, on an integrated GPU). Trees and woodwork glow bright orange in the textures: they are recognised as materials and not turned into lights. |
+| Rilgar | Works. Same warm-material handling as Eudora. |
+| Blarg (Nebula G34, Blarg's station) | **Still a mess.** Playtesting found some zones pitch dark. The station's closed zones are lit by a light that reaches the floor only through the geometry above it, so the sun's shadow covers the whole zone and darkens it. The likely cause is known but not fixed. The hangar has only a faint, low blue sun. |
+| Umbris | Works outdoors: the dead trees cast long shadows. Near the lava the zone's light comes from below, so there is no sun there and the shadows fade out. No automatic lights are found on this level. |
+
+Levels after Umbris have not been surveyed. Until a planet has been through this analysis and a
+playtest, the modern lighting may look wrong there: shadows from a doubtful sun, a zone far too
+dark, or lamps that cast no light.
+
+This page assumes the renderer described in [Rendering](rendering.md). Code paths are under
+`src/game/render/` unless stated.
+
+## The original game's lighting
+
+The PS2 game has no per-pixel lighting. Everything is lit per vertex, and much of it is baked.
+
+**The data.** The level data provides up to 12 sets of directional lights; the level load copies
+them to a table at 0x17fec0 (0x40 bytes a set) (`src/game/ovl/level_load.cpp`). One more set is
+rewritten every frame by `level_lights_update` (0x23e890, `src/game/ovl/effect_light.cpp`), turned
+with the camera. Beside them sit **8 dynamic point-light slots** (0x1802c0): a colour, an intensity,
+a position and a radius each. Explosions, weapons and some effect objects take a slot with
+`light_add` (0x23e738), which refuses when the frame is heavily loaded. `light_assign` (0x23ea10)
+then writes the light's index into a spare nibble of each overlapping terrain piece, moby and shrub.
+
+**Mobys.** For each moby, the moby draw loop (0x2559c0, `src/game/ovl/moby_draw.cpp`) builds an
+8-row light record: one directional light set (or two blended by a factor), plus the point lights
+that reach the moby summed into a third direction and colour, back-light factors and an ambient
+colour. The VU1 program then lights each vertex:
+
+```
+d   = max(L · n, -|back| * d)          for each of the three lights
+c   = sum(colour * d) * q + ambient
+```
+
+followed by the EE's fixed-point colour step.
+
+**The world.** tfrag, tie and shrub colours are lit on the EE and VU0 into the level's data
+(`world_tfrag_lighting` 0x295350, `world_tie_lighting` 0x297728, `world_shrub_lighting` 0x288908 in
+`src/game/ovl/world_lighting.cpp`, with the VU0 program in `world_light_vu0.cpp`): a base colour, a
+normal from two angle bytes, a blend of light sets, and the point lights named in the piece's
+nibbles. This runs at level load and again, per frame, for the visible pieces, so a nearby explosion
+lights the ground through the vertex colours.
+
+**Fog** is computed per vertex (the VU programs' fog byte) and blended with the fog colour in the
+GS. **Drop shadows** are shadow volumes counted in the frame's alpha channel.
+
+### How the MRP reproduces it
+
+By default (Options > Graphics > Lighting > Original) the MRP draws exactly this:
+
+- **Mobys:** `mrp_scene` captures each moby's 8-row light record from the ported moby pass, and the
+  moby vertex shader (`mrp_moby_renderer.cpp`) evaluates the formula above per vertex, including the
+  fixed-point colour step.
+- **World:** the lit colours the ported EE code wrote are mirrored to the GPU; only the instances
+  whose colours changed are uploaded each frame (`resident_colours_update` in `mrp_world_static.cpp`,
+  `tfrag_colours_update` in `mrp_tfrag_gpu.cpp`).
+- **Fog** per vertex as the VU programs compute it, blended in the fragment shader as the GS does.
+- **Drop shadows** with a stencil counter in place of the alpha channel (`mrp_shadows.cpp`).
+
+The modern lighting's code lives only in separate shader variants (`SH_POINTS` for the world,
+`SH_SPLIT` for mobys). With the lighting off, the original programs are bound unchanged, because
+adding even inactive code to them changed the rounding of a few pixels.
+
+## What the modern lighting adds
+
+| Feature | What it does | Applies to |
+|---|---|---|
+| Sun shadows | Cascaded shadow maps from the zone's own key light (the one that lights Ratchet) | world and mobys, cast and received |
+| Static shadow cache | The world's shadow casters drawn once per cascade and reused | performance |
+| Point lights per pixel | The game's own point lights lit per pixel, plus automatic emitters | the world |
+| Point lights per screen tile | Each pixel only walks the lights that reach its tile | performance |
+| Point-light shadows | Cube shadow maps for the nearest point lights | world and mobys |
+| Shadow distance and fade | How far mobys cast; far casters' shadows lighter | sun shadows |
+| Ambient occlusion | Screen-space darkening where surfaces meet | the 3D |
+| Light editor | Lights placed by hand, saved per level | the world |
+
+The whole module is active only when Lighting is not Original, the MRP draws both the world and the
+mobys, and the shared projection is in use: in practice during gameplay, not on the title screen, in
+menus or during fades (`mrp_lighting_shadow_pass`).
+
+## The frame with modern lighting
+
+```mermaid
+flowchart TD
+    A["Game update (ported code)"] --> B["Scene worker: world scene,<br/>off-view casters, colour mirrors"]
+    B --> C["mrp_lighting_frame_begin"]
+    C --> D["mrp_moby_prepare<br/>(includes cached off-screen casters)"]
+    D --> E["mrp_lighting_shadow_pass"]
+    subgraph SP["shadow pass"]
+        E1["fit the 3 cascades, gather point lights"] --> E2["per cascade: refresh the static cache if needed,<br/>copy back last frame's moby rectangle,<br/>draw the mobys scissored to this frame's"]
+        E2 --> E3["point-light cube shadows<br/>(up to 4 cubes x 6 faces)"]
+        E3 --> E4["point lights per tile<br/>(CPU, 32 x 18 mask texture)"]
+    end
+    E --> E1
+    E4 --> F["World and sky: SH_POINTS variant<br/>(sun shadow, point lights, fade)"]
+    F --> G["Mobys: SH_SPLIT variant<br/>(sun shadow on the key light)"]
+    G --> H["mrp_lighting_ao_pass (SSAO)"]
+    H --> I["GS replica: effects, particles, 2D"]
+```
+
+There is no depth prepass and no compute-shader light culling; the order above is the `draw` step in
+`src/host/orig_main.cpp`.
+
+## How a level is analysed
+
+This section says where the modern lighting's sun, lights, emitters and shadows come from. Everything
+is read from the game's data in EE memory after the level has loaded. The exceptions are labelled
+as our own choices: the thresholds, the automatic lights and the lights placed by hand. None of it
+changes the game's state. The code is `mrp_lighting.{h,cpp}` (sun, shadows, per-pixel lights,
+occlusion), `mrp_world_renderer.cpp` (`build_emitters`, the automatic lights) and
+`mrp_world_static.cpp` (off-view shadow casters).
+
+### The game data used
+
+Addresses are those of Veldin's overlay; they are relocated for each level's own overlay.
+
+| What | Where | Written by |
+|---|---|---|
+| **Directional light sets**: 16 x 0x40 bytes | 0x17fec0 | the level load, from the level's light block |
+| per set: colour 1 (rgb; w = back-light factor), direction 1, colour 2, direction 2 | +0x00 / +0x10 / +0x20 / +0x30 | |
+| **Light sets a moby uses**: set A, set B, blend weight (/256) | moby +0x38, +0x39, +0x3a | the game, per zone |
+| **The game's point lights**: 8 slots x 0x20 (colour, position at +0x10, radius at +0x1c) | 0x1802c0 | `light_add` (0x23e738): explosions, weapons, level lights |
+| slot in use (non-zero) | 0x1804c0 + 0x30 * i + 0x10 | |
+| **The world's vertex colours** (lighting already computed by the game) | tie: instance data +0x40 (64 RGBA); tfrag: per vertex | the game's world lighting routines |
+| geometry and textures of tie, shrub and tfrag | the level's assets and their copies in EE memory | `tools/setup.py` |
+
+A light set's direction is the direction the light **travels**; the direction toward the sun is its
+opposite.
+
+### The sun
+
+The sun is not invented. It is the directional light the game uses to light **Ratchet in the zone
+where he stands**.
+
+1. **The hero's sets.** Read set A, set B and the weight from the hero's moby (the first one in the
+   list, `*(0x15ffd8)`). A set number above 15 means "none" and set 0 is used.
+2. **The sun of one set** (`set_sun`). Of the set's two lights, take the **brightest one that comes
+   from above**, that is, whose direction toward the light is at least about 11.5 degrees above the
+   horizon (z >= 0.2). Brightness is the largest of the colour's r, g, b. The shadow's weight is
+   that light's brightness divided by the brightest light in the set, so a dim light gives faint
+   shadows. If neither light comes from above, the set has **no sun**.
+3. **Blend.** If both sets have a sun, direction and weight are blended with the game's weight
+   (+0x3a / 256). If only one has, its weight is scaled by its share of the blend.
+4. **Transitions.** When the zone changes, the direction turns at most **1 degree a frame** and the
+   weight changes at most **1/30 a frame**. In a zone without a sun the shadows fade out in about
+   half a second instead of vanishing. At weight 0 the cascades are not drawn, and the characters
+   get the original game's drop shadows back.
+5. **Overrides for testing:** `RAC1_SUN_DIR=x,y,z` forces a sun, `RAC1_SUN_LEVEL=1` always uses
+   light set 0 (the old way), and `RAC1_SUN_TRACE=1` prints the hero's sets and a census of the
+   sets the level's mobys use.
+
+What the levels up to Umbris give (direction toward the sun):
+
+| Level | Hero's set at the start | Sun |
+|---|---|---|
+| Veldin | 0 outside (1 in his house) | (0.40 -0.85 0.34), low and warm |
+| Novalis | 0 | (0.78 -0.32 0.54) |
+| Aridia | 0 | (0.89 0.32 0.34) |
+| Kerwan | 0 | (0.82 -0.05 0.57) |
+| Eudora | 0 | (-0.72 -0.58 0.38) |
+| Rilgar | 0 | (-0.90 -0.35 0.27) |
+| Blarg | 0 in the hangar (its main light comes from below), 2 to 8 in the other zones | hangar: the second light, low (12 degrees) and blue, weight about 0.5 |
+| Umbris | 0 outside; 5 / 6 near the lava (light from below) | (-0.92 0.01 0.40); no sun near the lava |
+
+### The sun's shadows
+
+- **Cascades.** Three cascaded shadow maps, split at 18 / 60 / 220 units from the camera, at
+  1024 / 2048 / 4096 texels for Low / Medium / High. At High only the near cascade is 4096. Each
+  cascade covers the bounding sphere of its slice of the view, snapped to the texel grid so that
+  it does not shimmer.
+- **What casts.** Whatever the frame draws, plus objects **outside the view**: tie, shrub and tfrag
+  instances inside a "capsule" that starts at each cascade and extends toward the sun up to a cut
+  plane 400 units from the camera (`caster_volume`). Mobys cast from the frame; those that leave the
+  view stay in a cache while they are alive, of the same class, and still.
+- **Static cache.** Each cascade's static world is drawn once into a map covering 1.25 times its
+  slice, and redrawn only when the slice leaves that box. Each frame the map is copied and the mobys
+  are drawn on top, copying back only the rectangle where mobys were.
+- **Receiving.** A 3 x 3 PCF filter with a normal-offset bias. A shadow darkens the world by 55 %
+  (`RAC1_SHADOW_STRENGTH`). For mobys the shadowed colour is the one the game would give **without**
+  the key light (shader variant `SH_SPLIT`).
+- **Far shadows are lighter.** For a pixel in shadow the shader finds the depth of the blockers.
+  Within 25 units along the ray the shadow is full; then it lightens to 35 % at 120 units and
+  beyond (`RAC1_SHADOW_FADE=0` turns it off).
+- **Shadow Distance.** Beyond 40 / 80 / 140 units, or with no limit, mobys cast no sun shadow.
+
+### The game's lights, per pixel
+
+- **Which.** Each frame the 8 slots at 0x1802c0 are read. Those in use with a colour and a radius
+  become per-pixel lights with the game's own formula: colour x 0.5 x max(n . l, 0) x (1 - d / radius).
+- **Held vertex colours.** The game already adds these lights into the world's vertex colours. So
+  that they are not counted twice, while one of them is lit the vertex colours from before are kept
+  (`mrp_lighting_points_freeze`). This starts only after the level's colours have been read at
+  least once; on Blarg a light on from the first frame otherwise left the world with no colours.
+- **Long-lit lights belong to the level.** A light that has been on for more than **90 frames in a
+  row** (Blarg's purple lamp) is the level's: it is left to the game's vertex colours, as on the PS2.
+  It gets no per-pixel light, no shadow, and its colours are not held. Explosions and shots are
+  short, so they stay per pixel.
+
+### The automatic emitters (our choice)
+
+When a level starts, the textures of the world are searched for glowing surfaces (lamps, panels,
+strips).
+
+1. **Sampling.** For each triangle of a tie (the class's LOD 0 geometry) and of a tfrag (the "near"
+   copy of its data, rebuilt with the CPU version of the VU1 program and an identity view), take
+   7 texture points: the three vertices, the three edge midpoints and the centre.
+2. **A glowing texel** has value (max of r, g, b) >= 0.8, saturation >= 0.55 and alpha >= 0x40. A
+   triangle glows with at least 4 of 7 points for ties, 2 of 7 for tfrags (the strips are thin).
+3. **A tfrag's texture** comes from the CLAMP_1 register of the texture change (its MINV field holds
+   the level texture's index).
+4. **Material, not lamp.** If a tie class, or a tfrag texture, glows over **more than 35 %** of its
+   surface **in a warm colour** (hue outside 165 to 260 degrees), it is a material (orange trees,
+   wood, paint). Cool colours on large surfaces stay lights: screens, glass, energy, the cyan
+   panels of Ratchet's house.
+5. **Grouping.** Glowing triangles are grouped in cells of 4 units; for ties at most the 12
+   largest cells per class. Each cell becomes a light, repeated for every instance of the class with
+   its matrix. The colour is the mean of the texels. Intensity is clamp(0.35 + 0.25 * sqrt(area),
+   0.35, 0.9) and radius clamp(2 + 3 * sqrt(area), 2, 7). Tfrag lights sit 1.5 units above the surface.
+6. **Merge and density.** Nearby lights are merged in cells of 3 units. If more than 88 remain within
+   60 units of one light, the cell grows (x1.5, up to 24 units). So near the camera there are never more than the shader
+   lights (96) and no light switches on or off as the camera turns.
+7. **Each frame.** The lights within 60 units are taken, nearest first, with a 6-unit fade at the edge.
+8. **Hand corrections.** In the debug menu's Lights tab, section "Automatic emitters", each class
+   found has a switch. A class turned off goes into the level's file as `noauto <class>`.
+
+Automatic lights found per level (before merging):
+
+| Level | Lights (before the merge) |
+|---|---|
+| Veldin | 153 (372) |
+| Novalis | 63 (66) |
+| Aridia | 170 (192) |
+| Kerwan | 30 (89) |
+| Eudora | 208 (555) |
+| Rilgar | 383 (1190) |
+| Blarg | 110 (1399) |
+| Umbris | 0 |
+
+### Lights placed by hand (our choice)
+
+Made in the debug menu (F1, Lights tab) and saved in `data/lights/level<NN>.txt`; see
+[The light editor](#the-light-editor). They are positions and colours chosen by us, with nothing
+taken from the disc. They are lit like the automatic ones and ahead of them.
+
+### Point-light shadows, per-pixel cost and occlusion
+
+See [Point-light shadows](#point-light-shadows), [Per screen tile](#per-screen-tile) and
+[Ambient occlusion](#ambient-occlusion) below. In short: up to 4 cube shadow maps of 512 px (the
+game's lights first, then emitters that have a moby within reach); a 32 x 18 tile grid with a
+96-bit light mask per tile; and a depth-only SSAO of 12 samples.
+
+### Guarantees
+
+- **Off means original.** With Lighting on Original the original shaders are bound unchanged; all
+  new code is in separate variants. The image is identical pixel for pixel, checked at each change.
+- **The game's state never changes.** The modern lighting reads the game's memory and does not
+  write it. The one exception is the debug light editor's "Ratchet to it" (see below).
+- **Test switches:** sun: `RAC1_SHADOWS`, `RAC1_SHADOW_RES`, `RAC1_SUN_DIR`, `RAC1_SUN_LEVEL`,
+  `RAC1_SUN_TRACE`; lights: `RAC1_POINTS`, `RAC1_POINT_SHADOWS`, `RAC1_AUTO_LIGHTS`,
+  `RAC1_LIGHTS_TRACE`, `RAC1_LIGHTS_DIR`; shadows: `RAC1_SHADOW_CACHE`, `RAC1_SHADOW_FADE`,
+  `RAC1_SHADOW_MOBY_DIST`; occlusion: `RAC1_AO`. The Graphics menu sets the same values; an
+  environment variable, when present, wins.
+
+## Sun shadows: cascaded shadow maps
+
+**The sun** is the light the game lights the hero with in his current zone, with its weight
+(`sun_direction` and `set_sun` in `mrp_lighting.cpp`); [How a level is analysed](#the-sun) gives the
+steps. It turns at most 1 degree a frame and its weight changes at most 1/30 a frame when the hero
+changes zone, and where there is no sun the cascades are not drawn. `fit_cascades` takes the result
+each frame.
+
+**Cascades** (`fit_cascades`). Three cascades in a `GL_DEPTH_COMPONENT32F` 2D array texture, with
+the view split at 18, 60 and 220 units from the camera. Each slice starts at 0.9 times the previous
+one's far distance, so they overlap. Each cascade covers its slice's bounding sphere with an
+orthographic light box whose centre is snapped to whole texels, so the shadows do not shimmer as the
+camera moves. The box reaches 400 units toward the sun beyond the slice, so tall objects outside the
+view still cast into it. Instead of clamping depth, one clip plane per caster pass cuts what lies
+further than that toward the sun.
+
+**Resolution** (Options > Graphics > Lighting): Low 1024, Medium 2048, High 4096 texels. At High,
+only the nearest cascade is 4096; the two far ones are 2048, drawn into a corner of their layer.
+
+**Casters.** Depth is drawn with a polygon offset. Nothing extra is stored per vertex: the shader
+rebuilds each vertex's world position from the camera's clip coordinates and projects it again with
+the cascade's matrix.
+
+- **The world.** Opaque batches use a depth-only program; alpha-tested ones (foliage, fences) use the
+  full program and discard the pixels that fail the alpha test, so cut-outs cast cut-out shadows.
+  Ties, shrubs and terrain outside the view but inside a cascade's volume (a capsule along the sun)
+  are found by host copies of the passes' culls, built on the scene worker thread
+  (`static_shadow_build` and `CasterVolume` in `mrp_world_static.cpp`, `tfrag_shadow_decide` in
+  `mrp_tfrag_gpu.cpp`). A shadow caster is always drawn as its whole model, never clipped.
+- **Mobys** (`draw_casters` in `mrp_moby_renderer.cpp`). Mobys on screen cast with their current pose.
+  A moby that has left the screen keeps casting from a cache of its last drawn pose, within 400 units
+  of the camera, until it dies, moves or changes class. A moby never drawn does not cast.
+
+**Receivers** (`sh_prepare`). Each pixel takes the flat face normal from screen-space derivatives,
+applies a normal-offset bias (1.5 texels along the normal, 1 along the sun), finds the first cascade
+that contains it, and blends into the next over a narrow band at the edge. Filtering is 3x3 PCF with
+hardware depth comparison and bilinear taps.
+
+How a shadow darkens differs between the world and the mobys:
+
+- **The world's** colours are baked vertex colours, which do not say how much of them came from the
+  sun. The shadow removes a share of the light: `colour * (1 - 0.55 * (1 - visibility) * facing)`,
+  where `facing` fades the shadow on surfaces turned away from the sun. The 55 % is an estimate.
+- **Mobys** are lit per vertex from their light record, so the `SH_SPLIT` vertex shader also computes
+  the colour without the key light. The fragment shader mixes the two by the shadow's visibility,
+  which is exactly the original's formula with the sun blocked.
+
+The sky is never shadowed. With modern lighting on, the original drop shadows are not drawn: the real
+shadows replace them.
+
+### The static shadow cache
+
+Re-drawing the whole world into three cascades every frame is the main cost of shadows. The world's
+casters do not move, so each cascade keeps them in a texture of its own (`State::Cache`), drawn into
+a box 1.25 times larger than the cascade needs. They are redrawn only when:
+
+- the slice's sphere leaves that larger box;
+- the level, the level of detail, the resolution or the sun direction changes;
+- the cache was drawn before the off-view casters had been built.
+
+Each frame, `glCopyImageSubData` copies back only the rectangle last frame's mobys covered (or the
+whole map after a refresh), and the mobys are drawn scissored to this frame's rectangle. If the
+driver lacks `glCopyImageSubData`, the cache turns itself off. The off-view casters are only built
+when a cascade is about to need them: when its slack is running out given the camera's speed.
+
+## Point lights per pixel
+
+**Where the lights come from**, at most 96 in all (`mrp_lighting_shadow_pass`):
+
+1. **The game's own 8 point-light slots**, whenever a slot is in use: explosions, weapon fire, effect
+   lights. These are the same lights the original lights its vertices with. A light that has been
+   on for more than 90 frames in a row is the level's own and is left to the game's vertex colours.
+2. **Lights placed by hand** with the light editor (below), within 60 units of the camera, with an
+   optional flicker.
+3. **Automatic emitters**, found once per level in the ties' and terrain's own textures
+   (`build_emitters` in `mrp_world_renderer.cpp`), as described in
+   [How a level is analysed](#the-automatic-emitters-our-choice). Per frame, the ones within 60
+   units are used, nearest first, faded in and out at the edges of that range so they do not pop.
+
+**Shading** (`sh_points` in the shader code of `mrp_lighting.h`): each light adds
+`colour * max(N · L, 0) * (1 - d / r) * 0.5 * shadow` to the pixel, with N the flat face normal from
+derivatives. This is the world only. Mobys keep the game's own 8 lights per vertex, as in the
+original, and are not lit by emitters or hand-placed lights.
+
+While any of the game's short-lived lights is active, the world's per-vertex colours on the GPU are not
+refreshed (`mrp_lighting_points_freeze`), so the same light is not added twice: once baked by the
+original into the vertex colours, once per pixel.
+
+### Per screen tile
+
+Walking 96 lights for every pixel is wasteful when most lights are small. Every frame the CPU cuts the
+view into 32 x 18 tiles and projects each light's bounding sphere onto them (`point_tiles_update`):
+a light behind the camera is skipped, one straddling the camera plane covers every tile. The result
+is a 96-bit mask per tile in an `RGBA32UI` texture. The fragment shader projects its position to find
+its tile and walks only that tile's bits (`findLSB`). There is no per-tile limit.
+
+### Point-light shadows
+
+With Dynamic Shadows on, up to 4 point lights cast shadows into a cube-map array (512 x 512 faces,
+32-bit float depth; `point_shadows_pass`). The game's own lights come first, nearest first; they
+are cast by the world and the mobys. Emitters and hand-placed lights fill the remaining cubes, but
+only when a moby is within their reach, and they are cast by mobys only. These fade in and out over 8 frames as cubes are
+reassigned. Sampling uses 4 taps.
+
+## Shadow distance and the fade of far casters
+
+**Shadow Distance** (Options > Graphics): Low, Medium, High or Maximum, 40, 80 or 140 units or as far
+as the cascades reach. It decides how far from the camera mobys cast into the sun's shadows. It does
+not affect the world, nor the point-light shadows. A moby's shadow appears without a fade at that
+distance.
+
+**The fade of far casters.** Real sun shadows from tall structures can stretch very far and look
+heavy where the original had none. For a shadowed pixel the shader reads the mean depth of the
+blockers around it (3 x 3 taps, without hardware comparison) and so knows how far the caster is. The
+shadow keeps its full strength up to 25 units from its caster and lightens to 35 % at 120 units and
+beyond. It applies to the world and the mobys.
+
+## Ambient occlusion
+
+Options > Graphics > Ambient Occlusion (`mrp_lighting_ao_pass`) is a screen-space ambient occlusion
+pass, run after the mobys and before the GS replica's effects, particles and 2D (so those get none):
+
+1. The depth buffer is copied to a texture, at the 3D's own resolution (the render-scale buffer when
+   scaling).
+2. For each pixel: the world position from the inverse view-projection, the face normal from
+   derivatives, then 12 cosine-weighted samples in the hemisphere, 0.9 units in radius scaled between
+   15 % and 100 %, rotated per pixel by interleaved gradient noise. A sample counts as occluded when it
+   lies behind the stored depth, with a range falloff.
+3. `AO = 1 - 0.7 * occluded / 12`, written to an 8-bit target, then blurred 5 x 5 with taps limited to
+   similar depths so the darkening does not bleed across edges.
+4. The frame's colour is multiplied by it; the sky is left alone.
+
+## The light editor
+
+The modern point lights can be placed by hand, as art choices that are labelled as such and not
+part of the original. The editor is in the debug menu (Lights tab), so it needs the debug tools (see
+[Settings](settings.md#debug-tools)).
+
+- Lights can be added at Ratchet's position or the camera's, moved, duplicated and deleted, and each
+  has a position, colour, intensity, radius, flicker amount and an on switch. On-screen markers show
+  them, and the selected light pulses.
+- "Ratchet to it" moves Ratchet to the selected light. Unlike everything else on this page, this does
+  change the game's state: it is a debug tool.
+- Lights are saved per level in `data/lights/levelNN.txt` (relative to the working directory;
+  `RAC1_LIGHTS_DIR` changes the directory), one light per line:
+  `light x y z  r g b  intensity radius flicker on`, with `#` for comments.
+- A level's file is loaded when the level's first shadow pass runs, and hand-placed lights are only
+  used with Secondary Lights set to All. No light files are shipped with the project.
+
+## Settings
+
+All on Options > Graphics (`src/game/enhance/graphics.cpp`). They are kept in the graphics
+preferences and in each save's `save<N>.pc` (see [Settings](settings.md)). The New Game's Modern mode
+does not turn the lighting on.
+
+| Row | Values | Default | Controls |
+|---|---|---|---|
+| Lighting | Original, Low, Medium, High | Original | the whole module; the sun shadow maps' resolution (1024, 2048, 4096) |
+| Shadow Distance | Low, Medium, High, Maximum | Maximum | how far mobys cast sun shadows (40, 80, 140 units, or as far as the cascades reach) |
+| Dynamic Shadows | Off, On | Off | point-light cube shadows |
+| Secondary Lights | Off, Game's, All | All | Game's: the game's point lights per pixel; All: also automatic emitters and hand-placed lights |
+| Ambient Occlusion | Off, On | Off | SSAO |
+
+The other rows take effect only when Lighting is not Original.
+
+For testing, environment variables override each of these (they need `--debug-tools`):
+`RAC1_SHADOWS`, `RAC1_SHADOW_RES`, `RAC1_SHADOW_MOBY_DIST`, `RAC1_POINT_SHADOWS`, `RAC1_POINTS`,
+`RAC1_AUTO_LIGHTS`, `RAC1_AO`, and finer ones such as `RAC1_SHADOW_STRENGTH`, `RAC1_SHADOW_SPLITS`,
+`RAC1_SUN_DIR`, `RAC1_SHADOW_CACHE`, `RAC1_SHADOW_FADE`, `RAC1_AO_RADIUS`, `RAC1_AO_STRENGTH`,
+`RAC1_POINT_TILES` and `RAC1_SHADOW_DEBUG` (1 shows the cascades, 2 the shadow visibility, 3 the
+point-light term alone).
+
+## Performance
+
+The choices above were made to keep the cost low on an integrated GPU: the static cache per
+cascade, the depth-only program for opaque casters, a 2048 far cascade at High, off-view casters
+built on a worker thread only when needed, and lights culled per screen tile.
+
+From the project's measurements at 1920x1080 on a shared machine with an integrated Radeon 890M
+(host frame time, average; noisy by 1 to 2 ms):
+
+| Setting | Before the optimisations | After |
+|---|---|---|
+| Lighting off | 7 to 8 ms | |
+| Medium | about 15 ms | about 11.6 ms |
+| High with Dynamic Shadows | 22.4 ms | 13.0 ms |
+| One cascade | 1.7 ms | 0.5 ms (far cascades 0.45 ms; the near one at High about 2.5 ms) |
+| Per-pixel point lights (GPU) | about 6 ms | about 1 ms with tiles |
+| Ambient occlusion (GPU) | | about 2 ms |
+
+Finding the automatic emitters costs 16 to 25 ms once per level.
+
+## Limits
+
+- At most 96 point lights in all, at most 4 with shadows, and hand-placed lights, emitters and cube
+  shadows only within 60 units of the camera.
+- Mobys get no per-pixel point lights and are not lit by emitters or hand-placed lights.
+- Emitters' cube shadows are cast by mobys only.
+- The world's sun shading is an estimate (55 % of the light removed, scaled by facing); the mobys'
+  is exact.
+- Normals are flat face normals, so per-pixel point lighting is faceted on coarse geometry.
+- A moby never drawn does not cast; an off-screen moby casts its last drawn pose.
+- Shadow Distance has no fade at its limit.
+- Casters further than 400 units toward the sun are cut.
+- While any of the game's short-lived point lights is active, the world's vertex colours are held as they were.
+- The intensity value of the game's point lights is not used per pixel; only their colour and radius.
+- Lighting is not applied on the title screen, in menus or during fades.
+- A zone whose key light comes from below or the horizon has no sun shadows, and a closed zone lit
+  through geometry can come out far too dark (Blarg, known and not fixed).
+- The automatic lights are a heuristic: some lamps are missed, and a bright coloured material can be
+  taken for a lamp or the reverse.

@@ -1,0 +1,103 @@
+# Enhancements
+
+The port's first goal is fidelity: the game behaves as the original, proved function by function
+(see [Overview](overview.md)). This page lists the improvements that sit **on top of** that faithful
+port: those you can already turn on, and those planned for after the port is complete.
+
+## The rules
+
+- **Optional and off by default.** Anything that changes how the game plays or what its state is
+  (controls, movement, the camera, pausing) is an enhancement. It is off unless you turn it on, and
+  labelled as a change to the game. With every enhancement off, the game plays as the original.
+- **Removing the PS2's compromises is a different thing.** Frame-rate drops, fades that hid disc
+  loading, aggressive level of detail and draw distances, low texture resolution and the 4:3 frame
+  were there because of the console, not the game's design. The port removes them where it can do so
+  without changing the game's state, and keeps the original's way as an option.
+- **The faithful path stays.** No enhancement replaces the original behaviour; it remains in the code
+  as the reference.
+- **Checked against the faithful path.** An enhancement that should not change the result (a faster
+  renderer, a higher level of detail) is compared with the faithful path on the same frames: the
+  game's state must stay identical. One that changes the result on purpose must leave the faithful
+  result untouched when it is off.
+- **After the faithful port.** An enhancement comes once the part of the game it touches is fully
+  ported, not before.
+- **Nothing from the disc is distributed.** Enhancements that need game data (such as HD textures)
+  generate it on your machine from your own disc, like the setup does.
+
+## Available now
+
+### Gameplay: Options > Advanced
+
+See [Advanced options](advanced.md).
+
+- **Quick Select: Pause.** The world holds still while the quick select is open, as in the later
+  games.
+- **Movement: RAC 3.** Ratchet moves as in *Ratchet & Clank: Up Your Arsenal*: the run follows the
+  stick's tilt, he turns and stops quicker, and L2 or R2 held makes him strafe.
+- **Aiming: Modern.** A modern shooter's aim built on the strafe: L2 aims, R2 fires, the right stick
+  turns the aim. It needs Movement: RAC 3.
+
+All three work on every level. The page also has **Fades** (Fast by default, Original as an option),
+which is a removed compromise rather than an enhancement.
+
+### Graphics: Options > Graphics
+
+See [Settings](settings.md#graphics) and [Rendering](rendering.md).
+
+- **Widescreen**: 16:9 or the window's own shape for the 3D, with black bars or stretched when the
+  shape differs. The game itself still sees its own 4:3 view, so its state is unchanged.
+- **Render resolution** from half to double the window's, and a **field of view** scale.
+- **Level of detail** from Original to Maximum: objects keep their best model further away, without
+  changing the game's own decisions.
+- **Full textures at every distance** (the default): every mip level of every texture is kept, so
+  distant objects stay sharp. The PS2's own mip choice remains available.
+- **A frame-rate cap** for the picture (the game's logic always runs at 60 frames a second).
+
+### Modern lighting
+
+See [Lighting](lighting.md). Off by default (Lighting: Original).
+
+- The sun's shadows, cast and received by the world and the objects.
+- The game's own dynamic lights (explosions, weapons) lit per pixel, and light emitters found
+  automatically in the levels' glowing textures (lamps, panels, floor strips), with their shadows.
+- Ambient occlusion.
+
+### Original, Modern or Experimental mode
+
+At New Game the game asks which set of defaults to start with: Original (the PS2's picture and
+controls), Modern (widescreen, higher level of detail, the Advanced options on) or Experimental
+(Modern plus the modern lighting at its highest). Everything can be changed later. See [Settings](settings.md#original-modern-or-experimental-mode).
+
+## Planned
+
+In no fixed order. Each one is optional, and off by default if it changes the game.
+
+### Picture
+
+- **A widescreen HUD.** Today the HUD and the menus stay 4:3 in the middle of a wide screen. The plan
+  is a HUD laid out to use the extra width: its elements (health, bolts, ammo, the weapon icon)
+  placed toward the screen's edges and corners, as games designed for widescreen do. Only where they
+  are drawn changes; what they show stays the game's own.
+- **The rest of widescreen**: a vertical field-of-view scale, and every effect culled against the
+  wider view.
+- **Higher frame rates.** The game runs its logic at 60 Hz, and many of its timers count frames. The
+  safe route is to draw extra frames *between* two logic frames, interpolating positions, the camera
+  and the animation poses, with the logic untouched.
+- **HD textures**: for example upscaled textures, either generated on your machine from your own
+  disc by a tool, or made by modders. The renderer would load a replacement by the original
+  texture's fingerprint and fall back to the original.
+- **Antialiasing and post-processing**: bloom, colour grading, depth of field, motion blur, each a
+  separate toggle.
+- **More modern lighting**: lights placed by hand where the automatic ones fall short, labelled as
+  our own art choices.
+
+### Game
+
+- **Cut content, optionally brought back**: things the game carries on the disc but never shows.
+- **A language switch** offering every language on the disc, without the console's system setting.
+- **Quality of life**: a level select and similar conveniences for players, a mod loader later.
+
+### Platforms
+
+- **Windows and macOS builds**, and other graphics back ends behind the renderer.
+- **Other releases of the game** (such as the European one) once the North American one is complete.

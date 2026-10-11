@@ -1,2 +1,144 @@
-# rac1-native-game
-Ratchet And Clank 1 (PS2) Native Port
+# rac1-native
+
+> **Current state:** apart from a few small bugs and glitches, the game is playable without major
+> problems up to **Umbris** (included). On arrival at **Batalia** the game crashes, because the
+> functions it needs there are not ported yet. Everything after Umbris is work in progress.
+> See [Status](docs/status.md).
+
+A native PC port of **Ratchet & Clank** (PlayStation 2, 2002), for Linux.
+
+The game's own code is ported to C++, function by function, from the original North American release
+(`SCUS-97199`), and each port is proved against the original code. It is not an emulator: all of the game's
+code, the PS2's vector-unit microcode included, runs as native C++ while you play. The 3D is drawn by a native OpenGL renderer from the game's own decisions, which
+makes widescreen, high resolutions, full-detail textures and longer draw distances possible without
+changing how the game behaves.
+
+<!-- Screenshot: to be added. -->
+
+## Status
+
+**Milestone 1 is reached: the game is playable up to Umbris.** Veldin, Novalis, Aridia, Kerwan,
+Eudora, Rilgar, Blarg / Nebula G34 and Umbris, the eight planets, have been played through, apart from a few small bugs
+and glitches. Batalia crashes on arrival (functions not ported yet); the planets after it are only partly
+ported or not yet. The port as a whole is still in progress. See [Status](docs/status.md) (which also maps the names
+the code uses for the levels to the names in the game), the [Roadmap](docs/roadmap.md) and the
+[History](docs/history.md).
+
+### Tested on
+
+So far the port has been tested on one machine only:
+
+- **CPU:** AMD Ryzen AI 9 HX 470 (12 cores, 24 threads)
+- **GPU:** the integrated AMD Radeon 890M
+- **Memory:** 64 GB
+- **System:** Ubuntu 26.04 LTS, Linux 7.0, Mesa 26.0 (radeonsi, OpenGL 4.6)
+
+Other hardware, drivers and distributions should work, but they have not been tried yet. Reports
+are welcome.
+
+### Modern lighting is experimental
+
+The optional modern lighting (sun shadows, per-pixel lights, ambient occlusion) is **EXPERIMENTAL**.
+It is off by default, and with it off the picture is the original's lighting, unchanged. It is not
+yet fully usable on some planets: Nebula G34 (Blarg's station) is still a mess, with some zones
+pitch dark. That is not a porting priority and will be dealt with later. Levels up to Umbris run
+with it, with varying results. The sun is the light the game itself lights Ratchet with in his
+current zone; the glowing objects are found automatically. See [Lighting](docs/lighting.md), which
+lists how well it works on each level.
+
+## Why C++ and OpenGL
+
+This is a **port**: the game's own code, carried over to the PC and proved to behave the same. It is
+not a recreation that copies how the game looks and feels. Remakes are a valid way to bring the game
+to the PC, and some are very good, but they are a different thing. The choice of language and renderer
+follows from that.
+
+- **C++, because the original is C and C++.** The game was written in C and C++ and compiled for the
+  PS2's processor. Porting it function by function means keeping its integer sizes, its
+  wrap-around arithmetic, its structure layouts, and its data where the game expects it in memory.
+  C++ does that directly, with nothing in between. It also gives control over the processor's
+  floating point: the PS2 rounds toward zero, the PC normally to nearest, and differences that
+  small hang the game ([Decisions](docs/decisions.md)). And it lets each port be compared with the
+  original, side by side: the same inputs, the same memory, the same results.
+- **OpenGL, because it is enough, and runs everywhere.** The renderer draws what the game's own code
+  decides to draw. The costly work is in that code, not in talking to the graphics card, and the
+  static world already sits on the GPU. OpenGL 4.6 covers what the renderer needs, compute shaders
+  included, and it runs on every desktop GPU and Linux driver in use. The renderer is kept apart
+  from the game code, so another graphics API can be added later if there is a reason for it.
+- **Other platforms and graphics APIs, later.** Vulkan and Direct3D renderers may come in the future,
+  next to OpenGL, and with them Windows. The code is portable C++, but other devices need more than
+  a renderer:
+  - **Graphics API.** Phones and handhelds speak OpenGL ES or their own APIs, not desktop OpenGL 4.6.
+  - **Processor.** The game's memory is little-endian, like the PS2 and the PC.
+  - **Memory and speed.** The device must have enough of both.
+
+  Each port to another device is its own project.
+- **Every choice is written down.** The big decisions, and the ones we reversed, are explained in
+  [Decisions](docs/decisions.md) and [History](docs/history.md).
+
+## Legal
+
+- This repository contains **no game assets and none of the game's code**: no executable, no
+  levels, textures, models, sounds or movies.
+- To play, you need **your own copy** of the game, the North American PS2 disc `SCUS-97199`, as an
+  ISO image you made yourself. The setup extracts and converts everything from it on your machine.
+- *Ratchet & Clank* is a trademark of Sony Interactive Entertainment. This project is not affiliated
+  with, authorised or endorsed by Sony Interactive Entertainment or Insomniac Games.
+
+## Quick start
+
+You need Linux, a GPU with OpenGL 4.6, and your ISO of the game.
+
+```bash
+git clone https://github.com/daino-selvatico/rac1-native-game.git
+cd rac1-native-game
+./setup.sh --iso /path/to/your/ratchet.iso
+```
+
+The setup checks your system (and tells you what to install), checks your disc, builds the game and
+generates the game's data. Run it again after a `git pull`: it redoes only what changed. Then play from the repository's root:
+
+```bash
+./build/rac1-native
+```
+
+The full guide, with requirements and troubleshooting: [Setup](docs/setup.md).
+
+## Documentation
+
+For players:
+
+- [Setup](docs/setup.md): requirements, step by step, troubleshooting.
+- [Settings](docs/settings.md): the Graphics, Controls and Advanced pages, the Original, Modern and Experimental modes,
+  where settings are kept, the debug tools.
+- [Input](docs/input.md): controllers, keyboard and mouse, rebinding.
+- [Saves](docs/saves.md): where your saves are. Saving and loading work, but the save files may still change: they have not been checked by hand yet.
+- [Advanced options](docs/advanced.md): the optional gameplay changes, including Ratchet & Clank 3
+  movement and modern aiming.
+- [Enhancements](docs/enhancements.md): the optional improvements, those available now and those
+  planned after the faithful port.
+- [Status](docs/status.md) (with the table of level names), [Roadmap](docs/roadmap.md) and
+  [History](docs/history.md): how the project got here, in plain words.
+
+For contributors, and for reverse-engineering and decompilation people:
+
+- [Overview](docs/overview.md): the approach; port, emulation and decompilation; what "faithful"
+  means; how a port is proved.
+- [Decisions](docs/decisions.md): the project's architectural decisions.
+- [Architecture](docs/architecture.md): the source tree, the layers, the `// orig:` annotations, the
+  per-level overlays.
+- [Game logic](docs/game-logic.md): the main loop, levels, mobys, the hero, the camera, cutscenes.
+- [Rendering](docs/rendering.md): how a frame is drawn by the native renderer (the MRP).
+- [Lighting](docs/lighting.md): the original lighting and the optional modern lighting.
+- [Audio](docs/audio.md): the 989snd sound driver, streams, movies.
+- [File formats](docs/formats/README.md): the game's formats and their decoders.
+
+## Licence
+
+The project's own code is under the [MIT licence](LICENSE). The third-party components it uses are
+listed, with their licences, in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Acknowledgements
+
+This project stands on OpenGOAL, Wrench, PCSX2, Ghidra and its Emotion Engine plugin, and the
+libraries it uses. See [Acknowledgements](docs/acknowledgements.md).

@@ -1,0 +1,44 @@
+# The game's data, generated from your own ISO: never versioned (copyrighted, and large).
+# No slash at the end, so that it also matches assets/ when it is a symbolic link.
+/assets
+
+# Build output
+build/
+build-*/
+cmake-build-*/
+out/
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+compile_commands.json
+*.o
+*.a
+*.so
+
+# Runtime output (screenshots, debug dumps, the dev menu's and the settings' local files)
+*.ppm
+*.pgm
+/*.png
+/*.bin
+imgui.ini
+devmenu_display.txt
+devmenu_positions.txt
+advanced_options.txt
+graphics_options.txt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editors and OS
+.vscode/
+.idea/
+.cache/
+.clangd/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
