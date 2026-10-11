@@ -80,7 +80,7 @@ off by default when it changes the game):
 - post-processing effects;
 - a language switch with all the languages on the disc;
 - optional revival of content the game carries but never shows;
-- Windows and macOS builds;
+- Windows and macOS builds (the plan: [Platforms](platforms.md));
 - the PAL release (50 Hz timing, different addresses), only once the NTSC-U version is complete;
 - other graphics backends (Vulkan, Metal) behind the renderer's interface.
 
