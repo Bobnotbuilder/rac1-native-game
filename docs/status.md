@@ -43,7 +43,9 @@ The rest of this page uses the in-game name first and the code's name in bracket
 
 ## The planets
 
-Levels 0 to 7 are Milestone 1, and the whole milestone has been played through from Veldin to Umbris (included): apart from a few small bugs and glitches it plays without major problems. After Umbris the game takes the player to Batalia, which runs but is only partly ported, as are the planets after it: they are not playable end to end yet. Bug reports are welcome.
+Levels 0 to 7 are Milestone 1, and the whole milestone has been played through from Veldin to Umbris (included): apart from a few small bugs and glitches it plays without major problems. After Umbris the game takes the player to Batalia, which runs but is only partly ported, as are the planets after it: they are not playable end to end yet.
+
+> **The planets after Umbris:** they all load and run, and some may already be largely playable. Batalia, for example, looks playable apart from its rain effect. But part of the code that covers them, or that may cover some of their sections, is not ported yet, so expect missing effects, objects that don't react, or sections that can't be finished. They have not been tested in depth yet. Bug reports are welcome.
 
 Every one of the game's 19 levels (0 to 18) loads and runs on its own overlay (the level's own build of the
 engine, see [Architecture](architecture.md#per-level-overlays-and-the-ov-macros)), without crashing,
