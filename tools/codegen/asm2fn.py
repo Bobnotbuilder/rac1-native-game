@@ -195,7 +195,8 @@ def adapter(addr, entries):
 def level_fn_map(level):
     """[(veldin_addr, level_addr, size)] of the functions the matcher found in the level's overlay"""
     out = []
-    for ln in open(os.path.join(ROOT, 'assets', 'generated', 'overlay_map', f'level{level}.txt')):
+    import ovlist
+    for ln in open(os.path.join(ovlist.map_dir(), f'level{level}.txt')):
         t = ln.split()
         if len(t) >= 4 and t[0] == 'fn':
             out.append((int(t[1], 16), int(t[2], 16), int(t[3], 16)))

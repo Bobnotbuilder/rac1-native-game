@@ -19,8 +19,13 @@ constexpr int GASPAR = 9;
 // orig: (host) the current translation target is Gaspar overlay
 inline bool on_gaspar() { return on_level(GASPAR); }
 
-// A level-9 address of the port's own (level-only data / code, not a Veldin equivalent): never translated.
-#define L9_ADDR(a) (a)
+// A level-9 address of the port's own (level-only data / code, not a Veldin equivalent): no Veldin
+// translation; on another region's disc, the region table's.
+#define L9_ADDR(a) LVL_ADDR(9, a)
+// the same address as a `case` label: its switch compares lvl_key(pointer)
+#define L9_CASE(a) (a)
+// a `lui` half kept apart from its low half (ovl_reloc.h lvl_page): never translated
+#define L9_PAGE(a) LVL_PAGE(a)
 
 }  // namespace rac1
 

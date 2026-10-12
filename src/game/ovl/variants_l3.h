@@ -24,9 +24,13 @@ inline bool on_kerwan() { return on_level(KERWAN); }
 // orig: (host) Novalis's hero code is what runs here: the three builds that share the L1 ports
 inline bool on_l1_family() { return on_level(1) || on_level(2) || on_level(3); }
 
-// A Kerwan address of the port's own (not a Veldin equivalent: level-only data / code): never
-// translated.
-#define L3_ADDR(a) (a)
+// A Kerwan address of the port's own (not a Veldin equivalent: level-only data / code): the same
+// on every level's overlay (no Veldin translation); on another region's disc, the region table's.
+#define L3_ADDR(a) LVL_ADDR(3, a)
+// the same address as a `case` label: its switch compares lvl_key(pointer)
+#define L3_CASE(a) (a)
+// a `lui` half kept apart from its low half (ovl_reloc.h lvl_page): never translated
+#define L3_PAGE(a) LVL_PAGE(a)
 
 }  // namespace rac1
 

@@ -7,7 +7,8 @@
 
 namespace rac1 {
 
-// The ISO's path: $RAC1_ISO, else assets/iso/rac1-ntsc-u.iso.
+// The ISO's path: $RAC1_ISO, else assets/iso/rac1-ntsc-u.iso, else assets/iso/rac1-pal.iso (the setup's link
+// for the PAL disc).
 std::string disc_path();
 // The disc's boot ELF as its SYSTEM.CNF names it (BOOT2 = cdrom0:\XXXX_NNN.NN): "SCUS_971.99" on the
 // NTSC-U disc (SCUS-97199), "SCES_509.16" on the PAL one (SCES-50916); "SCUS_971.99" when the disc cannot be read.
@@ -16,10 +17,9 @@ const std::string& disc_boot_elf();
 // "assets/dumps/" + disc_boot_elf(): the boot ELF setup.sh extracted from that disc.
 std::string disc_boot_elf_path();
 // The disc is not the NTSC-U build the ports are written against (the PAL disc): the ports' overlay
-// addresses go through the region's maps on every level, Veldin's included (src/game/ovl/ovl_reloc.cpp,
-//).
+// addresses go through the region's maps on every level, Veldin's included (src/game/ovl/ovl_reloc.cpp).
 bool disc_other_region();
-// Opens the ISO (default assets/iso/rac1-ntsc-u.iso, or $RAC1_ISO). False if it cannot be read.
+// Opens the ISO (default disc_path()). False if it cannot be read.
 bool disc_open(const std::string& path = "");
 bool disc_is_open();
 // Reads `sectors` sectors from `lba` to the host buffer `dst`. False past the end of the image.

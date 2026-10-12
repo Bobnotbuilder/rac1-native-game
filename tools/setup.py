@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """rac1-native's guided setup (run it through ./setup.sh).
 
-From a fresh clone and your own disc image (Ratchet & Clank, NTSC-U, SCUS-97199) to the game:
+From a fresh clone and your own disc image (Ratchet & Clank: the North American disc SCUS-97199 or the European PAL disc
+SCES-50916) to the game:
   1. checks the system and says what to install;
   2. checks your disc image;
   3. generates the part of the game's code that is made from the game's own code on the disc
@@ -9,7 +10,7 @@ From a fresh clone and your own disc image (Ratchet & Clank, NTSC-U, SCUS-97199)
      tools/codegen/generate_all.py into assets/generated/src/;
   4. builds the game (build/rac1-native);
   5. generates the game's data into assets/ (`rac1-native --setup`, one step at a time), and makes the
-     game find the disc (assets/iso/rac1-ntsc-u.iso);
+     game find the disc (assets/iso/rac1-ntsc-u.iso, or assets/iso/rac1-pal.iso for the PAL disc);
   6. offers to start the game.
 
 Re-runnable: the build only recompiles what changed, and each step is redone only when the sources
@@ -35,7 +36,8 @@ ROOT = Path(__file__).resolve().parents[1]
 BUILD_DIR = ROOT / "build"
 EXE = BUILD_DIR / "rac1-native"
 ASSETS_DIR = ROOT / "assets"
-GAME_ISO = ASSETS_DIR / "iso/rac1-ntsc-u.iso"  # where the game reads the disc (runtime/kernel/disc.cpp)
+# where the game reads the disc (runtime/kernel/disc.cpp): a link, one name per region
+GAME_ISOS = {"NTSC-U": ASSETS_DIR / "iso/rac1-ntsc-u.iso", "PAL": ASSETS_DIR / "iso/rac1-pal.iso"}
 STATE_FILE = ASSETS_DIR / "setup-state.json"
 SECTOR = 2048
 
@@ -45,13 +47,17 @@ CODE_ROOT = ASSETS_DIR / "generated"
 GEN_SRC = CODE_ROOT / "src"
 GEN_LIST = GEN_SRC / "generated_sources.cmake"
 GENERATE_ALL = ROOT / "tools/codegen/generate_all.py"
-ELF = ASSETS_DIR / "dumps/SCUS_971.99"
+DUMPS = ASSETS_DIR / "dumps"  # the disc's boot executable: SCUS_971.99 (NTSC-U) or SCES_509.16 (PAL)
 OVERLAY_MAPS = ASSETS_DIR / "generated/overlay_map"
+# Another region's disc (PAL): the region table (addresses and their shifts against the NTSC-U build the ports are written
+# against), data/regions/<serial>.txt; tools/overlay_match/region_maps.py and region_view.py read it.
+REGIONS = ROOT / "data/regions"
 
 # The generated code's sources: the generators and their inputs, and the headers (with variants_l<n>.cpp, the
 # levels' variant tables) whose `// orig:` declarations the generators read. (The boot executable and the overlay
 # maps they also read are steps of their own, below.)
 CODE_SOURCES = ["tools/codegen/**/*", "tools/overlay_match/overlay_match.py", "tools/overlay_match/front_match.py",
+                "tools/overlay_match/region_maps.py", "tools/overlay_match/region_view.py", "data/regions/*.txt",
                 "src/game/**/*.h", "src/game/ovl/variants*.cpp"]
 # What the generated VU programs come from, for the data steps that run them
 VU_CODEGEN = ["tools/codegen/vu2cpp*.py", "tools/codegen/vu_micro.py"]
@@ -59,7 +65,7 @@ VU_CODEGEN = ["tools/codegen/vu2cpp*.py", "tools/codegen/vu_micro.py"]
 # The steps before the build, done by this tool (Python only), with the sources that make each one's output.
 CODE_STEPS = [
     ("elf", "the boot executable", []),
-    ("overlay", "the overlay address maps", ["tools/overlay_match/*.py"]),
+    ("overlay", "the overlay address maps", ["tools/overlay_match/*.py", "data/regions/*.txt"]),
     ("code", "the generated code", CODE_SOURCES),
 ]
 # The data steps of `rac1-native --setup --step <name>`, in order, with the sources that make each
@@ -269,7 +275,7 @@ def looks_like_ps2_disc(path):
 # setup stop before the build when the disc is the wrong one. Add a release to both.
 KNOWN_DISCS = {
     "SCUS_971.99": ("SCUS-97199", "NTSC-U", True, 4214095872),
-    "SCES_509.16": ("SCES-50916", "PAL", False, 0),
+    "SCES_509.16": ("SCES-50916", "PAL", True, 4213997568),
     "SCPS_150.55": ("SCPS-15055", "NTSC-J", False, 0),
 }
 
@@ -279,11 +285,12 @@ def find_iso(arg):
         return Path(arg).expanduser().resolve()
     if os.environ.get("RAC1_ISO"):
         return Path(os.environ["RAC1_ISO"]).expanduser().resolve()
-    if GAME_ISO.exists():
-        return GAME_ISO
+    for p in GAME_ISOS.values():
+        if p.exists():
+            return p
     if not sys.stdin.isatty():
         fail("No disc image given. Run ./setup.sh --iso <path-to-your-iso>")
-    print("  Where is your Ratchet & Clank disc image (NTSC-U, SCUS-97199)?")
+    print("  Where is your Ratchet & Clank disc image (NTSC-U SCUS-97199, or PAL SCES-50916)?")
     while True:
         try:
             val = input("  Path to the .iso file: ").strip().strip("'\"")
@@ -336,22 +343,39 @@ def code_sources_fingerprint():
     return sources_fingerprint(CODE_SOURCES)
 
 
+def boot_elf(iso):
+    """Where the disc's boot executable goes: assets/dumps/SCUS_971.99, or SCES_509.16 for the PAL disc."""
+    return DUMPS / looks_like_ps2_disc(iso)
+
+
+def region_table(iso):
+    """The region table of another region's disc (data/regions/<serial>.txt), None for the NTSC-U disc."""
+    serial, region = KNOWN_DISCS[looks_like_ps2_disc(iso)][:2]
+    if region == "NTSC-U":
+        return None
+    table = REGIONS / f"{serial}.txt"
+    if not table.is_file():
+        fail(f"{table.relative_to(ROOT)} is missing: the {region} disc needs it (it is part of the repository).")
+    return table
+
+
 def extract_elf(iso):
-    """The boot executable (SCUS_971.99), copied from the disc's root directory: the generators read the
-    VU programs and the boot module from it, and the game reads it while it runs."""
-    found = iso_root_file(iso, ELF.name)
+    """The boot executable (SCUS_971.99, or the PAL disc's SCES_509.16), copied from the disc's root directory: the
+    generators read the VU programs and the boot module from it, and the game reads it while it runs."""
+    elf = boot_elf(iso)
+    found = iso_root_file(iso, elf.name)
     if found is None:
-        fail(f"{ELF.name} is not on the disc image: it is damaged, or another disc.")
+        fail(f"{elf.name} is not on the disc image: it is damaged, or another disc.")
     start, size = found
     if start + size > iso.stat().st_size:
         fail("The disc image is damaged or incomplete (it ends before the boot executable does). Dump the disc again.")
     with open(iso, "rb") as f:
         f.seek(start)
         data = f.read(size)
-    ELF.parent.mkdir(parents=True, exist_ok=True)
-    tmp = ELF.with_name(ELF.name + ".part")
+    elf.parent.mkdir(parents=True, exist_ok=True)
+    tmp = elf.with_name(elf.name + ".part")
     tmp.write_bytes(data)
-    tmp.replace(ELF)
+    tmp.replace(elf)
 
 
 def run_quiet(cmd, what):
@@ -362,11 +386,23 @@ def run_quiet(cmd, what):
 
 
 def overlay_maps(iso):
-    """Each level's code matched against Veldin's (level 0's), and the boot module's (tools/overlay_match/)."""
+    """Each level's code matched against Veldin's (level 0's), and the boot module's (tools/overlay_match/). On another
+    region's disc, through the region table: the game's maps (region_maps.py apply: NTSC-U Veldin -> the disc's levels, and
+    the table's runs) and the generators' (region_view.py maps: NTSC-U Veldin -> NTSC-U levels, on the code rebuilt at
+    NTSC-U's addresses, in overlay_map/codegen/)."""
     OVERLAY_MAPS.mkdir(parents=True, exist_ok=True)
     tools = ROOT / "tools/overlay_match"
+    table = region_table(iso)
+    if table is not None:
+        print("   the game's", end="", flush=True)
+        run_quiet([sys.executable, tools / "region_maps.py", "apply", "--iso", iso, "--elf", boot_elf(iso), "--table", table,
+                   "-o", OVERLAY_MAPS], "Making the overlay maps from the region table")
+        print(", the code generators'", flush=True)
+        run_quiet([sys.executable, tools / "region_view.py", "maps", "--iso", iso, "--table", table, "-o",
+                   OVERLAY_MAPS / "codegen"], "Making the code generators' overlay maps")
+        return
     print("   title", end="", flush=True)
-    run_quiet([sys.executable, tools / "front_match.py", "--elf", ELF, "--iso", iso, "--out", OVERLAY_MAPS],
+    run_quiet([sys.executable, tools / "front_match.py", "--elf", boot_elf(iso), "--iso", iso, "--out", OVERLAY_MAPS],
               "Matching the boot module's code")
     for lv in range(1, 19):
         print(f" {lv}", end="", flush=True)
@@ -442,8 +478,10 @@ def prepare_code(iso, forced, jobs):
         fingerprint = f"{disc}:{sources_fingerprint(patterns)}"
         if name == "code":  # (made from the two steps before it, too)
             fingerprint += ":" + hashlib.sha256((state.get("elf", "") + state.get("overlay", "")).encode()).hexdigest()
-        present = {"elf": ELF.is_file(), "overlay": (OVERLAY_MAPS / "front_reloc.txt").is_file()
-                   and all((OVERLAY_MAPS / f"level{lv}.txt").is_file() for lv in range(1, 19)),
+        other = region_table(iso) is not None
+        present = {"elf": boot_elf(iso).is_file(), "overlay": (OVERLAY_MAPS / "front_reloc.txt").is_file()
+                   and all((OVERLAY_MAPS / f"level{lv}.txt").is_file() for lv in range(1, 19))
+                   and (not other or all((OVERLAY_MAPS / f"codegen/level{lv}.txt").is_file() for lv in range(1, 19))),
                    "code": code_current()}[name]
         if name not in forced and state.get(name) == fingerprint and present:
             ok(f"{what[0].upper() + what[1:]}: up to date")
@@ -452,7 +490,7 @@ def prepare_code(iso, forced, jobs):
         state.pop(name, None)
         if name == "elf":
             extract_elf(iso)
-            ok(f"Copied {ELF.relative_to(ROOT)}")
+            ok(f"Copied {boot_elf(iso).relative_to(ROOT)}")
         elif name == "overlay":
             overlay_maps(iso)
             ok(f"Wrote {OVERLAY_MAPS.relative_to(ROOT)}/")
@@ -576,7 +614,7 @@ def check_disc(arg):
     serial, region, supported, good_size = KNOWN_DISCS[boot]
     if not supported:
         fail(f"This is Ratchet & Clank's {region} disc ({serial}). "
-             "Only the North American disc, SCUS-97199, is supported for now.")
+             "Only the North American disc, SCUS-97199, and the European PAL disc, SCES-50916, are supported for now.")
     if iso.stat().st_size < good_size:  # (cut short, or trimmed: checked fully after the build)
         warn(f"The image is smaller than a good dump ({iso.stat().st_size} bytes, not {good_size}): "
              "it may be incomplete.")
@@ -597,7 +635,7 @@ def main():
         return
     ap = argparse.ArgumentParser(description="Sets up rac1-native: checks the system and your disc image, generates "
                                              "the game's code from it, builds the game and generates the game's data.")
-    ap.add_argument("--iso", help="your disc image (Ratchet & Clank, NTSC-U, SCUS-97199)")
+    ap.add_argument("--iso", help="your disc image (Ratchet & Clank: NTSC-U SCUS-97199, or PAL SCES-50916)")
     ap.add_argument("--force", nargs="?", const="all", default=set(), type=parse_force, metavar="STEPS",
                     help=f"regenerate even if up to date: everything, or some steps ({','.join(STEP_NAMES)})")
     ap.add_argument("-j", "--jobs", type=int, default=None, help="parallel jobs (the code generation and the build)")

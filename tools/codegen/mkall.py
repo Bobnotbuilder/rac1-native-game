@@ -31,7 +31,8 @@ SCR = os.environ.get('MKALL_TMP', '/tmp/mkall' + ('_v' if VELDIN else ''))
 os.makedirs(SCR, exist_ok=True)
 GH = os.environ.get('MKALL_GH', W + '/tools/re/gh.sh' if VELDIN else '/tmp/claude-1000/t327/gh1.sh')  # runs Listing.java / Dis2.java on the level's project
 OV = os.environ.get('MKALL_OV', W + '/scratch/level0_overlay' if VELDIN else '/tmp/claude-1000/t327/l1/ov')
-MAPF = (os.environ.get('RAC1_ASSETS') or W + '/assets') + '/generated/overlay_map/level%s.txt' % LEVEL  # (RAC1_ASSETS)
+MAPF = os.path.join(ovlist.map_dir(), 'level%s.txt' % LEVEL) if LVL is not None else \
+    (os.environ.get('RAC1_ASSETS') or W + '/assets') + '/generated/overlay_map/level%s.txt' % LEVEL  # (RAC1_ASSETS)
 # the enhancements' hook points in the levels' own code (tools/codegen/mips2cpp.py load_hooks)
 os.environ.setdefault('MIPS2CPP_HOOKS', W + '/tools/codegen/hooks.glue')
 
@@ -414,7 +415,11 @@ def main():
             cmd += ['--wide-gpr', ','.join(wide_gpr[ad])]
         for j, tl in jts.items():
             cmd += ['--jt', '%x=%s' % (j, ','.join('%x' % x for x in tl))]
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        env = None
+        if LVL is not None and ad in dict(ovlist.STANDINS):  # (another region's disc: the disc's own build of a function the
+            env = dict(os.environ, MIPS2CPP_HOOKS='')     # region changed; the hook points are the NTSC-U code's: none)
+            print('    %x: a stand-in, without the enhancements\' hook points' % ad, file=sys.stderr)
+        r = subprocess.run(cmd, capture_output=True, text=True, env=env)
         if r.returncode != 0:
             print('FAILED', '%x' % ad, r.stderr[-500:], file=sys.stderr)
             continue

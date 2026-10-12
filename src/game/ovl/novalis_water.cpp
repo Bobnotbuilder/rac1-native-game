@@ -16,7 +16,7 @@
 namespace rac1 {
 
 namespace {
-constexpr uint32_t CUR = L1_ADDR(0x001611c0u);  // the packet's cursor (gp - 0x5a40)
+constexpr LvlConst<1, 0x001611c0u> CUR{};  // the packet's cursor (gp - 0x5a40)
 }  // namespace
 
 // orig: L1:0x002b96c0

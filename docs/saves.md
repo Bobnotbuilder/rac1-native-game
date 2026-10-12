@@ -26,7 +26,8 @@ flowchart LR
 ## What the game writes
 
 The game's save directory is named after the disc's product code, read from the disc's `SYSTEM.CNF`
-by `save_names_init` (0x24b410): `BASCUS-97199RATCHET` for the North American disc. In it, the card
+by `save_names_init` (0x24b410): `BASCUS-97199RATCHET` for the North American disc,
+`BESCES-50916RATCHET` for the PAL disc (the two discs' saves are kept apart, as on a console). In it, the card
 machine (0x24b690, `src/game/ovl/memory_card_ops.cpp`) writes:
 
 - `icon.sys` and `static.ico`, the icon a PS2's browser shows, copied from the disc;

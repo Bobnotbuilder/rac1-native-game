@@ -39,7 +39,7 @@ def off(o):
 def lit(v, wrap):
     v &= 0xFFFFFFFF
     if OVL_LO <= v < OVL_HI:
-        if wrap == 'none':  # the boot module's own addresses: no relocation (tools/codegen/gen/mkall/title_sky.json)
+        if wrap == 'none':  # no relocation
             return f'0x{v:08x}u'
         w = wrap.split('/')
         w = w[0] if len(w) == 1 or v < 0x1EAA00 else w[1]  # "OV/OVF": data / code
@@ -459,7 +459,7 @@ def main():
     ap.add_argument('--ret', default='void')
     ap.add_argument('--callees', default=None)
     ap.add_argument('--jt', action='append', default=[])
-    ap.add_argument('--const-wrap', default='L1_ADDR', help='L1_ADDR, or OV/OVF (data / code) for a port at Veldin addresses')
+    ap.add_argument('--const-wrap', default='L1_ADDR', help='L1_ADDR, OV/OVF (data / code) for a port at Veldin addresses, FR for the boot module\'s own')
     ap.add_argument('--veldin', action='store_true', help='a Veldin-address port: orig comment `0x...`, the jump tables switch on ovl_code_to_veldin')
     ap.add_argument('--ptr-args', default='')
     ap.add_argument('--local', action='append', default=[], help='start:end (hex): a routine reached by bal that shares the caller\'s registers (hand-written asm with its own register contract), appended to the listing: its jr ra returns to the bal sites')

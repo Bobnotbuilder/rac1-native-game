@@ -21,12 +21,13 @@
 #include <cstdio>
 #include <cstdlib>
 
+#include <game/ovl/ovl_reloc.h>
 namespace rac1 {
 
 namespace {
 constexpr uint32_t TOC = 0x00137b80;
 constexpr uint32_t BOOT_DATA = 0x00500000;  // the boot data, unpacked by the start (0x201650)
-constexpr uint32_t MODE = 0x0015f604;       // the game mode (the overlays' 0x15f5c4)
+constexpr FrConst<0x0015f604u> MODE{};       // the game mode (the overlays' 0x15f5c4)
 
 enum class Phase { Off, Card, Intro, Wait, Title, Attract, Left };
 struct Boot {
@@ -88,7 +89,7 @@ bool card_pass() {
 void intro_start() {
     const uint32_t a2 = lwu(BOOT_DATA + 0x70) + BOOT_DATA;
     sw(0x0015eed8, 0xffffffffu);
-    sw(0x0015ef5c, a2);
+    sw(FR(0x0015ef5c), a2);
     const bool pal = lw(0x0015ed80) != 0;
     const uint32_t row = pal ? 0x00139380u : 0x00139378u;
     movie_stream_start(lwu(row), lwu(row + 4), (a2 + 0x3f) & 0xffffffc0u, (a2 + 0x2c003f) & 0xffffffc0u, 0);
@@ -105,16 +106,16 @@ void after_intro() {
     picture_frame(BOOT_DATA + (lw(0x0015ed80) != 0 ? 8u : 0u));
     g_boot.picture = true;
     TODO_PORT(0x00122298, "kernel: vsync wait")(0);
-    sw(0x0015f438, lwu(0x0015f438) + 1);
+    sw(FR(0x0015f438), lwu(FR(0x0015f438)) + 1);
     debug_printf_stub();
     const uint32_t bank = static_cast<uint32_t>(boot_bank_load(lwu(TOC + 0x14e0)));
     snd_cmd_08();
-    sw(0x001861e0 + 0x9c, bank);
-    sw(0x00186100 + 0xdc, bank);
-    sw(0x0015f634, 0x00186100);
-    sw(0x0015f630, 7);
-    for (uint32_t o : {0x1cu, 0x3cu, 0x5cu, 0x7cu, 0x9cu, 0xbcu}) sw(0x00186100 + o, bank);
-    for (uint32_t o : {0x1cu, 0x3cu, 0x5cu, 0x7cu}) sw(0x001861e0 + o, bank);
+    sw(FR(0x001861e0) + 0x9c, bank);
+    sw(FR(0x00186100) + 0xdc, bank);
+    sw(FR(0x0015f634), FR(0x00186100));
+    sw(FR(0x0015f630), 7);
+    for (uint32_t o : {0x1cu, 0x3cu, 0x5cu, 0x7cu, 0x9cu, 0xbcu}) sw(FR(0x00186100) + o, bank);
+    for (uint32_t o : {0x1cu, 0x3cu, 0x5cu, 0x7cu}) sw(FR(0x001861e0) + o, bank);
     g_boot.wait = title_loop_start();
     if (g_boot_title_loaded_hook != nullptr) g_boot_title_loaded_hook();  // (host: the renderers' copy of the title's level)
     g_boot.phase = Phase::Wait;
@@ -143,7 +144,7 @@ void attract_start(int32_t k) {
     music_stop_all();
     snd_cd_status(0);
     while (!(lw(0x0013d290 + 0xd4) < 3) || lw(0x0013d290 + 0xdc) >= 0) card_machine();
-    const uint32_t a = lwu(0x001940dc);
+    const uint32_t a = lwu(FR(0x001940dc));
     movie_stream_start(lsn, size, a + 0x100000, a + 0x400000, 0);
 }
 
@@ -168,7 +169,7 @@ void attract_end() {
 // orig: front:0x001e9658 (after its title loop)
 void title_left() {
     title_loop_end();
-    const uint32_t want = lbu(0x0016034c);
+    const uint32_t want = lbu(FR(0x0016034c));
     if (lwu(0x0015ed80) != want) {
         sw(0x0015ed80, want);
         TODO_PORT(0x001204b8, "libgraph: sceGsResetPath")();
@@ -177,10 +178,10 @@ void title_left() {
         TODO_PORT(0x001fb2a8, "front: the display packet sent (the overlays' 0x200f18)")();
     }
     sh(0x0013e030 + 0x2a, 1);
-    sw(0x0015f600, lwu(0x0015ed84));
+    sw(FR(0x0015f600), lwu(0x0015ed84));
     sw(0x0015ed84, 0xffffffffu);
     g_boot.phase = Phase::Left;
-    std::printf("[boot] the title left for level %d\n", lw(0x0015f600));
+    std::printf("[boot] the title left for level %d\n", lw(FR(0x0015f600)));
 }
 }  // namespace
 
@@ -188,14 +189,14 @@ void title_left() {
 // the texture base, its BSS cleared, the frame's state, the render enables, the display, black.
 // orig: front:0x001e9658 (its start)
 void boot_start() {
-    sw(0x0015f5e8, 1);
+    sw(FR(0x0015f5e8), 1);
     boot_module_start();
     boot_tex_base();
-    for (uint32_t a = 0x00161280; a < 0x00165430; ++a) sb(a, 0);
+    for (uint32_t a = FR(0x00161280); a < FR(0x00165430); ++a) sb(a, 0);
     sub_002a07f8();
     sub_002a1128();
     render_enables_init();
-    sw(0x0015f438, 0);
+    sw(FR(0x0015f438), 0);
     TODO_PORT(0x00122298, "kernel: vsync wait")(0);
     sw(MODE, 0);
     TODO_PORT(0x001fb2a8, "front: the display packet sent (the overlays' 0x200f18)")();
@@ -214,8 +215,8 @@ bool boot_frame() {
     Boot& b = g_boot;
     switch (b.phase) {
         case Phase::Card:
-            if (lw(0x0015f5b0) != 0 || !card_pass()) {
-                if (lw(0x0015f5b0) != 0) {  // (the debug menu's skip)
+            if (lw(FR(0x0015f5b0)) != 0 || !card_pass()) {
+                if (lw(FR(0x0015f5b0)) != 0) {  // (the debug menu's skip)
                     title_left();
                     return false;
                 }
@@ -225,7 +226,7 @@ bool boot_frame() {
             return true;
         case Phase::Intro:
             if (!movie_stream_frame()) return true;
-            if (lw(0x0015f5b0) != 0) {
+            if (lw(FR(0x0015f5b0)) != 0) {
                 title_left();
                 return false;
             }
@@ -242,14 +243,14 @@ bool boot_frame() {
             std::printf("[boot] the title\n");
             return true;
         case Phase::Title: {
-            if (std::getenv("RAC1_TITLE_TRACE") != nullptr && lw(0x0018cb20 + 0x34) % 100 == 1) {  // testing: the title's scene
-                constexpr uint32_t S = 0x0018cb20;
-                std::printf("[title] scene frame %d block %d (frame %d of %d) mobys %d list %08x..%08x\n", lw(S + 0x34), lw(S + 0x3c), lw(S + 0x38), lh(S + 0x40), lh(S + 0x44), lwu(0x0015ff18), lwu(0x0015ff1c));
+            if (std::getenv("RAC1_TITLE_TRACE") != nullptr && lw(FR(0x0018cb20) + 0x34) % 100 == 1) {  // testing: the title's scene
+                const uint32_t S = FR(0x0018cb20u);
+                std::printf("[title] scene frame %d block %d (frame %d of %d) mobys %d list %08x..%08x\n", lw(S + 0x34), lw(S + 0x3c), lw(S + 0x38), lh(S + 0x40), lh(S + 0x44), lwu(FR(0x0015ff18)), lwu(FR(0x0015ff1c)));
                 for (int32_t i = 0; i < lh(S + 0x44) && i < 16; ++i) {
                     const uint32_t m = lwu(S + 0x178 + static_cast<uint32_t>(i) * 4);
                     std::printf("[title]  moby %08x class %d state %d fn %08x pos %.2f %.2f %.2f flags %04x scale %.3f\n", m, lh(m + 0xa6), lbu(m + 0x20), lwu(m + 0x74), lwc1(m + 0x10), lwc1(m + 0x14), lwc1(m + 0x18), lhu(m + 0x34), lwc1(m + 0x2c));
                 }
-                std::printf("[title] camera %.2f %.2f %.2f\n", lwc1(0x00187080), lwc1(0x00187084), lwc1(0x00187088));
+                std::printf("[title] camera %.2f %.2f %.2f\n", lwc1(FR(0x00187080)), lwc1(FR(0x00187084)), lwc1(FR(0x00187088)));
             }
             const int32_t r = title_loop_frame();
             if (r == 1) {
@@ -298,9 +299,9 @@ void boot_skip_to(int32_t level) {
     }
     if (g_boot.phase == Phase::Wait) g_boot.phase = Phase::Title;
     sw(0x0015ed84, static_cast<uint32_t>(level));
-    sw(0x0015f600, static_cast<uint32_t>(level));
-    sw(0x0015f5b0, 1);
-    sw(0x0015f618, 1);
+    sw(FR(0x0015f600), static_cast<uint32_t>(level));
+    sw(FR(0x0015f5b0), 1);
+    sw(FR(0x0015f618), 1);
 }
 
 }  // namespace rac1

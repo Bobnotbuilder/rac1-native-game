@@ -5,9 +5,9 @@ namespace rac1 {
 
 // orig: (host) see gaspar_hooks.h
 bool gaspar_sound_emitter_call(uint32_t fn, uint32_t em) {
-    switch (fn) {
-    case L9_ADDR(0x003158e8): gas_emitter1_l9(em); return true;
-    case L9_ADDR(0x00315c88): gas_emitter3_l9(em); return true;
+    switch (lvl_key(fn)) {
+    case L9_CASE(0x003158e8): gas_emitter1_l9(em); return true;
+    case L9_CASE(0x00315c88): gas_emitter3_l9(em); return true;
     default: return false;
     }
 }

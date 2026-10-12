@@ -17,7 +17,15 @@ std::FILE* g_iso = nullptr;
 
 std::string disc_path() {
     const char* env = std::getenv("RAC1_ISO");
-    return env != nullptr ? env : "assets/iso/rac1-ntsc-u.iso";
+    if (env != nullptr) return env;
+    // the setup's link: one name per region (the PAL disc's when it is the one there)
+    std::FILE* f = std::fopen("assets/iso/rac1-ntsc-u.iso", "rb");
+    if (f == nullptr && (f = std::fopen("assets/iso/rac1-pal.iso", "rb")) != nullptr) {
+        std::fclose(f);
+        return "assets/iso/rac1-pal.iso";
+    }
+    if (f != nullptr) std::fclose(f);
+    return "assets/iso/rac1-ntsc-u.iso";
 }
 
 namespace {

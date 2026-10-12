@@ -9,7 +9,9 @@
 A native PC port of **Ratchet & Clank** (PlayStation 2, 2002), for Linux.
 
 The game's own code is ported to C++, function by function, from the original North American release
-(`SCUS-97199`), and each port is proved against the original code. It is not an emulator: all of the game's
+(`SCUS-97199`), and each port is proved against the original code. Support for the
+European PAL release (`SCES-50916`) is new and awaits testing: it goes through a table of where the PAL
+build put the same code (see [Setup](docs/setup.md#the-european-pal-disc)). It is not an emulator: all of the game's
 code, the PS2's vector-unit microcode included, runs as native C++ while you play. The 3D is drawn by a native OpenGL renderer from the game's own decisions, which
 makes widescreen, high resolutions, full-detail textures and longer draw distances possible without
 changing how the game behaves.
@@ -81,15 +83,22 @@ follows from that.
 
 - This repository contains **no game assets and none of the game's code**: no executable, no
   levels, textures, models, sounds or movies.
-- To play, you need **your own copy** of the game, the North American PS2 disc `SCUS-97199`, as an
-  ISO image you made yourself. The setup extracts and converts everything from it on your machine,
-  including the part of the port that is a mechanical translation of the game's own code.
+- To play, you need **your own copy** of the game, as an ISO image you made yourself: the North
+  American PS2 disc `SCUS-97199`, or the European PAL disc `SCES-50916`. Either disc alone is enough.
+  The setup extracts and converts everything from it on your machine, including the part of the port
+  that is a mechanical translation of the game's own code.
+- One kind of file about the game is committed: the region table, `data/regions/SCES-50916.txt`.
+  It lists where the PAL build put the code and data of the North American build the port is written
+  against. The rule (Daino's decision): addresses, and the shifts between two builds' addresses, may
+  be committed like `orig:` annotations (the region table); never bytes of code, data or text. The
+  table holds addresses, shifts and the PAL executable's checksum, nothing else.
 - *Ratchet & Clank* is a trademark of Sony Interactive Entertainment. This project is not affiliated
   with, authorised or endorsed by Sony Interactive Entertainment or Insomniac Games.
 
 ## Quick start
 
-You need Linux, a GPU with OpenGL 4.6, and your ISO of the game.
+You need Linux, a GPU with OpenGL 4.6, and your ISO of the game (the North American or the European
+PAL disc).
 
 ```bash
 git clone https://github.com/daino-selvatico/rac1-native-game.git

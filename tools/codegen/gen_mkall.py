@@ -95,6 +95,21 @@ def run(name, tmp, quiet=True):
     res = {}
     for s, e, nm in gen_common.blocks(t):
         res[nm] = L[s:e]
+    # another region's disc: the functions the region changed, transliterated from that disc's own build (tools/codegen/ovlist.py
+    # listing, a stand-in): labelled
+    standins = {int(m.group(1), 16): int(m.group(2), 16) for m in re.finditer(r'\[ovlist\] STANDIN ([0-9a-f]+) PAL ([0-9a-f]+)', r.stderr)}
+    if d.get('tool') == 'mips2cpp.py':
+        import ovlist
+        standins.update(dict(ovlist.STANDINS))
+    for nm, body in res.items():
+        m = next((re.search(r'orig: (?:L\d+:|front:)?0x([0-9a-f]+)', x) for x in body if 'orig:' in x), None)
+        if m and int(m.group(1), 16) in standins:
+            a = int(m.group(1), 16)
+            res[nm] = ['// STAND-IN (another region\'s disc): the code the region changed here is not on this disc; this is the disc\'s own',
+                       '// build of the function (PAL:0x%08x), transliterated at the NTSC-U entry 0x%08x, without the enhancements\' hook'
+                       % (standins[a], a),
+                       '// points (tools/codegen/hooks.glue). Temporary: not proved by the oracle.'] + body
+            print('%s: %s is a stand-in (PAL:0x%08x)' % (name, nm, standins[a]), file=sys.stderr)
     return res
 
 
@@ -116,6 +131,7 @@ def cmd_gen(name, out_root, strip, tmp):
             else:
                 out.append(l)
         text = '\n'.join(out)
+        text = gen_common.region_proof(text)
         if strip:
             text = gen_common.strip_insn_comments(text)
         p = os.path.join(out_root, rel)

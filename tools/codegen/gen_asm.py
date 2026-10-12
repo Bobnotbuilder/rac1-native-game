@@ -46,6 +46,7 @@ def gen(name, out_root, strip, tmp):
     text = open(d2['out']).read()
     if '#error' in text:
         sys.exit('%s: #error in the output' % name)
+    text = gen_common.region_proof(text)
     if strip:
         text = gen_common.strip_insn_comments(text)
     p = os.path.join(out_root, d['out'])

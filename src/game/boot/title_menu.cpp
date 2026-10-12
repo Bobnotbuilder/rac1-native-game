@@ -10,14 +10,15 @@
 #include <game/ovl/pause_menu.h>
 #include <game/port_stubs.h>
 
+#include <game/ovl/ovl_reloc.h>
 namespace rac1 {
 
 namespace {
-constexpr uint32_t MS = 0x001d5bf0;     // the menu's block (the overlays' 0x1b9cf0)
-constexpr uint32_t MOBYS = 0x001d5d90;  // its 14 mobys (the overlays' 0x1b9e90)
-constexpr uint32_t SLOTS = 0x001ce2c0;  // the slots in use (the overlays' 0x1b23c0)
-constexpr uint32_t ROOT = 0x001d45c8;   // the main menu's root page (New Game, Load Game, Options)
-constexpr uint32_t MODE = 0x0015f604;   // the game mode
+constexpr FrConst<0x001d5bf0u> MS{};     // the menu's block (the overlays' 0x1b9cf0)
+constexpr FrConst<0x001d5d90u> MOBYS{};  // its 14 mobys (the overlays' 0x1b9e90)
+constexpr FrConst<0x001ce2c0u> SLOTS{};  // the slots in use (the overlays' 0x1b23c0)
+constexpr FrConst<0x001d45c8u> ROOT{};   // the main menu's root page (New Game, Load Game, Options)
+constexpr FrConst<0x0015f604u> MODE{};   // the game mode
 
 // orig: (helper) the widget in slot i of page p (+0x44)
 uint32_t widget_of(uint32_t p, uint32_t i) { return lwu(p + 0x44 + i * 4); }
@@ -59,20 +60,20 @@ void title_menu_page_start() {
     sw(MS + 8, ROOT);
     sw(MS + 0x124, 0);
     sw(MS + 4, ROOT);
-    vec3_scale(V(0x0019c150), V(0x001601c0), 1.0f);
-    lq_sq(0x0019c140, 0x001601d0);
-    sd(0x0019c170, 0);
-    sd(0x0019c178, 0);
-    sd(0x0019c160, 0);
-    sd(0x0019c168, 0);
+    vec3_scale(V(FR(0x0019c150)), V(FR(0x001601c0)), 1.0f);
+    lq_sq(FR(0x0019c140), FR(0x001601d0));
+    sd(FR(0x0019c170), 0);
+    sd(FR(0x0019c178), 0);
+    sd(FR(0x0019c160), 0);
+    sd(FR(0x0019c168), 0);
     dma_wait(1);
     TODO_PORT(0x00122298, "kernel: vsync wait")(0);
-    const uint32_t t1 = lwu(0x001940c8) + 0xa0000, a3 = lwu(0x001940c4) + 0xa0000;
+    const uint32_t t1 = lwu(FR(0x001940c8)) + 0xa0000, a3 = lwu(FR(0x001940c4)) + 0xa0000;
     const uint32_t a2 = a3 + 0x3c000, t0 = t1 + 0xe0000;
-    sw(0x0015f438, lwu(0x0015f438) + 1);
+    sw(FR(0x0015f438), lwu(FR(0x0015f438)) + 1);
     sw(MS + 0xfc, a2 + 0xc1000);
     sw(MS + 0x100, t0 + 0x11800);
-    sw(0x00160f0c, 0xa0000);
+    sw(FR(0x00160f0c), 0xa0000);
     sw(MS + 0x104, a3);
     sw(MS + 0x10, t1);
     sw(MS + 0x108, a2);
@@ -81,13 +82,13 @@ void title_menu_page_start() {
     sub_002a07f8();
     sw(MS + 0x18, lwu(0x0015ee78));
     if (lwu(MS + 4) == 0) return;
-    constexpr uint32_t C = 0x00186f40;  // the camera
+    const uint32_t C = FR(0x00186f40u);  // the camera
     for (uint32_t i = 0; i < 0xe; ++i) {
         const uint32_t m = menu_moby_spawn(0x472);
         sw(MOBYS + i * 4, m);
         if (m == 0) continue;
         sh(m + 0x34, lhu(m + 0x34) & 0xfffdu);
-        sw(m + 0x74, 0x0023a2c0);  // (the overlays' 0x2df638, the menu mobys' update)
+        sw(m + 0x74, FR(0x0023a2c0));  // (the overlays' 0x2df638, the menu mobys' update)
         swc1(m + 0x10, lwc1(C + 0x140));
         swc1(m + 0x14, lwc1(C + 0x144));
         swc1(m + 0x18, lwc1(C + 0x148));
@@ -128,11 +129,11 @@ void title_menu_update() {
             if (t - 1 != 0) return;
         }
         if (lh(0x001516d8) != 0) return;
-        sw(0x0015f5b8, 0x1e000);
+        sw(FR(0x0015f5b8), 0x1e000);
         sub_002a07c8();
         fog_setup();
         sw(MS + 0x10, 0);
-        sw(0x0015f618, 1);
+        sw(FR(0x0015f618), 1);
         sw(MS + 0x108, 0);
         sw(MS + 0x10c, 0);
         sw(MS + 0x104, 0);
@@ -213,7 +214,7 @@ void title_menu_update() {
 // version's pages added: Graphics, Advanced.
 // orig: front:0x0021a1b0
 int32_t title_options_list_focus_in(uint32_t w) {
-    sw(w + 0x34, lw(0x0015ee90) != 0 ? 0x001d4810u : 0x001d4840u);
+    sw(w + 0x34, lw(0x0015ee90) != 0 ? FR(0x001d4810u) : FR(0x001d4840u));
     graphics_main_options_entries(w);  // enhancement: Options > Graphics / Advanced
     return 0;
 }
@@ -246,7 +247,7 @@ void title_menu_draw() {
     moby_pass_start();
     spr_moby_fill();
     spr_moby_save();
-    moby_draw_list(lwu(0x0015ff18), 4);  // (the boot module's 0x20d330: the overlays' 0x24ff08)
+    moby_draw_list(lwu(FR(0x0015ff18)), 4);  // (the boot module's 0x20d330: the overlays' 0x24ff08)
     menu_camera_set();
     render_view_setup();
     for (uint32_t i = 0; i < 0xe; ++i) {
@@ -281,7 +282,7 @@ void title_menu_draw() {
         sw(d + 0x54, static_cast<uint32_t>(y));
         sw(d + 0x58, static_cast<uint32_t>(bw));
         sw(d + 0x5c, static_cast<uint32_t>(bh));
-        gs_flat_rect(x + 1, y + 1, x + bw - 1, y + bh - 1, static_cast<uint64_t>(static_cast<int64_t>(lw(0x001601b0))), 0);
+        gs_flat_rect(x + 1, y + 1, x + bw - 1, y + bh - 1, static_cast<uint64_t>(static_cast<int64_t>(lw(FR(0x001601b0)))), 0);
     }
     ee_stack_free(0x60);
     for (int32_t pass = 0; pass < 2; ++pass) {
@@ -309,7 +310,7 @@ void title_menu_draw() {
             while (!(sx + sy < 0x12)) --sy;
             render_to_texture_begin(sx, sy, pass != 0 ? 1 : 0, 1.0f);
             const int32_t th = 1 << sy, tw = 1 << sx;
-            gs_flat_rect_z(0, 0, tw, th, static_cast<uint64_t>(static_cast<int64_t>(lw(0x001601b0))), 0, 0);
+            gs_flat_rect_z(0, 0, tw, th, static_cast<uint64_t>(static_cast<int64_t>(lw(FR(0x001601b0)))), 0, 0);
             const uint32_t w2 = lwu(ws + i * 4);
             const int32_t r = menu_widget_call(lwu(w2 + 4), w2, 0);
             render_to_texture_end();

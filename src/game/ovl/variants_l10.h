@@ -19,8 +19,13 @@ constexpr int ORXON = 10;
 // orig: (host) the current translation target is Orxon overlay
 inline bool on_orxon() { return on_level(ORXON); }
 
-// A level-10 address of the port's own (level-only data / code, not a Veldin equivalent): never translated.
-#define L10_ADDR(a) (a)
+// A level-10 address of the port's own (level-only data / code, not a Veldin equivalent): no Veldin
+// translation; on another region's disc, the region table's.
+#define L10_ADDR(a) LVL_ADDR(10, a)
+// the same address as a `case` label: its switch compares lvl_key(pointer)
+#define L10_CASE(a) (a)
+// a `lui` half kept apart from its low half (ovl_reloc.h lvl_page): never translated
+#define L10_PAGE(a) LVL_PAGE(a)
 
 }  // namespace rac1
 

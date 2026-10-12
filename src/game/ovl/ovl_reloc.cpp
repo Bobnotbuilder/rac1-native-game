@@ -7,8 +7,10 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <map>
+#include <mutex>
 #include <set>
 #include <sstream>
 #include <string>
@@ -18,6 +20,8 @@
 namespace rac1 {
 
 uint32_t g_ovl_gen = 0;
+// orig: (host) see ovl_reloc.h's lvl_page
+uint32_t g_page_poison = std::getenv("RAC1_PAGE_POISON") != nullptr ? 0x01000000u : 0u;
 
 namespace {
 
@@ -32,30 +36,88 @@ std::set<uint32_t> g_code_kept;                     // Veldin addresses handed o
 // whose function is not the same code in the level (not an `fn` line: a variant); and back
 std::map<uint32_t, uint32_t> g_code_ptr, g_code_ptr_rev;
 
-// orig: (host) another region's disc: the region table's code runs of the level's own overlay
-// (region_levelN.txt: NTSC-U level N -> the disc's level N, tools/overlay_match/region_maps.py), for the level
-// addresses the ports carry (the variants' rows); 0 when the address is not in a run (code the region changed)
+// orig: (host) another region's disc: one unit's runs of the region table (region_levelN.txt /
+// region_boot.txt: the NTSC-U level N / boot module -> the disc's, tools/overlay_match/region_maps.py apply)
 struct RegionRuns {
-    std::vector<std::array<uint32_t, 3>> code;  // lo, hi (exclusive), displacement
-    uint32_t fwd(uint32_t a) const {
+    using Run = std::array<uint32_t, 3>;  // lo, hi, displacement
+    std::vector<Run> code;                // functions lo..hi (exclusive)
+    std::vector<Run> data;                // mapped data addresses lo..hi (both inclusive), sorted
+    std::map<uint32_t, uint32_t> entry, entry_rev;  // the entries of the functions the region changed
+    uint32_t code_base = 0, code_end = 0;           // the NTSC-U code section
+    // orig: (host) a code address (0: in a function the region changed, not its entry)
+    uint32_t code_fwd(uint32_t a) const {
         for (const auto& r : code)
             if (a >= r[0] && a < r[1]) return a + r[2];
-        return 0;
+        const auto e = entry.find(a);
+        return e != entry.end() ? e->second : 0;
+    }
+    // orig: (host) back to NTSC-U (0: none)
+    uint32_t code_back(uint32_t p) const {
+        for (const auto& r : code)
+            if (p - r[2] >= r[0] && p - r[2] < r[1]) return p - r[2];
+        const auto e = entry_rev.find(p);
+        return e != entry_rev.end() ? e->second : 0;
+    }
+    // orig: (host) a data address: inside a run, its displacement; between two runs of the same
+    // displacement, that one; less than 0x100 above a run's last address (an offset into its last
+    // object), that run's; 0 otherwise (region_maps.py's Region.data_fwd, checked against the direct
+    // maps on every literal: region_maps.py check-levels)
+    uint32_t data_fwd(uint32_t a) const {
+        auto it = std::upper_bound(data.begin(), data.end(), a, [](uint32_t v, const Run& r) { return v < r[0]; });
+        if (it == data.begin()) return 0;
+        const Run& r = *std::prev(it);
+        if (a <= r[1]) return a + r[2];
+        if (it != data.end() && (*it)[2] == r[2]) return a + r[2];
+        return a - r[1] < 0x100 ? a + r[2] : 0;
     }
 };
-// orig: (host) see RegionRuns
-RegionRuns region_runs(int level) {
+// orig: (host) see RegionRuns: unit n's (a level, or OVL_FRONT)
+RegionRuns region_load(int unit) {
     RegionRuns rr;
-    std::ifstream in("assets/generated/overlay_map/region_level" + std::to_string(level) + ".txt");
+    const std::string path = unit == OVL_FRONT ? std::string("assets/generated/overlay_map/region_boot.txt")
+                                               : "assets/generated/overlay_map/region_level" + std::to_string(unit) + ".txt";
+    std::ifstream in(path);
+    if (!in) std::fprintf(stderr, "[ovl_reloc] %s missing (./setup.sh): its addresses kept\n", path.c_str());
     std::string line;
     while (std::getline(in, line)) {
         std::istringstream s(line);
         std::string kind, d;
         uint32_t lo = 0, hi = 0;
         s >> kind >> std::hex >> lo >> hi >> d;
-        if (kind == "code") rr.code.push_back({lo, hi, static_cast<uint32_t>(std::stoll(d, nullptr, 16))});
+        const uint32_t disp = d.empty() ? 0 : static_cast<uint32_t>(std::stoll(d, nullptr, 16));
+        if (kind == "code") rr.code.push_back({lo, hi, disp});
+        else if (kind == "data") rr.data.push_back({lo, hi, disp});
+        else if (kind == "entry") {
+            rr.entry[lo] = hi;
+            rr.entry_rev[hi] = lo;
+        } else if (kind == "base") {
+            rr.code_base = lo;
+            rr.code_end = hi;
+        }
     }
+    std::sort(rr.data.begin(), rr.data.end());
     return rr;
+}
+// orig: (host) see RegionRuns: every unit's, read once (the levels 0..18 and the boot module)
+const RegionRuns& region_runs(int unit) {
+    static const std::map<int, RegionRuns> all = [] {
+        std::map<int, RegionRuns> m;
+        for (int n = 0; n < 19; ++n) m[n] = region_load(n);
+        m[OVL_FRONT] = region_load(OVL_FRONT);
+        return m;
+    }();
+    static const RegionRuns none;
+    const auto it = all.find(unit);
+    return it != all.end() ? it->second : none;
+}
+
+// orig: (host) see ovl_reloc.h's region_xlate: 0 when the address has no translation
+uint32_t region_fwd(int unit, uint32_t a) {
+    if (a < 0x0015ef00u) return a;  // (the base ELF below the overlays: the same on every region's disc)
+    const RegionRuns& rr = region_runs(unit);
+    if (rr.code_end != 0 ? (a >= rr.code_base && a < rr.code_end) : (!rr.code.empty() && a >= rr.code.front()[0]))
+        return rr.code_fwd(a);
+    return rr.data_fwd(a);
 }
 
 // orig: (host) an untranslated address, reported once
@@ -104,13 +166,13 @@ void ovl_reloc_set_level(int level) {
             g_code_size[v] = n;
         }
     }
-    // the rows' level addresses are NTSC-U level N's: on another region's disc, the region table's
-    const bool other = disc_other_region() && level != OVL_FRONT;
-    const RegionRuns rr = other ? region_runs(level) : RegionRuns{};
+    // the rows' level addresses are NTSC-U level N's: on another region's disc, the region
+    // table's (a function the region changed: its entry, the NTSC-U port standing in; none: the row dropped)
+    const bool other = region_other() && level != OVL_FRONT;
     auto add_row = [&](const VariantRow& r) {
         uint32_t l = r.level;
-        if (other && (l = rr.fwd(r.level)) == 0) {
-            log_once("variant", r.level, "is code the region changed: its row dropped");
+        if (other && (l = region_fwd(level, r.level)) == 0) {
+            log_once("variant", r.level, "is code the region changed, its entry unknown: its row dropped");
             return;
         }
         g_code[r.veldin] = l;
@@ -206,6 +268,38 @@ uint32_t ovl_code_to_veldin(uint32_t a) {
     // the level's variant of a Veldin function (a code pointer pair): Veldin's port stands in
     if (const auto p = g_code_ptr_rev.find(a); p != g_code_ptr_rev.end()) return p->second;
     return g_code_kept.count(a) != 0 ? a : 0;  // (a Veldin address the translation kept)
+}
+
+// orig: (host) see ovl_reloc.h
+bool region_other() {
+    static const bool other = disc_other_region();
+    return other;
+}
+
+// orig: (host) see ovl_reloc.h
+uint32_t region_xlate(int unit, uint32_t a) {
+    if (!region_other()) return a;
+    const uint32_t v = region_fwd(unit, a);
+    static std::mutex mu;  // (the sites' first uses: any thread)
+    std::lock_guard<std::mutex> lock(mu);
+    static std::set<std::pair<int, uint32_t>> seen;
+    const char* who = unit == OVL_FRONT ? "boot module" : "level";
+    if (v == 0) {
+        if (seen.insert({unit, a}).second)
+            std::fprintf(stderr, "[region] %s %d: %08x has no translation (code the region changed): kept\n", who, unit, a);
+        return a;
+    }
+    const RegionRuns& rr = region_runs(unit);
+    if (rr.entry.count(a) != 0 && seen.insert({unit, a}).second)
+        std::fprintf(stderr, "[region] %s %d: %08x is a function the region changed: the port at that address runs for the disc's at %08x\n", who, unit, a, v);
+    return v;
+}
+
+// orig: (host) see ovl_reloc.h
+uint32_t region_to_ntsc(int unit, uint32_t p) {
+    if (!region_other() || p < 0x0015ef00u) return p;
+    const uint32_t n = region_runs(unit).code_back(p);
+    return n != 0 ? n : p;
 }
 
 }  // namespace rac1

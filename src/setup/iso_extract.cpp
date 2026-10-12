@@ -105,11 +105,11 @@ std::vector<std::string> iso9660_list_root(std::span<const std::byte> iso) {
     return names;
 }
 
-// Ratchet & Clank's releases. Only the North American disc is supported: the port's addresses are
-// that build's (see find_known_disc).
+// Ratchet & Clank's releases. The port's addresses are the North American build's; the European PAL disc
+// is supported through its region table (data/regions/SCES-50916.txt; see find_known_disc).
 constexpr KnownDisc KNOWN_DISCS[] = {
     {"SCUS_971.99", "SCUS-97199", "NTSC-U", 4214095872ULL, true},
-    {"SCES_509.16", "SCES-50916", "PAL", 0, false},
+    {"SCES_509.16", "SCES-50916", "PAL", 4213997568ULL, true},
     {"SCPS_150.55", "SCPS-15055", "NTSC-J", 0, false},
 };
 
@@ -198,7 +198,7 @@ IsoValidation validate_iso(const std::string& iso_path) {
     }
     if (!res.disc->supported) {
         res.message = std::string("This is Ratchet & Clank's ") + res.disc->region + " disc (" + res.disc->serial +
-                      "). Only the North American disc, SCUS-97199, is supported for now.";
+                      "). Only the North American disc, SCUS-97199, and the European PAL disc, SCES-50916, are supported for now.";
         return res;
     }
 
@@ -228,17 +228,17 @@ IsoValidation validate_iso(const std::string& iso_path) {
     return res;
 }
 
-bool extract_boot_elf(std::span<const std::byte> iso, const std::string& out_path, bool force) {
+bool extract_boot_elf(std::span<const std::byte> iso, const std::string& out_path, bool force, const std::string& boot_file) {
     if (!force && std::filesystem::exists(out_path)) {
         return true;
     }
     uint32_t lba = 0, size = 0;
-    if (!iso9660_find_file(iso, "SCUS_971.99", lba, size)) {
-        std::cerr << "[setup] SCUS_971.99 not found in ISO\n";
+    if (!iso9660_find_file(iso, boot_file, lba, size)) {
+        std::cerr << "[setup] " << boot_file << " not found in ISO\n";
         return false;
     }
     if (static_cast<size_t>(lba) * SECTOR + size > iso.size()) {
-        std::cerr << "[setup] SCUS_971.99 sector range out of bounds\n";
+        std::cerr << "[setup] " << boot_file << " sector range out of bounds\n";
         return false;
     }
     std::filesystem::path out(out_path);

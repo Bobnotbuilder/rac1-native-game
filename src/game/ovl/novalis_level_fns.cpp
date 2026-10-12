@@ -46,25 +46,25 @@ bool level_camera_type_call(uint32_t fn, uint32_t cam, uint32_t other, int32_t& 
             ret = static_cast<int32_t>(f(cam, other, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f).v0);
             return true;
         };
-        switch (fn) {
-        case L3_ADDR(0x002e8870): return acc(ker_cam_type1_accept_u);
-        case L3_ADDR(0x002e8940): ker_cam_type1_init_l3(cam); ret = 0; return true;
-        case L3_ADDR(0x002e8960): ker_cam_type1_update_l3(cam); ret = 0; return true;
-        case L3_ADDR(0x002e8980): ker_cam_type1_exit_l3(cam); ret = 0; return true;
-        case L3_ADDR(0x002ebd70): return acc(ker_cam_type14_accept_u);
-        case L3_ADDR(0x002eb978): ker_cam_type14_init_l3(cam); ret = 0; return true;
-        case L3_ADDR(0x002ebdb0): ker_cam_type14_update_l3(cam); ret = 0; return true;
-        case L3_ADDR(0x002ebde8): ker_cam_type14_exit_l3(cam); ret = 0; return true;
-        case L3_ADDR(0x002ed5f8): return acc(ker_cam_type18_accept_u);
+        switch (lvl_key(fn)) {
+        case L3_CASE(0x002e8870): return acc(ker_cam_type1_accept_u);
+        case L3_CASE(0x002e8940): ker_cam_type1_init_l3(cam); ret = 0; return true;
+        case L3_CASE(0x002e8960): ker_cam_type1_update_l3(cam); ret = 0; return true;
+        case L3_CASE(0x002e8980): ker_cam_type1_exit_l3(cam); ret = 0; return true;
+        case L3_CASE(0x002ebd70): return acc(ker_cam_type14_accept_u);
+        case L3_CASE(0x002eb978): ker_cam_type14_init_l3(cam); ret = 0; return true;
+        case L3_CASE(0x002ebdb0): ker_cam_type14_update_l3(cam); ret = 0; return true;
+        case L3_CASE(0x002ebde8): ker_cam_type14_exit_l3(cam); ret = 0; return true;
+        case L3_CASE(0x002ed5f8): return acc(ker_cam_type18_accept_u);
         default: return false;
         }
     }
     if (!on_novalis()) return false;
-    switch (fn) {
-    case L1_ADDR(0x00315dd8): ret = camera_type_315dd8_l1(); return true;
-    case L1_ADDR(0x00315de0): nov_cam_type3_init_l1(cam); ret = 0; return true;
-    case L1_ADDR(0x00315358): nov_cam_type3_update_l1(cam); ret = 0; return true;
-    case L1_ADDR(0x00316030): nov_cam_type3_exit_l1(cam); ret = 0; return true;
+    switch (lvl_key(fn)) {
+    case L1_CASE(0x00315dd8): ret = camera_type_315dd8_l1(); return true;
+    case L1_CASE(0x00315de0): nov_cam_type3_init_l1(cam); ret = 0; return true;
+    case L1_CASE(0x00315358): nov_cam_type3_update_l1(cam); ret = 0; return true;
+    case L1_CASE(0x00316030): nov_cam_type3_exit_l1(cam); ret = 0; return true;
     default: return false;
     }
 }
@@ -72,11 +72,11 @@ bool level_camera_type_call(uint32_t fn, uint32_t cam, uint32_t other, int32_t& 
 // orig: (host) see novalis_level_fns.h
 bool level_sound_emitter_call(uint32_t fn, uint32_t em) {
     if (!on_novalis()) return false;
-    switch (fn) {
-    case L1_ADDR(0x00319928): nov_emitter_319928_l1(em); return true;
-    case L1_ADDR(0x00319f18): nov_emitter_319f18_l1(em); return true;
-    case L1_ADDR(0x0031a078): nov_emitter_31a078_l1(em); return true;
-    case L1_ADDR(0x0031a128): nov_emitter_31a128_l1(em); return true;
+    switch (lvl_key(fn)) {
+    case L1_CASE(0x00319928): nov_emitter_319928_l1(em); return true;
+    case L1_CASE(0x00319f18): nov_emitter_319f18_l1(em); return true;
+    case L1_CASE(0x0031a078): nov_emitter_31a078_l1(em); return true;
+    case L1_CASE(0x0031a128): nov_emitter_31a128_l1(em); return true;
     default: return false;
     }
 }
