@@ -103,9 +103,9 @@ def run(name, tmp, quiet=True):
         if m and int(m.group(1), 16) in standins:
             a = int(m.group(1), 16)
             res[nm] = ['// STAND-IN (another region\'s disc): the code the region changed here is not on this disc; this is the disc\'s own',
-                       '// build of the function (PAL:0x%08x), transliterated at the NTSC-U entry 0x%08x, without the enhancements\' hook'
+                       '// build of the function (PAL:0x%08x), transliterated at the NTSC-U entry 0x%08x, with the enhancements\' hook'
                        % (standins[a], a),
-                       '// points (tools/codegen/hooks.glue). Temporary: not proved by the oracle.'] + body
+                       '// points of that build (tools/codegen/hooks.glue, `PAL:` lines). Temporary: not proved by the oracle.'] + body
             print('%s: %s is a stand-in (PAL:0x%08x)' % (name, nm, standins[a]), file=sys.stderr)
     return res
 

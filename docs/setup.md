@@ -156,9 +156,9 @@ not supported yet.
   (`screen_draw_tr.cpp`), the hero's horizontal velocity on Rilgar, Blarg, Batalia and Pokitaru, the HUD
   counters on Rilgar (two), Blarg and Umbris, and Rilgar's class 918. From the PAL disc these are
   translated from the PAL code, as temporary stand-ins: they are marked `STAND-IN` in the generated
-  sources and are not yet proved against the original. The four hero velocity stand-ins leave out the
-  optional enhancements' hook points (R&C 3 movement's air braking and the strafe flip's speed on those
-  four planets).
+  sources and are not yet proved against the original. The four hero velocity stand-ins carry the same
+  enhancement hook points as the North American code (R&C 3 movement's air braking and the strafe flip's
+  speed), placed at the matching instructions of the PAL code (`PAL:` lines in `tools/codegen/hooks.glue`).
 
 ## Running it again
 

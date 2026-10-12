@@ -435,8 +435,8 @@ def load_hooks(path, lvl):
     if not path or not os.path.exists(path):
         return hooks, labels
     for line in open(path):
-        if not line.strip() or line.lstrip().startswith('#'):
-            continue
+        if not line.strip() or line.lstrip().startswith('#') or re.match(r'^L\d+\s+PAL:', line):
+            continue  # (`PAL:` points: the PAL build's code, moved onto a stand-in by mkall.py)
         m = re.match(r'^(L\d+)\s+(0x[0-9a-fA-F]+)\s*(?::\s*(.*?)|\s+(label))\s*$', line.rstrip('\n'))
         if not m:
             print('mips2cpp: bad hook line: ' + line.rstrip(), file=sys.stderr)

@@ -64,6 +64,24 @@ UNIFORM_ENTRY = lambda nm: nm.endswith('_u') or nm in UNIFORM_NAMES  # an entry 
 FORCE = {int(x, 16) for x in os.environ.get('MKALL_FORCE', '').split(',') if x}
 
 
+def standin_hooks(ad):
+    """A hooks file for the stand-in at `ad` (tools/codegen/ovlist.py): the `L<n> PAL:0x...` lines of hooks.glue inside the PAL
+    function it is made from, their addresses and `L_PAL_<addr>` labels moved to the stand-in's (its NTSC-U entry + the
+    offset in the PAL function)."""
+    pal, end, n = ovlist.overlay(LVL).standin(ad).local
+    move = lambda a: n + (a - pal)
+    out = []
+    for line in open(os.environ['MIPS2CPP_HOOKS']):
+        m = re.match(r'^L(\d+)\s+PAL:(0x[0-9a-fA-F]+)(.*)$', line.rstrip('\n'))
+        if m and int(m.group(1)) == LVL and pal <= int(m.group(2), 16) < end:
+            rest = re.sub(r'L_PAL_([0-9a-f]+)', lambda x: 'L_%x' % move(int(x.group(1), 16)), m.group(3))
+            out.append('L%d 0x%08x%s' % (LVL, move(int(m.group(2), 16)), rest))
+    path = os.path.join(SCR, 'standin_hooks_%x.glue' % ad)
+    open(path, 'w').write('\n'.join(out) + '\n')
+    print('    %x: a stand-in (PAL:0x%x), its %d hook point(s) from the PAL build' % (ad, pal, len(out)), file=sys.stderr)
+    return path
+
+
 def word(a):
     if LVL is not None:
         w = ovlist.overlay(LVL).data_word(a)
@@ -420,8 +438,7 @@ def main():
             cmd += ['--jt', '%x=%s' % (j, ','.join('%x' % x for x in tl))]
         env = None
         if LVL is not None and ad in dict(ovlist.STANDINS):  # (another region's disc: the disc's own build of a function the
-            env = dict(os.environ, MIPS2CPP_HOOKS='')     # region changed; the hook points are the NTSC-U code's: none)
-            print('    %x: a stand-in, without the enhancements\' hook points' % ad, file=sys.stderr)
+            env = dict(os.environ, MIPS2CPP_HOOKS=standin_hooks(ad))  # region changed: its own hook points, `PAL:` lines)
         r = subprocess.run(cmd, capture_output=True, text=True, env=env)
         if r.returncode != 0:
             print('FAILED', '%x' % ad, r.stderr[-500:], file=sys.stderr)
