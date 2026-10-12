@@ -266,7 +266,7 @@ void crouch_input() {
     } else if (hero_jump_input() != 0) {
         return;
     }
-    if (pad_button_history(0x80, frame_scale_i(0xf), nullptr) != 0 && lw(P + 0x10b8) == 8) set(0x15);
+    if (pad_button_history(0x80, frame_scale_i(0xf), nullptr) != 0 && lw(P + 0x10b8) == 8 && !advanced_rac3_wrench_out()) set(0x15);  // enhancement: R&C 3 throws from the crouch only with the wrench back
     if (!fall_check(0.0f)) return;
     if (lw(P + 0x2090) == 8 && lw(P + 0x198) < frame_scale_i(0xf)) return;
     set(6);

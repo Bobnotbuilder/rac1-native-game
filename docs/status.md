@@ -77,6 +77,8 @@ nothing, so an object whose class is not ported stands still or does not appear.
 
 ### Fixed since the first playtest
 
+- RAC 3 movement (Advanced): the wrench can no longer be thrown again before it is back in Ratchet's hand.
+
 - The flight between planets: the loading screen shows the ship flying through space to the next
   planet, then the planet and its name (it was a dark screen with only the sound).
 - The pause menu's 3D models: Ratchet holding the selected weapon or gadget, and the item models on
@@ -106,12 +108,6 @@ nothing, so an object whose class is not ported stands still or does not appear.
 | Options > Graphics (including Texture Detail and Overscan, the 2D cut to a TV's area), Controls, Advanced; the Original / Modern / Experimental choice at New Game | Implemented, known issues may remain; see [Settings](settings.md). |
 | Keyboard, mouse and controller mapping, remapping in Options > Controls | Implemented, known issues may remain; see [Input](input.md). |
 | Debug tools behind `--debug-tools` | Implemented; see [Settings](settings.md#debug-tools). |
-
-## Known issues
-
-- **RAC 3 movement (Advanced, off by default):** the wrench can be thrown again before it is back in
-  Ratchet's hand. Holding a direction and repeating the throw sends it ever further. It breaks
-  nothing; a fix is in progress.
 
 ## Not done yet
 

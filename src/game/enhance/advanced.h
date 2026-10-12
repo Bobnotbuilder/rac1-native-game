@@ -115,6 +115,9 @@ bool advanced_rac3_running_jump();
 // orig: (none) — enhancement: swing_input (states 0x13 / 0x15) leaving to the run with the stick,
 // R&C 3's rule; true when it did (`step`: the combo table's row)
 bool advanced_rac3_swing_exit(uint32_t step);
+// orig: (none) — enhancement: R&C 3's guard while the thrown wrench is out (thrown flag +0x10aa
+// set): no item input, no crouch throw, no new throw start
+bool advanced_rac3_wrench_out();
 // orig: (none) — enhancement: run_input's jump while aiming: the flip 0xb instead (stick sideways /
 // back past 0.9), as R&C 3's strafe
 bool advanced_strafe_flip();

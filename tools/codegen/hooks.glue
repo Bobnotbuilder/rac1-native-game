@@ -27,6 +27,8 @@
 #   I  0x2149c4  hero_horizontal_velocity, states 0xb / 0xc: the strafe flip's speed (to 0x214a58)
 #   J  0x214de0  hero_horizontal_velocity: R&C 3's air braking (f12 = k x 8 / 11, k = f4) instead of 2 / 6
 #   K  after each call of the level's own hero_stick_speed (Blarg, Pokitaru): advanced_move_speed, as hero_stick_speed (ovl_21.cpp)
+#   L  0x227fa0  hero_item_use, after its +0x1090 test: no item input while the thrown wrench is out (advanced_rac3_wrench_out; to the return 0)
+#   M  0x22c45c  crouch_input (state 4): the crouch throw 0x15 skipped while the thrown wrench is out (to the instruction after the call)
 
 # ---- Rilgar (level 5): hero_state_update 0x244a70, hero_set_state 0x24cee8, hero_input_update 0x255960, hero_horizontal_velocity 0x242258
 L5 0x00249b10: if (advanced_rac3_movement()) { advanced_rac3_along_stick(); set32(s0, s5.w() + -0xcb0); goto L_249bb4; }  // enhancement (A)
@@ -89,3 +91,13 @@ L11 0x0024ae14: advanced_move_speed();  // enhancement (K)
 L11 0x0024b5fc: advanced_move_speed();  // enhancement (K)
 L11 0x002545c0: advanced_move_speed();  // enhancement (K)
 L11 0x00254664: advanced_move_speed();  // enhancement (K)
+
+# ---- Points L / M (R&C 3 starts no throw while the wrench is out; UYA 0x501678, 0x503b68 case 4), every level with a copy
+L5 0x00251c78: if (advanced_rac3_wrench_out()) goto L_251c70;  // enhancement (L)
+L5 0x00257c14: if (advanced_rac3_wrench_out()) goto L_257c20;  // enhancement (M)
+L6 0x0023992c: if (advanced_rac3_wrench_out()) goto L_239924;  // enhancement (L)
+L6 0x0023ce28: if (advanced_rac3_wrench_out()) goto L_23ce34;  // enhancement (M)
+L8 0x002355c4: if (advanced_rac3_wrench_out()) goto L_2355bc;  // enhancement (L)
+L8 0x00239508: if (advanced_rac3_wrench_out()) goto L_239514;  // enhancement (M)
+L11 0x00251f04: if (advanced_rac3_wrench_out()) goto L_251efc;  // enhancement (L)
+L11 0x00255b00: if (advanced_rac3_wrench_out()) goto L_255b0c;  // enhancement (M)

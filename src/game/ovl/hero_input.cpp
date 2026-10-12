@@ -1,5 +1,6 @@
 // Ported overlay code: the hero's per-frame input -> state transitions (0x229b70) and the
 // checks it runs before the per-state part.
+#include <game/enhance/advanced.h>
 #include <game/ovl/hero_l1.h>
 #include <game/ovl/ovl_common.h>
 #include <game/ovl/ovl_reloc.h>
@@ -536,6 +537,7 @@ int32_t hero_item_use() {
     if (lbu(P + 0x20ac) != 0 && (lw(P + 0x10b8) != 8 || lh(P + 0x308) != 1)) return 0;
     if (lbu(P + 0x20a4) != 0) return 0;
     if (lw(P + 0x1090) == 0) return 0;
+    if (advanced_rac3_wrench_out()) return 0;  // enhancement: R&C 3 takes no item input while the thrown wrench is out
     if (lw(P + 0x10b4) != 2) return 0;
     const int32_t t0 = lw(P + 0x198);
     const uint32_t mask = lwu(P + 0x10a0);

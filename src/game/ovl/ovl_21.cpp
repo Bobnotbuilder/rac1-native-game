@@ -1306,6 +1306,7 @@ void hero_run_lean() {
 // rotation), pitch rate 23 * dt, effect table 0x140b00 entries and animation set 6.
 void hero_hold_moby_start() {
     const uint32_t P = g::PLAYER;
+    if (advanced_rac3_wrench_out()) return;  // enhancement: R&C 3 starts no throw while the wrench is out (UYA 0x4f1a08)
     constexpr OvConst<0x00166c80u> CAM{};
     bool aimed = false;
     const int32_t st = lw(P + 0x2084);

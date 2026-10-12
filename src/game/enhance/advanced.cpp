@@ -1013,6 +1013,17 @@ bool advanced_rac3_swing_exit(uint32_t step) {
 }
 
 // orig: (none) — enhancement (advanced.h)
+bool advanced_rac3_wrench_out() {
+    // R&C1 needs no such guard: its hero stays in the throw (0x15) until the wrench is back (row 3
+    // ends at 91, reached after the catch). Leaving it early (advanced_rac3_swing_exit, the jump
+    // cancel at 35) needs UYA's: its item input 0x501678 returns while the thrown flag P+0x121a is
+    // set, its crouch (0x503b68 case 4) throws only with it clear, and its throw start 0x4f1a08
+    // does nothing while it is set. R&C1's flag: +0x10aa
+    // (set by hero_hold_moby_start, cleared by the wrench moby when it is back in the hand).
+    return advanced_rac3_movement() && lbu(HERO + 0x10aa) != 0;
+}
+
+// orig: (none) — enhancement (advanced.h)
 bool advanced_strafe_flip() {
     // UYA: while strafing, cross with the stick past 0.9 and not forward (quadrant 2 of
     // hero_stick_quadrant 0x221df8: 3 back, 1 right, 0 left) is the flip 0xb, its animation by the

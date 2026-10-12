@@ -1,6 +1,7 @@
 // Novalis's (level 1) variants of the hero's timers, idle entry, landing and item use:
 // Veldin's code minus the features Novalis's build does not have (movement modes 1 / 2, the
 // swingshot, the hoverboard landing). Addresses are Novalis's.
+#include <game/enhance/advanced.h>
 #include <game/ovl/hero_l1.h>
 #include <game/ovl/ovl_common.h>
 #include <game/ovl/ovl_reloc.h>
@@ -291,6 +292,7 @@ int32_t hero_item_use_l1() {
     if (lbu(P + 0x20ac) != 0 && (lw(P + 0x10b8) != 8 || lh(P + 0x308) != 1)) return 0;
     if (lbu(P + 0x20a4) != 0) return 0;
     if (lw(P + 0x1090) == 0) return 0;
+    if (advanced_rac3_wrench_out()) return 0;  // enhancement: R&C 3 takes no item input while the thrown wrench is out
     if (lw(P + 0x10b4) != 2) return 0;
     const int32_t t0 = lw(P + 0x198);
     const uint32_t mask = lwu(P + 0x10a0);
