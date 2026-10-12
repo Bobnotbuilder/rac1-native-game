@@ -1,13 +1,13 @@
 # Environment variables
 
-rac1-native reads a number of `RAC1_*` environment variables. This page lists all of them: 274 in
+rac1-native reads a number of `RAC1_*` environment variables. This page lists all of them: 275 in
 total, in three groups.
 
 | Group | Count | Who it is for |
 |---|---|---|
 | [Player](#player-variables) | 18 | Settings a player may want to change: files, window, audio, the ISO |
 | [Debugging](#debugging-variables) | 202 | Developers: profilers, overlays, switching a renderer or an optimisation on or off to compare |
-| [Automated testing](#automated-testing-variables) | 54 | Scripted and headless runs: frame counts, screenshots, simulated input, self-checks |
+| [Automated testing](#automated-testing-variables) | 55 | Scripted and headless runs: frame counts, screenshots, simulated input, self-checks |
 
 ## When a variable is honoured
 
@@ -310,6 +310,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_TITLE_HOST` | 0 or 1; unset = the title scene is drawn through the normal chain (modern or faithful) | 1 draws the title screen's scene with the older host renderers instead; 0 forces the normal chain. |
 | `RAC1_TITLE_WAIT` | integer frames; default 60 | With a RAC1_SIM_INPUT title: script, how many frames after the title appears before Start is pressed. |
 | `RAC1_UNLOCK_PLANETS` | comma-separated level numbers, e.g. 2,3,4; unset = none | At the first gameplay frame, makes those planets reachable from the ship by calling the game's own unlock routine, so the galactic map shows them. |
+| `RAC1_UPDATE_FAKE` | x.y.z (a release) or dev:N (N new commits on main); unset = off | Offers a made-up update to the update notice instead of asking GitHub (no network), so the main menu's panel can be seen and tried: with `--debug-tools`, or headless with RAC1_ADVANCED=1 and RAC1_BOOT=1 (a headless run never checks for real). Skip Version applies to it as to a real one (`update_skip` in advanced_options.txt). |
 | `RAC1_VENDOR_OPEN` | button bitmask (decimal or 0x hex); default 0x10 (triangle) | With the RAC1_SIM_INPUT vendor script, the button press used to open the vendor screens (for example 0x20 for circle). |
 | `RAC1_VU_SELFCHECK` | any value = on; default off | Runs each fast VU1 port and the exact port side by side and reports on stderr when their results differ; a progress line every 5000 programs. |
 | `RAC1_WORLD_MRP_CHECK` | any value = on; default off | Verification mode for the modern world renderer: it compares the triangles it builds against the CPU reference and also disables the GPU fast paths. |

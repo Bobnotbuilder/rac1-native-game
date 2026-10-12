@@ -3,6 +3,7 @@
 
 #include <game/enhance/advanced.h>
 #include <game/enhance/graphics.h>
+#include <game/enhance/update_notice.h>
 #include <game/ovl/memory_card.h>
 #include <game/ovl/moby_pass.h>
 #include <game/ovl/ovl.h>
@@ -140,6 +141,7 @@ void title_menu_update() {
         return;
     }
     if (st == 0 || st == 0x2d) title_menu_page_start();
+    update_notice_menu_frame(MS, ROOT);  // enhancement: a newer version found: the update notice opened, once
     if ((lwu(0x0015eeb4) & 1) != 0) {
         screen_open(3, lwu(MS + 4));
         return;

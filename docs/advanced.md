@@ -10,7 +10,7 @@ from the PS2 compromises the port removes (see [Overview](overview.md#faithful-t
   whether the world pauses. Enhancements are **optional, off by default, and labelled as changes to
   the game**. With all of them off, the game plays as the original.
 
-The Advanced page has four rows:
+The Advanced page has six rows:
 
 | Row | Values (default first) | Kind |
 |---|---|---|
@@ -18,6 +18,8 @@ The Advanced page has four rows:
 | Aiming | Original, Modern | enhancement |
 | Movement | Original, RAC 3 | enhancement |
 | Fades | Fast, Original | a removed compromise: Fast is the port's default, Original the PS2's |
+| Update Check | On, Off | the PC version's [update check](settings.md#the-update-check), not a game setting |
+| Update Channel | Stable, Development | which builds the update check compares with |
 
 All of it is in `src/game/enhance/advanced.{h,cpp}`. None of it is a port: every function there is
 annotated `// orig: (none) — enhancement`.
@@ -44,7 +46,9 @@ port's fast fades). Left and right on a row step the value (`advanced_settings_d
   `$XDG_CONFIG_HOME/rac1-native/`, or `$RAC1_ADVANCED_FILE`), one `name value` line per setting,
   written whenever a setting changes;
 - with each save, in a `save<N>.pc` file next to the game's own `save<N>.bin` (see
-  [Saves](saves.md#the-pc-settings-next-to-each-save)), so each playthrough keeps its own.
+  [Saves](saves.md#the-pc-settings-next-to-each-save)), so each playthrough keeps its own. The update
+  check's two rows are not: they belong to the machine (in the file, `update_check_off` and
+  `update_channel`, and `update_skip`, the version the update notice's Skip Version chose).
 
 **The New Game choice.** Picking "Modern mode" at New Game turns Quick Select, Aiming and Movement
 on; "Original mode" turns them off (`advanced_apply_mode`). Fades is left as it is. Every setting can
