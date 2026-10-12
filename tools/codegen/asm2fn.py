@@ -105,8 +105,13 @@ def scan_headers():
 
 
 def ported_set():
-    r = subprocess.run(['grep', '-rhoE', 'orig: 0x[0-9a-fA-F]{8}', os.path.join(ROOT, 'src', 'game')], capture_output=True, text=True).stdout
-    return {int(l.split('0x')[1], 16) for l in r.split('\n') if l.strip()}
+    # (in Python, not grep: Windows has none)
+    found = set()
+    for dirpath, _, files in os.walk(os.path.join(ROOT, 'src', 'game')):
+        for fn in files:
+            with open(os.path.join(dirpath, fn), encoding='utf-8', errors='replace') as fh:
+                found.update(int(h, 16) for h in re.findall(r'orig: 0x([0-9a-fA-F]{8})', fh.read()))
+    return found
 
 
 def has_ref(params):
