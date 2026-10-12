@@ -55,6 +55,9 @@ std::filesystem::path config_dir();
 std::filesystem::path data_dir();
 // This program's own file (empty when unknown).
 std::filesystem::path executable_path();
+// The system's language for the user, as a lowercase ISO 639-1 code ("en", "fr", "it" ...); empty when unknown.
+// Linux: $LC_ALL, $LC_MESSAGES, $LANG (in that order); Windows: the user's default locale.
+std::string system_language();
 
 // ---- Processes and the environment ----
 

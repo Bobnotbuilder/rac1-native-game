@@ -100,6 +100,7 @@ the window settings or Fades. The mode chosen is kept with the save.
 | Controls | `~/.config/rac1-native/controls.txt` (see [Input](input.md#the-bindings-file-controlstxt)) |
 | The picture settings, the Advanced settings and the mode, per save | `save<N>.pc` next to each save (see [Saves](saves.md#the-pc-settings-next-to-each-save)) |
 | The game's own options | the game's own settings file on the memory card, as on the PS2 |
+| The language | `~/.config/rac1-native/console.txt` (see below) |
 
 `~/.config` stands for `$XDG_CONFIG_HOME` when it is set. On Windows the folder is
 `%APPDATA%\rac1-native\`. `RAC1_GRAPHICS_FILE`, `RAC1_ADVANCED_FILE` and `RAC1_CONTROLS_FILE` point
@@ -110,6 +111,13 @@ and are kept only in the preferences. The picture settings (render resolution, a
 field of view, level of detail, the lighting rows, texture detail, overscan) and the Advanced settings are also written into
 each save's `save<N>.pc`, so loading a save brings back the settings it was played with. A save
 without that file (an older one) keeps the current settings.
+
+**The language.** As on the PS2, the game doesn't keep its language in its save: at the start it
+takes the console's language. The port has no console, so it keeps one for it: the language last
+chosen in the game's Options is kept in `console.txt` and is the console's language at the next
+start, as if the player had set their PS2 to it. The first time, it is the system's language when
+the disc has it (English, French, German, Spanish or Italian), else English. A headless run always
+starts in English and keeps nothing; `RAC1_LANGUAGE` (testing) sets the language for one run.
 
 ## Debug tools
 
