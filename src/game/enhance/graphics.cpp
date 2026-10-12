@@ -37,6 +37,8 @@
 #include <game/render/render_toggles.h>
 #include <game/render/render_view.h>
 
+#include <platform/platform.h>
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -303,8 +305,7 @@ void values_to_ee() {
 // orig: (none) — enhancement: the preferences file's path
 std::filesystem::path prefs_path() {
     if (const char* f = std::getenv("RAC1_GRAPHICS_FILE")) return f;
-    if (const char* x = std::getenv("XDG_CONFIG_HOME"); x != nullptr && *x != 0) return std::filesystem::path(x) / "rac1-native" / "graphics_options.txt";
-    if (const char* h = std::getenv("HOME")) return std::filesystem::path(h) / ".config" / "rac1-native" / "graphics_options.txt";
+    if (const std::filesystem::path d = platform::config_dir(); !d.empty()) return d / "graphics_options.txt";
     return "graphics_options.txt";
 }
 
@@ -319,7 +320,7 @@ int nearest(const int (&list)[N], int v) {
 
 // orig: (none) — enhancement: the preferences read; false when there are none
 bool prefs_read(const std::filesystem::path& path) {
-    FILE* f = std::fopen(path.c_str(), "r");
+    FILE* f = platform::open_file(path, "r");
     if (f == nullptr) return false;
     char key[64];
     while (std::fscanf(f, "%63s", key) == 1) {
@@ -389,7 +390,7 @@ void prefs_write() {
     const std::filesystem::path path = prefs_path();
     std::error_code ec;
     if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path(), ec);
-    if (FILE* f = std::fopen(path.c_str(), "w")) {
+    if (FILE* f = platform::open_file(path, "w")) {
         const int* v = gs_.value;
         std::fprintf(f, "display %d\nwindow %d %d\nrender_scale %d\naspect %d\nfit %d\nlod %d\nfov %d\nvsync %d\nfps_cap %d\nlighting %d\ndynamic_shadows %d\nsecondary_lights %d\nshadow_distance %d\nambient_occlusion %d\ntexture_detail %d\noverscan %d\nmode %u\n",
                      v[S_DISPLAY], gs_.win_w, gs_.win_h, SCALES[v[S_SCALE]], v[S_ASPECT], v[S_FIT], v[S_LOD], FOVS[v[S_FOV]], v[S_VSYNC], CAPS[v[S_CAP]], v[S_LIGHTING], v[S_DYN_SHADOWS],

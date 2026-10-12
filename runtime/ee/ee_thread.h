@@ -8,12 +8,13 @@
 // loop either runs all its frames inside one host frame (nothing of it is seen) or has to be cut
 // into a machine resumed frame by frame, which every caller would have to be split for.
 //
-// Instead the game frame runs on a coroutine (a stack of its own, ucontext): a vsync wait inside a
-// blocking loop (ee_thread_vsync) suspends it and the host frame ends there - the host presents
-// the frame's packets as the PS2 would show them after that vsync - and the next host frame
-// resumes it right after the wait, the callers' C++ frames untouched. Nothing of the game runs
-// while it is suspended (the PS2's main thread is blocked in the loop), and the host frame's
-// own work (the picture, the sound's output) goes on as after any other frame.
+// Instead the game frame runs on a coroutine (a stack of its own; src/platform: ucontext on Linux,
+// a fiber on Windows): a vsync wait inside a blocking loop (ee_thread_vsync) suspends it and the
+// host frame ends there - the host presents the frame's packets as the PS2 would show them after
+// that vsync - and the next host frame resumes it right after the wait, the callers' C++ frames
+// untouched. Nothing of the game runs while it is suspended (the PS2's main thread is blocked in
+// the loop), and the host frame's own work (the picture, the sound's output) goes on as after any
+// other frame.
 //
 // Outside the coroutine (the oracle, the start-up before the main loop) ee_thread_vsync returns
 // at once: the loop runs to its end inside the call, as the original does with no time passing.

@@ -1,4 +1,4 @@
-// The host's thread priorities through rtkit (see host_priority.h). Host code.
+// The host's thread priorities through rtkit (see host_priority.h): Linux. Host code.
 #include "host_priority.h"
 
 #include <dirent.h>
@@ -102,7 +102,7 @@ bool host_priority_enabled() {
 
 void host_priority_set_enabled(bool on) { g_enabled = on ? 1 : 0; }
 
-bool host_priority_realtime(pid_t tid, int prio) {
+bool host_priority_realtime(std::uint64_t tid, int prio) {
     if (!host_priority_enabled()) return false;
     // rtkit requires the process's RLIMIT_RTTIME at most its RTTimeUSecMax (200 ms): a real-time thread that runs that long
     // without blocking gets SIGXCPU (the audio thread blocks every few ms)

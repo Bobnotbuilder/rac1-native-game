@@ -19,6 +19,7 @@ src/
     enhance/       the PC options: Graphics, Controls and Advanced pages
   formats/         decoders for the game's file formats
   io/              memory-mapped files, byte readers
+  platform/        the operating system's calls (Linux, Windows) behind one small interface
   host/            main, the frame loop, window and input, audio output, test scripting
   setup/           the setup mode: ISO checks, extraction, asset generation
   _devtools/       the debug menu (openly invented, never part of the port)

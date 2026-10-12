@@ -3,6 +3,8 @@
 
 #include <runtime/kernel/ee_memory.h>
 
+#include <platform/platform.h>
+
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -192,7 +194,7 @@ void host_load(const fs::path& root) {
 // orig: (host) a sceMcStDateTime (the card keeps Japan's time: the host's own)
 void date(uint32_t a, std::time_t t) {
     std::tm tm{};
-    localtime_r(&t, &tm);
+    platform::local_time(t, &tm);
     ee_write<uint8_t>(a, 0);
     ee_write<uint8_t>(a + 1, static_cast<uint8_t>(tm.tm_sec));
     ee_write<uint8_t>(a + 2, static_cast<uint8_t>(tm.tm_min));
@@ -497,8 +499,8 @@ bool mc_card_present() { return g_card.present; }
 // orig: (host)
 std::string mc_default_card_dir() {
     if (const char* d = std::getenv("RAC1_MEMCARD_DIR"); d != nullptr && *d != 0) return d;
-    if (const char* x = std::getenv("XDG_DATA_HOME"); x != nullptr && *x != 0) return std::string(x) + "/rac1-native/memcard";
-    if (const char* h = std::getenv("HOME"); h != nullptr && *h != 0) return std::string(h) + "/.local/share/rac1-native/memcard";
+    // ($XDG_DATA_HOME/rac1-native, else ~/.local/share/rac1-native; %APPDATA%\rac1-native on Windows)
+    if (const std::filesystem::path d = platform::data_dir(); !d.empty()) return (d / "memcard").string();
     return "memcard";
 }
 

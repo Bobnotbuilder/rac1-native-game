@@ -65,7 +65,7 @@ std::string bindings_to_text(const Bindings& b);
 Bindings bindings_from_text(std::string_view text, std::vector<std::string>* warnings = nullptr);
 
 // The controls file: $RAC1_CONTROLS_FILE, else $XDG_CONFIG_HOME/rac1-native/controls.txt, else
-// ~/.config/rac1-native/controls.txt.
+// ~/.config/rac1-native/controls.txt (Windows: %APPDATA%\rac1-native\controls.txt; platform::config_dir).
 std::string controls_path();
 // Reads the file; when it does not exist, writes the defaults there (the player edits it) and returns them.
 Bindings load_or_create(const std::string& path);

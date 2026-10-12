@@ -48,8 +48,7 @@
 
 #include <runtime/iop/snd989_iop.h>
 
-#include <sys/syscall.h>
-#include <unistd.h>
+#include <platform/platform.h>
 
 #include <algorithm>
 #include <atomic>
@@ -111,7 +110,7 @@ std::atomic<uint64_t> g_underruns{0}, g_dry_frames{0}, g_skips{0}, g_skipped_fra
 std::atomic<double> g_max_cb_gap_ms{0}, g_min_fill_ms{1e9}, g_fill_sum_ms{0}, g_rate_sum{0};
 std::atomic<int> g_target_now{kStartTarget};
 std::atomic<uint64_t> g_rate_n{0};
-std::atomic<long> g_device_tid{0};
+std::atomic<uint64_t> g_device_tid{0};
 std::atomic<uint64_t> g_alone_frames{0}, g_alone_runs{0};  // (the IOP's mirror played alone; since the last summary)
 std::atomic<uint64_t> g_alone_total{0};                    // (the whole run's)  // (the device's thread, seen by its first callback)
 
@@ -139,7 +138,7 @@ void pull(ma_device*, void* out, const void*, ma_uint32 frames_u) {
     int16_t* o = static_cast<int16_t*>(out);
     const int frames = static_cast<int>(frames_u);
     Reader& rd = g_rd;
-    if (g_device_tid.load(std::memory_order_relaxed) == 0) g_device_tid.store(static_cast<long>(syscall(SYS_gettid)), std::memory_order_relaxed);
+    if (g_device_tid.load(std::memory_order_relaxed) == 0) g_device_tid.store(rac1::platform::thread_id(), std::memory_order_relaxed);
     const double t = now_ms();
     if (rd.last_cb_ms != 0) atomic_max(g_max_cb_gap_ms, t - rd.last_cb_ms);
     rd.last_cb_ms = t;
@@ -376,8 +375,8 @@ bool audio_out_start() {
         g_iop_run.store(true);
         g_iop = std::thread([] {
             if (rac1::host_priority_enabled()) {  // (the queue's producer now: real-time as the device's thread, one step under it)
-                const long tid = static_cast<long>(syscall(SYS_gettid));
-                std::fprintf(stderr, "[audio] the IOP thread %ld real-time: %s\n", tid, rac1::host_priority_realtime(static_cast<pid_t>(tid), 9) ? "yes" : "no (rtkit refused or absent)");
+                const uint64_t tid = rac1::platform::thread_id();
+                std::fprintf(stderr, "[audio] the IOP thread %llu real-time: %s\n", static_cast<unsigned long long>(tid), rac1::host_priority_realtime(tid, 9) ? "yes" : "no (rtkit refused or absent)");
             }
             iop_loop();
         });
@@ -385,9 +384,9 @@ bool audio_out_start() {
     if (rac1::host_priority_enabled())
         std::thread([] {  // (the device's thread real-time once its first callback named it; the D-Bus call off the game's thread)
             for (int i = 0; i < 200 && g_device_tid.load() == 0; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            const long tid = g_device_tid.load();
+            const uint64_t tid = g_device_tid.load();
             if (tid != 0)
-                std::fprintf(stderr, "[audio] the device's thread %ld real-time: %s\n", tid, rac1::host_priority_realtime(static_cast<pid_t>(tid), 10) ? "yes" : "no (rtkit refused or absent)");
+                std::fprintf(stderr, "[audio] the device's thread %llu real-time: %s\n", static_cast<unsigned long long>(tid), rac1::host_priority_realtime(tid, 10) ? "yes" : "no (rtkit refused or absent)");
         }).detach();
     return true;
 }

@@ -2,11 +2,13 @@
 
 #include "ee_memory.h"
 
+#include <platform/platform.h>
+
 #include <cstdio>
-#include <fcntl.h>
-#include <unistd.h>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <vector>
 
 namespace rac1 {
@@ -17,8 +19,23 @@ std::FILE* g_iso = nullptr;
 
 std::string disc_path() {
     const char* env = std::getenv("RAC1_ISO");
-    return env != nullptr ? env : "assets/iso/rac1-ntsc-u.iso";
+    if (env != nullptr) return env;
+    // the setup's link to the player's image; where links cannot be made (Windows without the
+    // privilege), the image's path written in a text file beside it instead
+    const std::string link = "assets/iso/rac1-ntsc-u.iso";
+    std::error_code ec;
+    if (!std::filesystem::exists(link, ec)) {
+        std::ifstream f(disc_path_file());
+        std::string p;
+        if (f && std::getline(f, p)) {
+            while (!p.empty() && (p.back() == '\r' || p.back() == '\n')) p.pop_back();
+            if (!p.empty()) return p;
+        }
+    }
+    return link;
 }
+
+const char* disc_path_file() { return "assets/iso/disc-path.txt"; }
 
 namespace {
 // SYSTEM.CNF's BOOT2 file name, read through the ISO9660 root directory ("" when it cannot be read)
@@ -90,14 +107,14 @@ bool disc_open(const std::string& path) {
 
 bool disc_is_open() { return g_iso != nullptr; }
 
-// pread on the file's descriptor, no shared position: the game's thread and the host's audio thread (the IOP
-// mirror's stream reader, ADR 0013) read at the same time
+// a positional read (pread; ReadFile at an offset on Windows), no shared position: the game's thread and the host's
+// audio thread (the IOP mirror's stream reader, ADR 0013) read at the same time
 bool disc_read(uint32_t lba, uint32_t sectors, void* dst) {
     if (g_iso == nullptr && !disc_open()) return false;
     const size_t n = static_cast<size_t>(sectors) * 2048;
     size_t got = 0;
     while (got < n) {
-        const ssize_t r = pread(fileno(g_iso), static_cast<char*>(dst) + got, n - got, static_cast<off_t>(lba) * 2048 + static_cast<off_t>(got));
+        const int64_t r = platform::read_at(g_iso, static_cast<uint64_t>(lba) * 2048 + got, static_cast<char*>(dst) + got, n - got);
         if (r <= 0) return false;
         got += static_cast<size_t>(r);
     }
@@ -106,7 +123,7 @@ bool disc_read(uint32_t lba, uint32_t sectors, void* dst) {
 
 void disc_will_need(uint32_t lba, uint32_t sectors) {
     if (g_iso == nullptr && !disc_open()) return;
-    posix_fadvise(fileno(g_iso), static_cast<off_t>(lba) * 2048, static_cast<off_t>(sectors) * 2048, POSIX_FADV_WILLNEED);
+    platform::will_need(g_iso, static_cast<uint64_t>(lba) * 2048, static_cast<uint64_t>(sectors) * 2048);
 }
 
 bool disc_read_ee(uint32_t ee_dst, uint32_t lba, uint32_t sectors) {
