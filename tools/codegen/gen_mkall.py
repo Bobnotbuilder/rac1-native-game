@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# usage: gen_mkall.py list | gen <group> [--out ROOT] [--no-insn-comments] [--tmp DIR] | freeze <group> [--from DIR]
+# usage: gen_mkall.py list | gen <group> [--out ROOT] [--no-insn-comments] [--tmp DIR]
 #
 # The machine-transliterated ports of tools/codegen/mkall.py + mips2cpp.py, generated whole from the ISO and the group's committed,
 # hand-written inputs (nothing is read from the generated files themselves):
@@ -13,9 +13,6 @@
 # must be produced by the run and every function of the run placed (else it fails, naming them). --no-insn-comments: the trailing
 # comments carrying the original instruction (`// lw a1,0xf0(sp)`, `// jal 0x...`) are left out (tools/codegen/gen_common.py); the
 # `// orig:` lines and the code stay, so the result compiles to the same object code.
-# `freeze` (the dev repo, once per group or after a deliberate change of its layout) writes the three inputs from a set of files
-# that already hold the group's functions (default: the committed ones; --from DIR: a regen.py run's splice), with regen.py's
-# recovery of the entries / glue.
 import json
 import os
 import re
@@ -144,63 +141,6 @@ def cmd_gen(name, out_root, strip, tmp):
     return written
 
 
-def cmd_freeze(name, src_dir):
-    import regen  # noqa: E402  (the recovery of the entries / glue from generated files: only here)
-    g = regen.GROUPS[name]
-    files = [os.path.join(src_dir, os.path.basename(f)) if src_dir else os.path.join(W, f) for f in g['files']]
-    rels = g['files']
-    # the run regen.py made last (its final glue file holds the call-site glue the group needs)
-    keep = os.path.join(W, 'scratch', 'gen_freeze', name)
-    if not src_dir or not os.path.exists(os.path.join(src_dir, name + '.glue')):
-        sys.exit('freeze %s: run `tools/re/regen.py run %s --keep DIR` first and pass --from DIR' % (name, name))
-    glue = open(os.path.join(src_dir, name + '.glue')).read()
-    ents = regen.entries(rels)
-    have = {e.split(':')[0] for e in ents}
-    ents += [e for e in g.get('extra', []) if e.split(':')[0] not in have]
-    retired = regen.retired_addrs(g['level'])
-    fa = regen.func_addrs(rels)
-    env = dict(g['env'])
-    force = sorted(a for a, (nm, rt) in fa.items() if rt == 'TrRet' and regen.HELPER.match(nm) and a not in retired)
-    if force:
-        env['MKALL_FORCE'] = ','.join('%x' % a for a in force)
-    uni = [nm for nm, rt in fa.values() if rt == 'TrRet' and not regen.HELPER.match(nm)]
-    if uni:
-        env['MKALL_UNIFORM'] = ','.join(uni)
-    spec = {'level': g['level'], 'tool': g.get('tool', 'mkall.py'), 'env': env, 'entries': ents,
-            'glue_files': list(g['glue']), 'files': rels}
-    os.makedirs(SPEC, exist_ok=True)
-    json.dump(spec, open(os.path.join(SPEC, name + '.json'), 'w'), indent=1)
-    open(os.path.join(SPEC, name + '.glue'), 'w').write(glue)
-    # the run's functions (the skeletons place exactly those)
-    gen = os.path.join(src_dir, name + '.gen.cpp')
-    produced = {nm for s, e, nm in gen_common.blocks(open(gen).read())}
-    for f, rel in zip(files, rels):
-        t = open(f).read()
-        L = t.split('\n')
-        out = []
-        pos = 0
-        for s, e, nm in gen_common.blocks(t):
-            out.extend(L[pos:s])
-            if nm in produced:
-                out.append(MARK + nm)
-            elif not any(re.match(r'^// orig: (?:L\d+:|front:)?0x', x) for x in L[s:e]):  # (hand-written: kept as the skeleton's text)
-                print('%s: %s is not generated (hand-written): kept in the skeleton' % (rel, nm), file=sys.stderr)
-                out.extend(L[s:e])
-            else:
-                print('%s: %s not produced by the run: dropped' % (rel, nm), file=sys.stderr)
-                while out and out[-1] == '':
-                    out.pop()
-                out.append('')
-                while e < len(L) and L[e] == '':
-                    e += 1
-            pos = e
-        out.extend(L[pos:])
-        p = skel_path(rel)
-        os.makedirs(os.path.dirname(p), exist_ok=True)
-        open(p, 'w').write('\n'.join(out))
-    print('froze', name, len(ents), 'entries', len(glue.splitlines()), 'glue lines')
-
-
 def main():
     a = sys.argv[1:]
     if not a or a[0] == 'list':
@@ -211,8 +151,6 @@ def main():
         tmp = opt('--tmp') or tempfile.mkdtemp(prefix='gen_mkall_')
         for f in cmd_gen(a[1], opt('--out', W), '--no-insn-comments' in a, tmp):
             print(f)
-    elif a[0] == 'freeze':
-        cmd_freeze(a[1], opt('--from'))
 
 
 if __name__ == '__main__':

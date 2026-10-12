@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Refuses a commit that would put the game's code or data into the repository: anything under
+# assets/ or a build directory, the sources tools/codegen generates from the player's disc, disc
+# images, executables, game-format and image files, and very large files.
+# Enable once per clone:  git config core.hooksPath tools/git-hooks
+# (the hook reads the staged contents, so what it checks is what would be committed)
+set -u
+
+root=$(git rev-parse --show-toplevel) || exit 1
+cd "$root" || exit 1
+
+max_bytes=$((1024 * 1024))
+fail=0
+refuse() {
+    echo "pre-commit: refused: $1: $2" >&2
+    fail=1
+}
+
+# the generated sources' paths, as generate_all.py lists them (src/game/...)
+generated=""
+if [ -f tools/codegen/generate_all.py ]; then
+    generated=$(python3 tools/codegen/generate_all.py --files 2>/dev/null) || generated=""
+    [ -n "$generated" ] || echo "pre-commit: warning: could not list the generated sources" >&2
+fi
+
+while IFS= read -r -d '' path; do
+    lower=${path,,}
+    base=${path##*/}
+
+    case "$path" in
+        assets/* | assets) refuse "$path" "assets/ is generated from the player's disc"; continue ;;
+        build/* | build-*/* | cmake-build-*/* | out/* | scratch/*) refuse "$path" "build or scratch output"; continue ;;
+    esac
+
+    if [ -n "$generated" ] && grep -qxF -- "$path" <<<"$generated"; then
+        refuse "$path" "generated from the disc by tools/codegen (it lives in assets/generated/src/)"
+        continue
+    fi
+
+    case "$base" in
+        SCUS_* | SCES_* | SCPS_* | SLUS_* | SLES_*)
+            [[ "$base" =~ ^[A-Z]{4}_[0-9]{3}\.[0-9]{2}$ ]] && { refuse "$path" "a PS2 executable"; continue; } ;;
+    esac
+
+    case "$lower" in
+        *.iso | *.chd | *.cso | *.zso | *.bin | *.cue | *.img | *.elf | *.irx | *.wad | *.vag | *.pss \
+        | *.snd | *.vb | *.glb | *.gltf | *.dae | *.obj | *.fbx | *.ppm | *.pgm | *.p2s | *.ps2 \
+        | *.mcd | *.sav | *.7z | *.zip | *.rar | *.gz | *.xz | *.zst | *.tar)
+            refuse "$path" "a disc image, game data, archive or dump file type"; continue ;;
+        *.png | *.jpg | *.jpeg | *.bmp | *.tga | *.dds | *.webp | *.gif)
+            case "$path" in
+                docs/*) ;;
+                *) refuse "$path" "an image outside docs/"; continue ;;
+            esac ;;
+    esac
+
+    size=$(git cat-file -s ":$path" 2>/dev/null || echo 0)
+    if [ "$size" -gt "$max_bytes" ]; then
+        refuse "$path" "$size bytes, over the 1 MiB limit"
+        continue
+    fi
+
+    magic=$(git cat-file blob ":$path" 2>/dev/null | head -c 4 | od -An -tx1 | tr -d ' \n')
+    [ "$magic" = "7f454c46" ] && refuse "$path" "an ELF executable"
+done < <(git diff --cached --name-only --diff-filter=ACMR -z)
+
+if [ "$fail" -ne 0 ]; then
+    echo "pre-commit: unstage those files (git restore --staged <file>). Nothing from the game's disc may be committed." >&2
+    exit 1
+fi
+exit 0

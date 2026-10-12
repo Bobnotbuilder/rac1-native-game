@@ -9,7 +9,7 @@
 #                                      "after": [...]}}: asm2cpp.translate) -- ours: host notes, spin loops the port does not need, ...
 #   tools/codegen/gen/skel/<path>.skel      the file with each fragment's statements replaced by a `//@asm <fragment>` line: the
 #                                      hand-written C++ around them (the wrappers, the compiled functions ported by hand)
-# `freeze` (the dev repo) writes both from the committed file: every function whose body carries instruction comments and an
+# `freeze` writes both from a file that carries its instruction comments (generated without --no-insn-comments): every function whose body carries instruction comments and an
 # `// orig: 0x...` is a fragment; what the review changed becomes its patches (the instruction comments left out of them).
 import difflib
 import json

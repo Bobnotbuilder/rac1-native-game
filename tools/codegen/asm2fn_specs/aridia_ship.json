@@ -27,7 +27,7 @@
    "name": "ari_ship_takeoff_draw_l2",
    "ret": "void",
    "params": "uint32_t m",
-   "doc": "The take-off's draw callback (Veldin 0x28f238; the landing / take-off sequence queues it, docs/reversing/cutscene.md)"
+   "doc": "The take-off's draw callback (Veldin 0x28f238; the landing / take-off sequence queues it)"
   },
   {
    "addr": "211348",
