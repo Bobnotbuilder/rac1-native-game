@@ -7,18 +7,15 @@
 #include "scene_export.h"
 
 #include <io/mapped_file.h>
+#include <platform/platform.h>
+#include <runtime/kernel/disc.h>
 
 #include <cstdlib>
-#include <fcntl.h>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
-#include <spawn.h>
 #include <string>
-#include <sys/wait.h>
-#include <unistd.h>
 #include <vector>
-
-extern char** environ;
 
 namespace rac1::setup {
 
@@ -59,7 +56,7 @@ void print_status(const fs::path& root) {
         std::cout << "  [" << (ok ? "OK" : "MISSING") << "] " << desc << " (" << count << " files in " << p.string() << ")\n";
     };
 
-    check_file("Disc image", root / GAME_ISO);
+    check_file("Disc image", fs::exists(root / GAME_ISO) || !fs::exists(root / "iso/disc-path.txt") ? root / GAME_ISO : fs::path(disc_path()));
     check_file("Boot executable", root / "dumps/SCUS_971.99");
     count_dir("Level data", root / "extracted/level_wads", 19);
     count_dir("Moby models and textures", root / "generated/mrp/moby", 20);
@@ -70,7 +67,9 @@ void print_status(const fs::path& root) {
 }
 
 // Makes the game find the disc while it runs: assets/iso/rac1-ntsc-u.iso, a link to the image
-// when it is elsewhere. A file the player put there is never replaced.
+// when it is elsewhere. A file the player put there is never replaced. Where a link cannot be made
+// (Windows, without Developer Mode or the administrator's right), the image's path goes into
+// assets/iso/disc-path.txt instead, which the game reads (runtime/kernel/disc.cpp).
 bool link_iso(const fs::path& assets, const fs::path& iso) {
     const fs::path dest = assets / GAME_ISO;
     std::error_code ec;
@@ -84,20 +83,30 @@ bool link_iso(const fs::path& assets, const fs::path& iso) {
         return true;
     }
     fs::create_directories(dest.parent_path(), ec);
+    const fs::path path_file = dest.parent_path() / "disc-path.txt";
     fs::create_symlink(target, dest, ec);
     if (ec) {
+#if defined(_WIN32)
+        // no link: the path in a text file (UTF-8, the program's code page: its manifest)
+        std::ofstream f(path_file, std::ios::binary | std::ios::trunc);
+        f << target.string() << "\n";
+        if (f.flush()) {
+            std::cout << "[setup] The game will read your disc image from " << target.string() << " (" << path_file.string() << ")\n";
+            return true;
+        }
+#endif
         std::cerr << "[setup] Error: cannot create " << dest.string() << ": " << ec.message() << "\n";
         return false;
     }
+    fs::remove(path_file, ec);  // (an older note of the path: the link is used now)
     std::cout << "[setup] The game will read your disc image through " << dest.string() << "\n";
     return true;
 }
 
 // The repository's root: the directory above build/ holding this executable, else the current directory.
 fs::path repo_root() {
-    std::error_code ec;
-    const fs::path exe = fs::read_symlink("/proc/self/exe", ec);
-    if (!ec) {
+    const fs::path exe = platform::executable_path();
+    if (!exe.empty()) {
         const fs::path root = exe.parent_path().parent_path();
         if (fs::exists(root / "tools/overlay_match/overlay_match.py")) return root;
     }
@@ -105,21 +114,7 @@ fs::path repo_root() {
 }
 
 // Runs a program (looked up in PATH) with its standard output discarded; returns its exit code (-1: not started).
-int run_quiet(const std::vector<std::string>& args) {
-    std::vector<char*> argv;
-    for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
-    argv.push_back(nullptr);
-    posix_spawn_file_actions_t fa;
-    posix_spawn_file_actions_init(&fa);
-    posix_spawn_file_actions_addopen(&fa, STDOUT_FILENO, "/dev/null", O_WRONLY, 0);
-    pid_t pid = 0;
-    const int err = posix_spawnp(&pid, argv[0], &fa, nullptr, argv.data(), environ);
-    posix_spawn_file_actions_destroy(&fa);
-    if (err != 0) return -1;
-    int status = 0;
-    if (waitpid(pid, &status, 0) < 0) return -1;
-    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
-}
+int run_quiet(const std::vector<std::string>& args) { return platform::run_quiet(args); }
 
 bool overlay_maps(const fs::path& assets, const std::string& iso_path) {
     const fs::path tools = repo_root() / "tools/overlay_match";
@@ -131,15 +126,15 @@ bool overlay_maps(const fs::path& assets, const std::string& iso_path) {
     fs::create_directories(out);
     // the boot module (the title and its menu) first, then each level against Veldin's (level 0)
     std::cout << " title" << std::flush;
-    int r = run_quiet({"python3", (tools / "front_match.py").string(), "--elf", (assets / "dumps/SCUS_971.99").string(),
+    int r = run_quiet({platform::python_program(), (tools / "front_match.py").string(), "--elf", (assets / "dumps/SCUS_971.99").string(),
                        "--iso", iso_path, "--out", out.string()});
     for (int lv = 1; lv <= 18 && r == 0; ++lv) {
         std::cout << " " << lv << std::flush;
-        r = run_quiet({"python3", (tools / "overlay_match.py").string(), "--iso", iso_path, "--out", out.string(),
+        r = run_quiet({platform::python_program(), (tools / "overlay_match.py").string(), "--iso", iso_path, "--out", out.string(),
                        "--levels", std::to_string(lv)});
     }
     if (r != 0) {
-        std::cerr << "\n[setup] Error: the overlay matcher failed (" << (r < 0 ? std::string("python3 not found")
+        std::cerr << "\n[setup] Error: the overlay matcher failed (" << (r < 0 ? platform::python_program() + " not found"
                                                                              : "exit code " + std::to_string(r)) << ").\n";
         return false;
     }

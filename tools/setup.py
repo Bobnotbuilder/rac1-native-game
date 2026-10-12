@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rac1-native's guided setup (run it through ./setup.sh).
+"""rac1-native's guided setup (run it through ./setup.sh; on Windows, setup.cmd).
 
 From a fresh clone and your own disc image (Ratchet & Clank, NTSC-U, SCUS-97199) to the game:
   1. checks the system and says what to install;
@@ -32,10 +32,14 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+WINDOWS = os.name == "nt"  # (a native Windows Python: MSYS2's CLANG64 / UCRT64 one, or python.org's)
+SETUP_CMD = "setup.cmd" if WINDOWS else "./setup.sh"  # (what the messages tell the player to run)
 BUILD_DIR = ROOT / "build"
-EXE = BUILD_DIR / "rac1-native"
+EXE = BUILD_DIR / ("rac1-native.exe" if WINDOWS else "rac1-native")
 ASSETS_DIR = ROOT / "assets"
 GAME_ISO = ASSETS_DIR / "iso/rac1-ntsc-u.iso"  # where the game reads the disc (runtime/kernel/disc.cpp)
+# where links cannot be made (Windows without the privilege), the disc image's path instead (runtime/kernel/disc.cpp)
+GAME_ISO_PATH_FILE = ASSETS_DIR / "iso/disc-path.txt"
 STATE_FILE = ASSETS_DIR / "setup-state.json"
 SECTOR = 2048
 
@@ -78,7 +82,20 @@ STEPS = [
 ]
 STEP_NAMES = [s[0] for s in CODE_STEPS] + [s[0] for s in STEPS]
 
-USE_COLOR = sys.stdout.isatty()
+def enable_windows_colors():
+    """The console's escape sequences (Windows 10 and newer); False when they cannot be turned on."""
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+        mode = ctypes.c_uint32()
+        return bool(kernel32.GetConsoleMode(handle, ctypes.byref(mode))) and \
+            bool(kernel32.SetConsoleMode(handle, mode.value | 0x0004))  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    except (AttributeError, OSError):
+        return False
+
+
+USE_COLOR = sys.stdout.isatty() and (not WINDOWS or enable_windows_colors())
 
 
 def color(code, text):
@@ -201,7 +218,44 @@ INSTALL = {"debian": "sudo apt install", "fedora": "sudo dnf install", "arch": "
 DISTRO_NAME = {"debian": "Debian / Ubuntu", "fedora": "Fedora", "arch": "Arch"}
 
 
+# Windows: the MSYS2 CLANG64 environment's packages (docs/setup.md); clang is the recommended compiler there
+# (the same float code as on Linux, docs/platforms.md). The OpenGL, window and audio libraries are Windows' own.
+WINDOWS_DEPENDENCIES = [
+    ("CMake 3.20 or newer", True, cmake_ok, "mingw-w64-clang-x86_64-cmake"),
+    ("a C++20 compiler (clang 13+, or GCC 11+ for MinGW-w64)", True, compiler_ok, "mingw-w64-clang-x86_64-clang"),
+    ("Ninja (the build tool)", True, lambda: shutil.which("ninja") is not None, "mingw-w64-clang-x86_64-ninja"),
+    ("pkg-config (finds FFmpeg)", False, lambda: shutil.which("pkg-config") is not None, "mingw-w64-clang-x86_64-pkgconf"),
+    ("FFmpeg's libavcodec (optional: plays the game's movies)", False, lambda: pkg_config("libavcodec", "libavutil"),
+     "mingw-w64-clang-x86_64-ffmpeg"),
+]
+
+
+def check_system_windows():
+    missing_req, missing_opt = [], []
+    for dep in WINDOWS_DEPENDENCIES:
+        if not dep[2]():
+            (missing_req if dep[1] else missing_opt).append(dep)
+    for dep in missing_opt:
+        warn(f"Not found: {dep[0]}. The game runs without it.")
+    if not missing_req:
+        ok("Everything needed to build the game is installed.")
+    else:
+        for dep in missing_req:
+            print(color("1;31", f"  Missing: {dep[0]}"))
+    wanted = missing_req + missing_opt
+    if wanted:
+        cmd = "pacman -S --needed " + " ".join(dep[3] for dep in wanted)
+        print("\n  With MSYS2 (https://www.msys2.org), in its CLANG64 shell:\n    " + color("1", cmd) +
+              "\n  then run the setup from that shell (or with MSYS2's clang64\\bin folder in your PATH).")
+    if missing_req:
+        print(f"\n  Then run {SETUP_CMD} again.")
+        sys.exit(1)
+
+
 def check_system():
+    if WINDOWS:
+        check_system_windows()
+        return
     distro = detect_distro()
     column = {"debian": 3, "fedora": 4, "arch": 5}.get(distro)
     missing_req, missing_opt = [], []
@@ -219,7 +273,7 @@ def check_system():
     if not wanted:
         return
     if column is None:
-        print("\n  Install them with your distribution's package manager, then run ./setup.sh again.")
+        print(f"\n  Install them with your distribution's package manager, then run {SETUP_CMD} again.")
     else:
         cmd = f"{INSTALL[distro]} " + " ".join(dep[column] for dep in wanted)
         print(f"\n  To install {'them' if missing_req else 'it'} on {DISTRO_NAME[distro]}:\n    {color('1', cmd)}")
@@ -229,9 +283,9 @@ def check_system():
                 if not missing_req:
                     ok("Installed.")
                     return
-            fail("Something is still missing. Install it and run ./setup.sh again.")
+            fail(f"Something is still missing. Install it and run {SETUP_CMD} again.")
     if missing_req:
-        print("\n  Then run ./setup.sh again.")
+        print(f"\n  Then run {SETUP_CMD} again.")
         sys.exit(1)
 
 
@@ -281,8 +335,12 @@ def find_iso(arg):
         return Path(os.environ["RAC1_ISO"]).expanduser().resolve()
     if GAME_ISO.exists():
         return GAME_ISO
+    if GAME_ISO_PATH_FILE.is_file():  # (where the setup could not link the image: its path)
+        lines = GAME_ISO_PATH_FILE.read_text(encoding="utf-8").splitlines()
+        if lines and Path(lines[0].strip()).is_file():
+            return Path(lines[0].strip())
     if not sys.stdin.isatty():
-        fail("No disc image given. Run ./setup.sh --iso <path-to-your-iso>")
+        fail(f"No disc image given. Run {SETUP_CMD} --iso <path-to-your-iso>")
     print("  Where is your Ratchet & Clank disc image (NTSC-U, SCUS-97199)?")
     while True:
         try:
@@ -358,7 +416,7 @@ def run_quiet(cmd, what):
     r = subprocess.run([str(c) for c in cmd], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
     if r.returncode:
         print(r.stderr[-3000:])
-        fail(f"{what} failed (see above). Run ./setup.sh again to retry.")
+        fail(f"{what} failed (see above). Run {SETUP_CMD} again to retry.")
 
 
 def overlay_maps(iso):
@@ -464,9 +522,30 @@ def prepare_code(iso, forced, jobs):
 
 # --- 4. The build -------------------------------------------------------------------------------
 
+def available_memory_kb_windows():
+    import ctypes
+
+    class MemoryStatus(ctypes.Structure):
+        _fields_ = [("dwLength", ctypes.c_uint32), ("dwMemoryLoad", ctypes.c_uint32), ("ullTotalPhys", ctypes.c_uint64),
+                    ("ullAvailPhys", ctypes.c_uint64), ("ullTotalPageFile", ctypes.c_uint64),
+                    ("ullAvailPageFile", ctypes.c_uint64), ("ullTotalVirtual", ctypes.c_uint64),
+                    ("ullAvailVirtual", ctypes.c_uint64), ("ullAvailExtendedVirtual", ctypes.c_uint64)]
+    st = MemoryStatus()
+    st.dwLength = ctypes.sizeof(MemoryStatus)
+    if not ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(st)):
+        raise OSError("GlobalMemoryStatusEx")
+    return st.ullAvailPhys // 1024
+
+
 def default_jobs():
     """One compile job per core, but no more than one per 2 GB of available memory."""
     jobs = os.cpu_count() or 2
+    if WINDOWS:
+        try:
+            jobs = min(jobs, max(1, available_memory_kb_windows() // (2 * 1024 * 1024)))
+        except (OSError, AttributeError):
+            pass
+        return max(1, jobs)
     try:
         for line in Path("/proc/meminfo").read_text().splitlines():
             if line.startswith("MemAvailable:"):
@@ -488,6 +567,10 @@ def run_logged(cmd, log):
         for line in proc.stdout:
             f.write(line)
             m = re.match(r"\[\s*(\d+)%\]", line)
+            if not m and WINDOWS:  # (Ninja's progress: [done/total])
+                n = re.match(r"\[(\d+)/(\d+)\]", line)
+                if n:
+                    m = re.match(r"(\d+)", str(int(n.group(1)) * 100 // max(1, int(n.group(2)))))
             if m and m.group(1) != shown and USE_COLOR:
                 shown = m.group(1)
                 print(f"\r  {shown:>3}%", end="", flush=True)
@@ -506,8 +589,15 @@ def build(jobs):
     BUILD_LOG.write_text("")
     if not (BUILD_DIR / "CMakeCache.txt").exists() or not any((BUILD_DIR / f).exists() for f in ("Makefile", "build.ninja")):
         print("  Configuring (this downloads a few libraries the first time)...", flush=True)
-        if not run_logged(["cmake", "-S", str(ROOT), "-B", str(BUILD_DIR), "-DCMAKE_BUILD_TYPE=RelWithDebInfo"], BUILD_LOG):
-            fail("CMake could not configure the build (see above). If a library is missing, install it and run ./setup.sh again.")
+        cmd = ["cmake", "-S", str(ROOT), "-B", str(BUILD_DIR), "-DCMAKE_BUILD_TYPE=RelWithDebInfo"]
+        if WINDOWS:  # (Ninja and clang, not Visual Studio's generator and compiler: docs/platforms.md)
+            cmd += ["-G", "Ninja"]
+            if shutil.which("clang++"):
+                cmd += ["-DCMAKE_C_COMPILER=clang", "-DCMAKE_CXX_COMPILER=clang++"]
+            else:
+                cmd += ["-DCMAKE_C_COMPILER=gcc", "-DCMAKE_CXX_COMPILER=g++"]
+        if not run_logged(cmd, BUILD_LOG):
+            fail(f"CMake could not configure the build (see above). If a library is missing, install it and run {SETUP_CMD} again.")
     print(f"  Compiling with {jobs} parallel jobs (the first build takes several minutes)...", flush=True)
     if not run_logged(["cmake", "--build", str(BUILD_DIR), "-j", str(jobs)], BUILD_LOG):
         fail("The build failed (see above).")
@@ -547,10 +637,16 @@ def generate(iso, forced):
             continue
         # a step that is forced, whose sources changed, or that never finished, is redone from scratch
         cmd = [str(EXE), "--setup", "--iso", str(iso), "--step", name, "--force"]
-        if subprocess.run(cmd, cwd=ROOT).returncode:
-            fail(f"Generating {what} failed (see the messages above). Run ./setup.sh again to retry.")
+        if subprocess.run(cmd, cwd=ROOT, env=game_env()).returncode:
+            fail(f"Generating {what} failed (see the messages above). Run {SETUP_CMD} again to retry.")
         state[name] = fingerprint
         save_state(state)
+
+
+def game_env():
+    """The environment the game's setup mode runs in: on Windows, the Python it runs the overlay matcher with
+    (src/platform/platform_win32.cpp) is this one."""
+    return dict(os.environ, RAC1_PYTHON=sys.executable) if WINDOWS else None
 
 
 # --- main ---------------------------------------------------------------------------------------
@@ -607,7 +703,7 @@ def main():
     ap.add_argument("--no-play", action="store_true", help="do not offer to start the game at the end")
     args = ap.parse_args()
     if args.iso:
-        args.iso = str(Path(args.iso).expanduser().resolve())  # (relative to where the user ran ./setup.sh)
+        args.iso = str(Path(args.iso).expanduser().resolve())  # (relative to where the user ran the setup)
     os.chdir(ROOT)
     jobs = args.jobs or default_jobs()
 
@@ -643,13 +739,14 @@ def main():
         return
 
     next_step("Generating the game's data from your disc")
-    r = subprocess.run([str(EXE), "--setup", "--iso", str(iso), "--check-iso"], cwd=ROOT)
+    r = subprocess.run([str(EXE), "--setup", "--iso", str(iso), "--check-iso"], cwd=ROOT, env=game_env())
     if r.returncode:
         sys.exit(1)
     generate(iso, args.force)
 
     print(color("1;32", "\nAll done: Ratchet & Clank is ready."))
-    print(f"To play, run this from {ROOT}:\n    ./build/rac1-native\n")
+    play = "build\\rac1-native.exe" if WINDOWS else "./build/rac1-native"
+    print(f"To play, run this from {ROOT}:\n    {play}\n")
     if not args.no_play and ask("Start the game now?", True):
         sys.exit(subprocess.run([str(EXE)], cwd=ROOT).returncode)
 

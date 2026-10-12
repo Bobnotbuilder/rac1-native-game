@@ -9,6 +9,8 @@
 #include <runtime/kernel/disc.h>
 #include <runtime/kernel/ee_memory.h>
 
+#include <platform/platform.h>
+
 namespace rac1 {
 
 std::time_t g_host_clock_fixed = 0;
@@ -45,7 +47,7 @@ int32_t cd_break() { return 1; }
 int32_t cd_read_clock(uint32_t clock) {
     const std::time_t now = g_host_clock_fixed != 0 ? g_host_clock_fixed : std::time(nullptr);
     std::tm t{};
-    localtime_r(&now, &t);
+    platform::local_time(now, &t);
     const uint8_t b[8] = {0, bcd(t.tm_sec), bcd(t.tm_min), bcd(t.tm_hour), 0, bcd(t.tm_mday), bcd(t.tm_mon + 1), bcd(t.tm_year % 100)};
     for (uint32_t i = 0; i < 8; ++i) ee_write<uint8_t>(clock + i, b[i]);
     return 1;

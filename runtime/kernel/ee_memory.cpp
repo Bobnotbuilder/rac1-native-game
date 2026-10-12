@@ -3,9 +3,7 @@
 #include <runtime/kernel/disc.h>
 #include <cstdlib>
 #include <cstring>
-#if defined(__GLIBC__)
-#include <execinfo.h>
-#endif
+#include <platform/platform.h>
 #include <algorithm>
 #include <vector>
 #include <stdexcept>
@@ -249,12 +247,7 @@ u8* ee_get_scratchpad_base() {
 }
 
 void ee_debug_backtrace() {
-#if defined(__GLIBC__)
-    if (std::getenv("EE_BT") != nullptr) {
-        void* frames[32];
-        backtrace_symbols_fd(frames, backtrace(frames, 32), 2);
-    }
-#endif
+    if (std::getenv("EE_BT") != nullptr) platform::print_backtrace(32);
 }
 
 } // namespace rac1

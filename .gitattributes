@@ -1,0 +1,5 @@
+# Line endings: LF in every checkout, Windows included (the code generators read the sources and the
+# setup fingerprints them: the same bytes on every system), except the Windows command scripts.
+* text=auto eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf

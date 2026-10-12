@@ -10,10 +10,27 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif()
 
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang)$")
+    message(FATAL_ERROR "rac1-native builds with GCC or clang (on Windows: clang or GCC for MinGW-w64, see docs/platforms.md); "
+                        "this is ${CMAKE_CXX_COMPILER_ID}.")
+endif()
+
 add_compile_options(-Wall -Wextra -Wpedantic)
 # the game's code runs with the host FPU rounding toward zero (runtime/ee/ps2_fpu.h): no folding or
-# moving of float operations that assumes round-to-nearest
-add_compile_options(-frounding-math)
+# moving of float operations that assumes round-to-nearest, and no a * b + c fused into one rounding
+# (the same float operations from GCC and clang, on Linux and Windows: docs/platforms.md)
+add_compile_options(-frounding-math -ffp-contract=off)
+
+# Windows (MinGW-w64, with clang or GCC): see docs/platforms.md
+if(WIN32)
+    enable_language(RC)  # (the program's manifest: src/platform/win32/)
+    # (the Win32 headers without their min / max macros and rarely used parts)
+    add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+    # (GCC's assembler needs the large object format for the biggest generated sources; clang picks it itself)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        add_compile_options(-Wa,-mbig-obj)
+    endif()
+endif()
 
 find_package(OpenGL REQUIRED)
 
@@ -24,9 +41,18 @@ add_subdirectory(third_party/989snd)
 # downloaded at configure time: GLFW, GLM, Dear ImGui, TinyGLTF, miniaudio
 include(cmake/dependencies.cmake)
 
+# ---- src/platform/ : the operating system's calls, behind one interface (Linux: POSIX; Windows: Win32) ----
+if(WIN32)
+    add_library(rac1_platform STATIC src/platform/platform_win32.cpp)
+else()
+    add_library(rac1_platform STATIC src/platform/platform_posix.cpp)
+endif()
+target_include_directories(rac1_platform PUBLIC src)
+
 # ---- src/formats/ : the game's file formats (our own decoders) ----
 add_library(rac1_io INTERFACE)
 target_include_directories(rac1_io INTERFACE src)
+target_link_libraries(rac1_io INTERFACE rac1_platform)
 
 add_library(rac1_formats STATIC
     src/formats/scene_wad.cpp
@@ -83,7 +109,7 @@ add_library(rac1_runtime STATIC
     runtime/level/level_loader.cpp
 )
 target_include_directories(rac1_runtime PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src)
-target_link_libraries(rac1_runtime PUBLIC rac1_formats glad glfw glm_headers OpenGL::GL imgui opengoal_989snd)
+target_link_libraries(rac1_runtime PUBLIC rac1_platform rac1_formats glad glfw glm_headers OpenGL::GL imgui opengoal_989snd)
 
 # The movies' MPEG-2 pictures (runtime/ipu/movie_hw.cpp, the IPU's stand-in): FFmpeg's libavcodec
 # when pkg-config finds it (optional). Without it the game runs and its movies are skipped (logged).
@@ -93,7 +119,7 @@ if(RAC1_MOVIES)
     if(PkgConfig_FOUND)
         pkg_check_modules(RAC1_AVCODEC QUIET IMPORTED_TARGET libavcodec libavutil)
         # (a Homebrew FFmpeg when the system has no development files for it)
-        if(NOT RAC1_AVCODEC_FOUND AND EXISTS "/home/linuxbrew/.linuxbrew/lib/pkgconfig/libavcodec.pc")
+        if(NOT RAC1_AVCODEC_FOUND AND NOT CMAKE_CROSSCOMPILING AND EXISTS "/home/linuxbrew/.linuxbrew/lib/pkgconfig/libavcodec.pc")
             set(ENV{PKG_CONFIG_PATH} "/home/linuxbrew/.linuxbrew/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
             pkg_check_modules(RAC1_AVCODEC QUIET IMPORTED_TARGET libavcodec libavutil)
         endif()
@@ -106,6 +132,11 @@ if(RAC1_MOVIES)
         message(STATUS "Movies: libavcodec not found (pkg-config): the game's movies are skipped")
     endif()
 endif()
+
+# Without the generated sources (they are made from the player's disc by ./setup.sh): everything that does
+# not need them is compiled, the game's hand-written code included, and nothing is linked. For a CI build
+# that has no disc (.github/workflows/build.yml); the game cannot run from such a build.
+option(RAC1_NO_GENERATED "Compile without the generated sources (no disc): libraries only, no executable" OFF)
 
 # ---- src/game/ : the game's code, ported (`// orig: 0xADDR`) ----
 add_subdirectory(src/game)
@@ -127,18 +158,38 @@ target_include_directories(rac1_setup PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_
 target_link_libraries(rac1_setup PUBLIC rac1_formats rac1_game rac1_runtime)
 
 # ---- the game: one executable ----
-add_executable(rac1-native
+set(RAC1_HOST_SOURCES
     src/host/orig_main.cpp
     src/host/audio_out.cpp
     src/host/sample_prof.cpp
-    src/host/host_priority.cpp
     src/host/host_input.cpp
     src/host/sim_script.cpp
     src/host/sim_autopilot.cpp
 )
+if(WIN32)
+    list(APPEND RAC1_HOST_SOURCES src/host/host_priority_win32.cpp src/platform/win32/rac1-native.rc)
+else()
+    list(APPEND RAC1_HOST_SOURCES src/host/host_priority_posix.cpp)
+endif()
+if(RAC1_NO_GENERATED)
+    # (no generated code: the host's files compiled, nothing linked)
+    add_library(rac1-native OBJECT ${RAC1_HOST_SOURCES})
+else()
+    add_executable(rac1-native ${RAC1_HOST_SOURCES})
+endif()
 target_link_libraries(rac1-native PRIVATE rac1_runtime rac1_game rac1_setup miniaudio_headers)
 if(RAC1_DEVTOOLS)
     target_link_libraries(rac1-native PRIVATE rac1_devtools)
     target_compile_definitions(rac1-native PRIVATE RAC1_DEVTOOLS=1)
+endif()
+if(WIN32 AND NOT RAC1_NO_GENERATED)
+    # a main thread's stack of 64 MB reserved (Linux gives 8 MB or more, Windows 1 MB): the game's code
+    # also runs on it, outside the coroutine
+    target_link_options(rac1-native PRIVATE -Wl,--stack,67108864)
+    # the C++ runtime linked in (no MinGW DLLs beside the program); with FFmpeg, whose static libraries need
+    # more than pkg-config lists, everything stays a DLL (run the game from MSYS2's shell, or copy its DLLs)
+    if(NOT RAC1_AVCODEC_FOUND)
+        target_link_options(rac1-native PRIVATE -static)
+    endif()
 endif()
 

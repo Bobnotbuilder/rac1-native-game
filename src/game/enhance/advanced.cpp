@@ -18,6 +18,8 @@
 
 #include <game/lib/libmc.h>
 
+#include <platform/platform.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -122,20 +124,19 @@ uint32_t row_values(const Row& r) {
 
 // --- The preferences (the settings at start, before any save is loaded) ------------------------
 // A text file of "name value" lines: $RAC1_ADVANCED_FILE, else $XDG_CONFIG_HOME/rac1-native/
-// advanced_options.txt, else ~/.config/rac1-native/advanced_options.txt. (Older versions kept advanced_options.txt in the working directory: read once when the new one
+// advanced_options.txt, else ~/.config/rac1-native/advanced_options.txt (Windows: %APPDATA%\rac1-native\; platform::config_dir). (Older versions kept advanced_options.txt in the working directory: read once when the new one
 // does not exist yet.)
 
 // orig: (none) — enhancement: the preferences file's path
 std::filesystem::path prefs_path() {
     if (const char* f = std::getenv("RAC1_ADVANCED_FILE")) return f;
-    if (const char* x = std::getenv("XDG_CONFIG_HOME"); x != nullptr && *x != 0) return std::filesystem::path(x) / "rac1-native" / "advanced_options.txt";
-    if (const char* h = std::getenv("HOME")) return std::filesystem::path(h) / ".config" / "rac1-native" / "advanced_options.txt";
+    if (const std::filesystem::path d = platform::config_dir(); !d.empty()) return d / "advanced_options.txt";
     return "advanced_options.txt";
 }
 
 // orig: (none) — enhancement: the settings from a preferences file; false when none
 bool prefs_read(const std::filesystem::path& path) {
-    FILE* f = std::fopen(path.c_str(), "r");
+    FILE* f = platform::open_file(path, "r");
     if (f == nullptr) return false;
     char name[64];
     unsigned value = 0;
@@ -167,7 +168,7 @@ void settings_save() {
     const std::filesystem::path path = prefs_path();
     std::error_code ec;
     if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path(), ec);
-    if (FILE* f = std::fopen(path.c_str(), "w")) {
+    if (FILE* f = platform::open_file(path, "w")) {
         for (const Row& r : SETTINGS_ROWS) std::fprintf(f, "%s %u\n", r.key, lbu(r.byte));
         std::fclose(f);
     }

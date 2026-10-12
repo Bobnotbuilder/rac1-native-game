@@ -1,8 +1,7 @@
 // The EE's main thread as a coroutine of the host (ADR 0012): see ee_thread.h.
 #include "ee_thread.h"
 
-#include <sys/mman.h>
-#include <ucontext.h>
+#include <platform/platform.h>
 
 #include <cstdio>
 #include <cstdlib>
@@ -13,13 +12,11 @@ namespace rac1 {
 namespace {
 // 64 MB of address space (committed as it is touched), a guard page below it: the game's frames
 // (the transliterations' register files, their callees) as deep as on the host's main stack.
+// The stack and the switches are the platform's (src/platform: ucontext on Linux, a fiber on Windows).
 constexpr size_t kStack = 64u << 20;
-constexpr size_t kGuard = 1u << 16;
 
 struct Coroutine {
-    ucontext_t host{};
-    ucontext_t game{};
-    void* stack = nullptr;
+    bool stack = false;      // the platform's coroutine created
     bool running = false;    // fn started, not returned
     bool inside = false;     // the coroutine is the current context
     bool suspended = false;  // waiting in ee_thread_vsync
@@ -38,7 +35,7 @@ void entry() {
     }
     g_co.running = false;
     g_co.inside = false;
-    // (uc_link is the host's context: returning from here resumes it)
+    // (returning from here resumes the host)
 }
 }  // namespace
 
@@ -49,27 +46,21 @@ bool ee_thread_run(const std::function<void()>& fn) {
         return true;
     }
     if (!g_co.suspended) {
-        if (g_co.stack == nullptr) {
-            void* p = mmap(nullptr, kStack + kGuard, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_STACK, -1, 0);
-            if (p == MAP_FAILED) {
+        if (!g_co.stack) {
+            if (!platform::coroutine_create(kStack)) {
                 std::fprintf(stderr, "[ee-thread] no stack: the game runs on the host's thread\n");
                 fn();
                 return true;
             }
-            mprotect(p, kGuard, PROT_NONE);
-            g_co.stack = p;
+            g_co.stack = true;
         }
         g_co.fn = fn;
         g_co.running = true;
-        getcontext(&g_co.game);  // (the host thread's FPU modes, ADR 0011's rounding, carried into the coroutine)
-        g_co.game.uc_stack.ss_sp = static_cast<char*>(g_co.stack) + kGuard;
-        g_co.game.uc_stack.ss_size = kStack;
-        g_co.game.uc_link = &g_co.host;
-        makecontext(&g_co.game, entry, 0);
+        platform::coroutine_start(entry);  // (the host thread's FPU modes, ADR 0011's rounding, carried into the coroutine)
     }
     g_co.suspended = false;
     g_co.inside = true;
-    swapcontext(&g_co.host, &g_co.game);
+    platform::coroutine_resume();
     g_co.inside = false;
     if (g_co.error) {
         std::exception_ptr e = g_co.error;
@@ -99,7 +90,7 @@ void ee_thread_vsync(EeVsyncFrame kind, bool shown) {
     g_co.frame = kind;
     g_co.suspended = true;
     g_co.inside = false;
-    swapcontext(&g_co.game, &g_co.host);
+    platform::coroutine_yield();
     g_co.inside = true;
 }
 
