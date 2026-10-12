@@ -1,10 +1,11 @@
 # Other platforms
 
-> **Windows is work in progress.** It is not ready to play yet: for now, play on Linux.
+> **Windows support is experimental.** It builds and runs, and most of it works without problems in
+> the tests so far, but it has been tried on one PC only: bugs that only Windows shows can't be
+> excluded. Linux remains the reference.
 
-rac1-native runs on Linux x86-64. A Windows build exists: it compiles and links (cross-compiled from
-Linux), but it has not been run on a Windows machine yet. This page is the state of the Windows
-port, what remains, and a note on macOS.
+rac1-native runs on Linux x86-64, and on Windows x86-64 (experimental). This page is the state of the
+Windows port, what remains, and a note on macOS.
 
 The goal is one codebase that builds on Linux and Windows and behaves identically on both: same
 game state, same oracle results, same reference images.
@@ -99,17 +100,18 @@ sources, which `./setup.sh` makes on Linux: they are the same on Windows.
 ## State
 
 1. Done: the host interface on Linux, with no change in behaviour (same reference hashes).
-2. Done, not yet run: the Windows implementations, the clang / MinGW-w64 build, the toolchain files.
-   The full game cross-compiles and links with clang and with GCC.
-3. Done, not yet run on Windows: the setup (`setup.cmd`, or `./setup.sh` in MSYS2's shell; both
-   run `tools/setup.py`), and the Windows instructions in [Setup](setup.md#on-windows-work-in-progress-not-yet-tested).
-4. Written, not yet enabled: the CI workflow. To do: the reference runs and the oracle on a Windows
-   machine; a playtest.
+2. Done: the Windows implementations, the clang / MinGW-w64 build, the toolchain files. The full
+   game also cross-compiles and links from Linux with clang and with GCC.
+3. Done: the setup (`setup.cmd`, or `./setup.sh` in MSYS2's shell; both run `tools/setup.py`), and
+   the Windows instructions in [Setup](setup.md#on-windows-experimental).
+4. Done: the CI workflow (Linux, Windows, and the Windows cross-build). Run and played on one Windows
+   PC. To do: more Windows machines, the reference runs and the oracle on Windows, a longer
+   playtest.
 5. To do: a release with a Windows build. The player still runs the setup with their own disc.
 
-What is untested so far: everything that only a Windows machine shows. The fiber and its FPU
-mode, the paths, the disc's reads, the setup's helper programs, the audio (miniaudio's WASAPI), the
-gamepads, the window. The cross-builds use MinGW-w64's older C runtime (`msvcrt.dll`) and GCC's
+What has been tried least: everything that only a Windows machine shows, on more than one PC. The
+fiber and its FPU mode, the paths, the disc's reads, the setup's helper programs, the audio
+(miniaudio's WASAPI), the gamepads, the window. The cross-builds use MinGW-w64's older C runtime (`msvcrt.dll`) and GCC's
 C++ library; MSYS2's CLANG64 uses the newer one (UCRT) and LLVM's C++ library, which the CI's
 Windows job compiles against.
 

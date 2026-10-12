@@ -18,7 +18,7 @@ source code, the files that are a mechanical translation of the game's own code 
 
 ### A Linux system with
 
-(Windows: see [On Windows](#on-windows-work-in-progress-not-yet-tested) below.)
+(Windows: see [On Windows](#on-windows-experimental) below.)
 
 - **CMake** 3.20 or newer and a **C++20 compiler** (GCC 11 or newer, or Clang 13 or newer);
 - **pkg-config**;
@@ -171,11 +171,11 @@ python3 tools/codegen/generate_all.py --out assets/generated --no-insn-comments
 `--list` shows its units, `--files` the files it writes, `--only <unit>` runs some of them. Without
 `--no-insn-comments`, each translated line keeps the original instruction as a comment.
 
-## On Windows (work in progress, not yet tested)
+## On Windows (experimental)
 
-> **Work in progress.** The Windows build is new and has not been run on a Windows machine yet. It
-> may not start, or not work properly: it is not ready to play. For now, play on Linux. If you try it,
-> expect problems, and please report them.
+> **Windows support is experimental.** The game runs on Windows and most of it works without
+> problems in the tests so far, but it has been tried on one PC only: bugs that only Windows shows
+> can't be excluded. Please report them.
 
 The Windows build is made with **clang** (or GCC) from **MSYS2**, not with Visual Studio's compiler
 (see [Platforms](platforms.md)).

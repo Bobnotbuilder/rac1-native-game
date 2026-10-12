@@ -6,7 +6,7 @@
 > effects or sections that can't be finished. Everything after Umbris is work in progress.
 > See [Status](docs/status.md).
 
-A native PC port of **Ratchet & Clank** (PlayStation 2, 2002), for Linux.
+A native PC port of **Ratchet & Clank** (PlayStation 2, 2002), for Linux, and experimentally for Windows.
 
 The game's own code is ported to C++, function by function, from the original North American release
 (`SCUS-97199`), and each port is proved against the original code. It is not an emulator: all of the game's
@@ -34,8 +34,17 @@ So far the port has been tested on one machine only:
 - **Memory:** 64 GB
 - **System:** Ubuntu 26.04 LTS, Linux 7.0, Mesa 26.0 (radeonsi, OpenGL 4.6)
 
+Windows has been tried on one PC so far (see [Windows support is experimental](#windows-support-is-experimental)).
+
 Other hardware, drivers and distributions should work, but they have not been tried yet. Reports
 are welcome.
+
+### Windows support is experimental
+
+The game builds and runs on Windows from the same sources, and most of it works without problems
+in the tests so far. But Windows has been tried on one PC only, and much less than Linux: bugs that
+only Windows shows can't be excluded. Linux remains the reference. Reports are welcome. See
+[Setup](docs/setup.md#on-windows-experimental) and [Platforms](docs/platforms.md).
 
 ### Modern lighting is experimental
 
@@ -89,7 +98,7 @@ follows from that.
 
 ## Quick start
 
-You need Linux, a GPU with OpenGL 4.6, and your ISO of the game.
+You need Linux (or Windows, [experimental](#windows-support-is-experimental)), a GPU with OpenGL 4.6, and your ISO of the game.
 
 ```bash
 git clone https://github.com/daino-selvatico/rac1-native-game.git
@@ -105,10 +114,8 @@ game's code from it, builds the game and generates the game's data. Run it again
 ```
 
 The full guide, with requirements and troubleshooting: [Setup](docs/setup.md).
-> **Windows: work in progress.** The Windows version builds, but it has not been run on a Windows
-> machine yet, so it may not start or may not work properly. It is not ready to play: for now, play
-> on Linux. If you try it anyway, reports are welcome. See
-> [Setup](docs/setup.md#on-windows-work-in-progress-not-yet-tested) and [Platforms](docs/platforms.md).
+On Windows, run `setup.cmd` instead (double-click it, or drop your disc image on it): see
+[Setup](docs/setup.md#on-windows-experimental). Windows support is experimental.
 
 ## Documentation
 
@@ -119,7 +126,7 @@ For players:
   where settings are kept, the debug tools.
 - [Input](docs/input.md): controllers, keyboard and mouse, rebinding.
 - [Saves](docs/saves.md): where your saves are. Saving and loading work, but the save files may still change: they have not been checked by hand yet.
-- [Platforms](docs/platforms.md): Windows (work in progress: it builds, not yet run on Windows) and macOS later.
+- [Platforms](docs/platforms.md): Windows (experimental) and macOS later.
 - [Advanced options](docs/advanced.md): the optional gameplay changes, including Ratchet & Clank 3
   movement and modern aiming.
 - [Enhancements](docs/enhancements.md): the optional improvements, those available now and those

@@ -119,5 +119,5 @@ nothing, so an object whose class is not ported stands still or does not appear.
 - **Not everything is native in the renderer.** The HUD, menus and some effects are still drawn
   through the GS replica, and the mobys' flattened shadow meshes are not drawn yet (see
   [Rendering](rendering.md#limits)).
-- **Platforms.** Linux x86-64 only for now. Windows is planned (see [Platforms](platforms.md)); Vulkan / Direct3D renderers and macOS may come later.
+- **Platforms.** Linux x86-64; Windows x86-64 is experimental (see [Platforms](platforms.md)). Vulkan / Direct3D renderers and macOS may come later.
 - **Regions.** Only the North American disc (`SCUS-97199`) is supported.
