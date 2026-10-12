@@ -20,6 +20,10 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 # moving of float operations that assumes round-to-nearest, and no a * b + c fused into one rounding
 # (the same float operations from GCC and clang, on Linux and Windows: docs/platforms.md)
 add_compile_options(-frounding-math -ffp-contract=off)
+# the emulated memory is read and written through several types (Vec4 floats, 32-bit words, bytes): no type-based
+# alias analysis, which lets the optimizer reorder or drop those accesses (clang's -O2 did, in ovl_24_25.cpp: the moby
+# grid stayed empty, the mobys' state went wrong; GCC's happened not to)
+add_compile_options(-fno-strict-aliasing)
 
 # Windows (MinGW-w64, with clang or GCC): see docs/platforms.md
 if(WIN32)
