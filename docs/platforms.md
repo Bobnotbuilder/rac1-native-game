@@ -1,5 +1,7 @@
 # Other platforms
 
+> **Windows is work in progress.** It is not ready to play yet: for now, play on Linux.
+
 rac1-native runs on Linux x86-64. A Windows build exists: it compiles and links (cross-compiled from
 Linux), but it has not been run on a Windows machine yet. This page is the state of the Windows
 port, what remains, and a note on macOS.
@@ -100,7 +102,7 @@ sources, which `./setup.sh` makes on Linux: they are the same on Windows.
 2. Done, not yet run: the Windows implementations, the clang / MinGW-w64 build, the toolchain files.
    The full game cross-compiles and links with clang and with GCC.
 3. Done, not yet run on Windows: the setup (`setup.cmd`, or `./setup.sh` in MSYS2's shell; both
-   run `tools/setup.py`), and the Windows instructions in [Setup](setup.md#on-windows-not-yet-tested).
+   run `tools/setup.py`), and the Windows instructions in [Setup](setup.md#on-windows-work-in-progress-not-yet-tested).
 4. Written, not yet enabled: the CI workflow. To do: the reference runs and the oracle on a Windows
    machine; a playtest.
 5. To do: a release with a Windows build. The player still runs the setup with their own disc.

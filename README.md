@@ -105,8 +105,10 @@ game's code from it, builds the game and generates the game's data. Run it again
 ```
 
 The full guide, with requirements and troubleshooting: [Setup](docs/setup.md).
-A Windows build exists but has not been run on Windows yet: see
-[Setup](docs/setup.md#on-windows-not-yet-tested) and [Platforms](docs/platforms.md).
+> **Windows: work in progress.** The Windows version builds, but it has not been run on a Windows
+> machine yet, so it may not start or may not work properly. It is not ready to play: for now, play
+> on Linux. If you try it anyway, reports are welcome. See
+> [Setup](docs/setup.md#on-windows-work-in-progress-not-yet-tested) and [Platforms](docs/platforms.md).
 
 ## Documentation
 
@@ -117,7 +119,7 @@ For players:
   where settings are kept, the debug tools.
 - [Input](docs/input.md): controllers, keyboard and mouse, rebinding.
 - [Saves](docs/saves.md): where your saves are. Saving and loading work, but the save files may still change: they have not been checked by hand yet.
-- [Platforms](docs/platforms.md): Windows (it builds; not yet run on Windows) and macOS later.
+- [Platforms](docs/platforms.md): Windows (work in progress: it builds, not yet run on Windows) and macOS later.
 - [Advanced options](docs/advanced.md): the optional gameplay changes, including Ratchet & Clank 3
   movement and modern aiming.
 - [Enhancements](docs/enhancements.md): the optional improvements, those available now and those
