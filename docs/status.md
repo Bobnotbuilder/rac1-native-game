@@ -107,6 +107,12 @@ nothing, so an object whose class is not ported stands still or does not appear.
 | Keyboard, mouse and controller mapping, remapping in Options > Controls | Implemented, known issues may remain; see [Input](input.md). |
 | Debug tools behind `--debug-tools` | Implemented; see [Settings](settings.md#debug-tools). |
 
+## Known issues
+
+- **RAC 3 movement (Advanced, off by default):** the wrench can be thrown again before it is back in
+  Ratchet's hand. Holding a direction and repeating the throw sends it ever further. It breaks
+  nothing; a fix is in progress.
+
 ## Not done yet
 
 - **The second half of the game.** Levels 8 to 11 have their first part ported; levels 12 to 18
