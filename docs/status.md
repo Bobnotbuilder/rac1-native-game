@@ -119,7 +119,7 @@ nothing, so an object whose class is not ported stands still or does not appear.
 - **Not everything is native in the renderer.** The HUD, menus and some effects are still drawn
   through the GS replica, and the mobys' flattened shadow meshes are not drawn yet (see
   [Rendering](rendering.md#limits)).
-- **Platforms.** Linux x86-64 only for now. Windows is planned (see [Platforms](platforms.md)); Vulkan / Direct3D renderers and macOS may come later.
+- **Platforms.** Linux x86-64; Windows x86-64 is experimental (see [Platforms](platforms.md)). Vulkan / Direct3D renderers and macOS may come later.
 - **Regions.** The North American disc (`SCUS-97199`) is the reference. The European PAL disc
   (`SCES-50916`) can now be used on its own, through its region table: the setup, the generated code
   and the game run from it, in the PAL game's 60 Hz mode. This is new and awaits playtesting. Still to

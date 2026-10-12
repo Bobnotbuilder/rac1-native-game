@@ -6,10 +6,7 @@
 #include <filesystem>
 #include <span>
 
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <unistd.h>
+#include <platform/platform.h>
 
 namespace rac1 {
 
@@ -23,20 +20,11 @@ public:
 
     bool open(const std::filesystem::path& path) {
         close();
-        int fd = ::open(path.c_str(), O_RDONLY);
-        if (fd < 0) return false;
-        struct stat st {};
-        if (::fstat(fd, &st) != 0 || st.st_size <= 0) { ::close(fd); return false; }
-        void* p = ::mmap(nullptr, static_cast<std::size_t>(st.st_size), PROT_READ, MAP_PRIVATE, fd, 0);
-        ::close(fd);
-        if (p == MAP_FAILED) return false;
-        data_ = static_cast<const std::byte*>(p);
-        size_ = static_cast<std::size_t>(st.st_size);
-        return true;
+        return platform::map_file(path, &data_, &size_);  // (mmap; MapViewOfFile on Windows)
     }
 
     void close() {
-        if (data_) ::munmap(const_cast<std::byte*>(data_), size_);
+        if (data_) platform::unmap_file(data_, size_);
         data_ = nullptr;
         size_ = 0;
     }

@@ -59,9 +59,10 @@
 #include <thread>
 #include <set>
 #include <sstream>
-#include <unistd.h>  // (environ)
 #include <optional>
 #include <vector>
+
+#include <platform/platform.h>
 
 #include <game/enhance/advanced.h>
 #include <game/enhance/controls.h>
@@ -162,8 +163,9 @@ constexpr const char* PLAYER_ENV[] = {
     "RAC1_AUDIO_PERIOD_MS", "RAC1_AUDIO_PERIODS", "RAC1_MOVIE_VOLUME", "RAC1_PRIORITY", "RAC1_IOP_MIRROR",
 };
 
-// orig: (host) the gate, from the ELF's .init_array before the static initialisers (glibc passes argc / argv)
-__attribute__((constructor(101))) void debug_tools_gate(int argc, char** argv, char** /*envp*/) {
+// orig: (host) the gate, from the ELF's .init_array before the static initialisers (glibc passes argc / argv; on Windows
+// the C runtime's __argc / __argv, already parsed when the constructors run)
+void debug_tools_gate_args(int argc, char** argv) {
     const char* env = std::getenv("RAC1_DEBUG_TOOLS");
     g_debug_tools = env != nullptr && std::atoi(env) != 0;
     for (int i = 1; argv != nullptr && i < argc; ++i)
@@ -171,17 +173,18 @@ __attribute__((constructor(101))) void debug_tools_gate(int argc, char** argv, c
     g_test_switches = g_debug_tools || std::getenv("RAC1_HEADLESS") != nullptr;
     if (g_test_switches) return;
     std::vector<std::string> drop;
-    for (char** e = environ; e != nullptr && *e != nullptr; ++e) {
-        const std::string kv = *e;
-        if (kv.rfind("RAC1_", 0) != 0) continue;
-        const std::string name = kv.substr(0, kv.find('='));
+    for (const std::string& name : rac1::platform::environment_names("RAC1_"))
         if (std::none_of(std::begin(PLAYER_ENV), std::end(PLAYER_ENV), [&name](const char* n) { return name == n; })) drop.push_back(name);
-    }
     for (const std::string& n : drop) {
         std::fprintf(stderr, "[orig] %s ignored: testing switches need --debug-tools (or RAC1_DEBUG_TOOLS=1)\n", n.c_str());
-        unsetenv(n.c_str());
+        rac1::platform::unset_environment(n.c_str());
     }
 }
+#if defined(_WIN32)
+__attribute__((constructor(101))) void debug_tools_gate() { debug_tools_gate_args(__argc, __argv); }
+#else
+__attribute__((constructor(101))) void debug_tools_gate(int argc, char** argv, char** /*envp*/) { debug_tools_gate_args(argc, argv); }
+#endif
 
 // Testing (RAC1_FRAME_PROF=1): the frame's host stages timed (each closed by glFinish, so the GPU's
 // work counts in its stage), averaged and printed every 120 frames.
@@ -385,9 +388,7 @@ struct FrameProf {
     double acc[N] = {}, gpu[N] = {}, tcpu[N] = {};
     double tc = 0;  // the main thread's CPU time (not the wall's: the machine's other load left out)
     static double thread_ms() {
-        timespec ts{};
-        clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
-        return static_cast<double>(ts.tv_sec) * 1e3 + static_cast<double>(ts.tv_nsec) * 1e-6;
+        return rac1::platform::thread_cpu_ms();
     }
     int frames = 0, gpu_frames = 0;
     // the whole run's host frames: their periods (present to present), the work before the present (the poll to

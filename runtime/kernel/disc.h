@@ -7,9 +7,12 @@
 
 namespace rac1 {
 
-// The ISO's path: $RAC1_ISO, else assets/iso/rac1-ntsc-u.iso, else assets/iso/rac1-pal.iso (the setup's link
-// for the PAL disc).
+// The ISO's path: $RAC1_ISO, else the setup's link to the image (assets/iso/rac1-ntsc-u.iso, or
+// assets/iso/rac1-pal.iso for the PAL disc), else the path written in disc_path_file() (where the setup
+// could not make the link: Windows).
 std::string disc_path();
+// assets/iso/disc-path.txt: the image's path, one line, written by the setup when it cannot link it.
+const char* disc_path_file();
 // The disc's boot ELF as its SYSTEM.CNF names it (BOOT2 = cdrom0:\XXXX_NNN.NN): "SCUS_971.99" on the
 // NTSC-U disc (SCUS-97199), "SCES_509.16" on the PAL one (SCES-50916); "SCUS_971.99" when the disc cannot be read.
 // Read once, through its own handle (the game's reads are not touched).

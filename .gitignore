@@ -2,6 +2,9 @@
 # No slash at the end, so that it also matches assets/ when it is a symbolic link.
 /assets
 
+# The tools setup.cmd downloads on Windows (tools/windows/toolchain.ps1)
+/.toolchain
+
 # Build output
 build/
 build-*/

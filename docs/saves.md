@@ -61,6 +61,8 @@ The card's directory is, in order of preference:
 2. `$XDG_DATA_HOME/rac1-native/memcard`;
 3. `~/.local/share/rac1-native/memcard`.
 
+On Windows, 2 and 3 are `%APPDATA%\rac1-native\memcard`.
+
 (`mc_default_card_dir` in `libmc.cpp`.) So by default the saves are in
 `~/.local/share/rac1-native/memcard/BASCUS-97199RATCHET/`. `RAC1_MEMCARD=0` runs without a card
 (with `--debug-tools`); an automated headless run only has a card when `RAC1_MEMCARD_DIR` is set.

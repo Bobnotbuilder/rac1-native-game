@@ -244,6 +244,10 @@ target_link_libraries(rac1_game PUBLIC rac1_runtime tinygltf_headers)
 # generators in tools/codegen/ (docs/architecture.md, "The generated code"). It is not in the repository: ./setup.sh
 # generates it into assets/generated/src/ (the same tree as src/), with generated_sources.cmake, the list of its files
 # and the fingerprint of the generators and inputs that made them.
+if(RAC1_NO_GENERATED)
+    message(STATUS "RAC1_NO_GENERATED: the game's generated sources are left out (no executable is linked)")
+    return()
+endif()
 set(RAC1_GENERATED_SRC "${CMAKE_SOURCE_DIR}/assets/generated/src" CACHE PATH "Where ./setup.sh generated the game's generated sources")
 set(_rac1_gen_list "${RAC1_GENERATED_SRC}/generated_sources.cmake")
 if(NOT EXISTS "${_rac1_gen_list}")

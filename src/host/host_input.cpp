@@ -4,6 +4,8 @@
 
 #include <GLFW/glfw3.h>  // (the key / button numbers only: nothing here calls GLFW)
 
+#include <platform/platform.h>
+
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -283,8 +285,7 @@ Bindings bindings_from_text(std::string_view text, std::vector<std::string>* war
 
 std::string controls_path() {
     if (const char* f = std::getenv("RAC1_CONTROLS_FILE"); f != nullptr && *f != 0) return f;
-    if (const char* x = std::getenv("XDG_CONFIG_HOME"); x != nullptr && *x != 0) return (std::filesystem::path(x) / "rac1-native" / "controls.txt").string();
-    if (const char* h = std::getenv("HOME"); h != nullptr && *h != 0) return (std::filesystem::path(h) / ".config" / "rac1-native" / "controls.txt").string();
+    if (const std::filesystem::path d = rac1::platform::config_dir(); !d.empty()) return (d / "controls.txt").string();
     return "controls.txt";
 }
 
