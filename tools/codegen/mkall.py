@@ -29,8 +29,9 @@ EXTRA_INC = ''.join('#include <%s>\n' % h for h in os.environ.get('MKALL_INCLUDE
 PROOF = os.environ.get('MKALL_PROOF', 'batch 103' if LEVEL == '1' else 'batch 109')  # the oracle batch named in the file's header
 SCR = os.environ.get('MKALL_TMP', '/tmp/mkall' + ('_v' if VELDIN else ''))
 os.makedirs(SCR, exist_ok=True)
-GH = os.environ.get('MKALL_GH', W + '/tools/re/gh.sh' if VELDIN else '/tmp/claude-1000/t327/gh1.sh')  # runs Listing.java / Dis2.java on the level's project
-OV = os.environ.get('MKALL_OV', W + '/scratch/level0_overlay' if VELDIN else '/tmp/claude-1000/t327/l1/ov')
+# (without MKALL_ISO / MKALL_LVL: a Ghidra project's listings; the setup never runs that way)
+GH = os.environ.get('MKALL_GH')  # runs Listing.java / Dis2.java on the level's project
+OV = os.environ.get('MKALL_OV')  # the overlay's sections, with their manifest.csv
 MAPF = (os.environ.get('RAC1_ASSETS') or W + '/assets') + '/generated/overlay_map/level%s.txt' % LEVEL  # (RAC1_ASSETS)
 # the enhancements' hook points in the levels' own code (tools/codegen/mips2cpp.py load_hooks)
 os.environ.setdefault('MIPS2CPP_HOOKS', W + '/tools/codegen/hooks.glue')
@@ -40,6 +41,8 @@ def sections():
     out = []
     if LVL is not None:
         return out
+    if not (GH and OV):
+        sys.exit('mkall: without MKALL_ISO / MKALL_LVL, set MKALL_GH and MKALL_OV (a Ghidra project)')
     for l in open(OV + '/manifest.csv').read().splitlines()[1:]:
         p = l.split(',')
         out.append((int(p[2], 16), int(p[3]), open(OV + '/' + p[0], 'rb').read()))

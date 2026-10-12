@@ -6,8 +6,6 @@ becomes `constexpr OvConst<literal> NAME{};`. Comments, strings, `case` labels, 
 address, the registries' keys (ovl_register_moby_fn / snd_register_callback: Veldin's addresses,
 the dispatchers translate) and literals already wrapped are left alone. Idempotent.
 
-The oracle's generators (tests/oracle/*.cpp, given by name) are rewritten the same way (the per-level oracle), except the function address of check() and its wrappers (Veldin's: check() translates it).
-
 Usage (repo root): tools/codegen/reloc_rewrite.py [--check] [files...]   (default: src/game/**/*.{cpp,h})
   --check: list what would change, write nothing (exit 1 if anything would).
 """
@@ -42,9 +40,7 @@ def kind(v):
     return None
 
 
-def rewrite(text, tests=False):
-    """tests: an oracle file (tests/oracle): check()'s / check_fn()'s function address stays
-    Veldin's (check() translates it and skips a function the level does not have)."""
+def rewrite(text):
     changes = []
 
     def cx(m):
@@ -66,9 +62,6 @@ def rewrite(text, tests=False):
             continue
         before = text[max(0, m.start() - 48):m.start()]
         if re.search(r"\b(OV|OVF|OvConst<|ov_site<|ovf_site<|NOT_ADDR|L1_ADDR|L2_ADDR|L3_ADDR|L4_ADDR|L5_ADDR|L6_ADDR|L7_ADDR|L8_ADDR|L9_ADDR|L10_ADDR|L11_ADDR)\s*\(?\s*$", before) or before.rstrip().endswith("OvConst<"):
-            continue
-        if tests and re.search(r"\b(check|check_fn|classcheck|moby_check|skip_check)\(\s*(?:\"(?:\\.|[^\"\\])*\"|[\w\[\]+]+)\s*,\s*$",
-                               text[max(0, m.start() - 160):m.start()]):
             continue
         line_end = text.find("\n", m.end())
         if "// lui " in text[m.end():line_end if line_end >= 0 else len(text)]:
@@ -128,7 +121,7 @@ def main():
         if rel in SKIP_FILES:
             continue
         text = p.read_text()
-        new, changes = rewrite(text, tests=rel.startswith("tests/"))
+        new, changes = rewrite(text)
         if not changes:
             continue
         total += len(changes)
