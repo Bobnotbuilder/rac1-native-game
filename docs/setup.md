@@ -180,32 +180,20 @@ python3 tools/codegen/generate_all.py --out assets/generated --no-insn-comments
 The Windows build is made with **clang** (or GCC) from **MSYS2**, not with Visual Studio's compiler
 (see [Platforms](platforms.md)).
 
-1. Install [MSYS2](https://www.msys2.org). Open its **CLANG64** shell (in the Start menu) and
-   install the tools:
+1. Get the repository (with git, or as a zip) and **double-click `setup.cmd`** in its folder (or drop
+   your disc image on it, or run `setup.cmd --iso C:\Users\you\Games\ratchet.iso`).
 
-   ```bash
-   pacman -S --needed mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-cmake mingw-w64-clang-x86_64-ninja mingw-w64-clang-x86_64-python mingw-w64-clang-x86_64-pkgconf
-   # optional, to play the game's movies:
-   pacman -S --needed mingw-w64-clang-x86_64-ffmpeg
-   ```
+   Nothing needs to be installed first. The first time, the setup downloads the tools that build the
+   game (about 1 GB, a few minutes): a private copy of [MSYS2](https://www.msys2.org) in the
+   repository's `.toolchain\` folder, with Python, clang, CMake, Ninja and FFmpeg
+   (`tools\windows\toolchain.ps1`). Nothing is installed elsewhere: deleting `.toolchain\` removes it.
+   Then `tools/setup.py` runs, with the same steps as on Linux, and the result is
+   `build\rac1-native.exe`.
 
-2. Get the repository (with git, or as a zip) and run the setup in the repository's folder, from
-   the CLANG64 shell (the same script as on Linux):
+   With your own MSYS2, the setup can also run from its **CLANG64** shell (`./setup.sh`, or
+   `setup.cmd`): it then uses that shell's tools and tells you which packages to install.
 
-   ```bash
-   ./setup.sh --iso /c/Users/you/Games/ratchet.iso
-   ```
-
-   or from the Windows command prompt or PowerShell, with MSYS2's `clang64\bin` folder in the `PATH`:
-
-   ```
-   setup.cmd --iso C:\Users\you\Games\ratchet.iso
-   ```
-
-   Both run `tools/setup.py`. The steps are the same as on Linux. The build uses Ninja and clang,
-   and the result is `build\rac1-native.exe`.
-
-3. **Play** from the repository's folder: `build\rac1-native.exe`.
+2. **Play**: double-click `build\rac1-native.exe`.
 
 What differs from Linux:
 
@@ -216,8 +204,8 @@ What differs from Linux:
   and the memory card in `memcard\`), instead of `~/.config/rac1-native/` and
   `~/.local/share/rac1-native/`.
 - **The DLLs.** Built without FFmpeg, the program needs only Windows' own DLLs (the C++ runtime is
-  linked in). Built with FFmpeg (the movies), it uses MSYS2's DLLs: run it from the CLANG64 shell,
-  or with `clang64\bin` in the `PATH`.
+  linked in). Built with FFmpeg (the movies), it uses MSYS2's DLLs: the build copies them into
+  `build\`, beside the program.
 
 ## Troubleshooting
 

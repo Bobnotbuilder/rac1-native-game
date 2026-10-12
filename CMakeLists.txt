@@ -187,9 +187,15 @@ if(WIN32 AND NOT RAC1_NO_GENERATED)
     # also runs on it, outside the coroutine
     target_link_options(rac1-native PRIVATE -Wl,--stack,67108864)
     # the C++ runtime linked in (no MinGW DLLs beside the program); with FFmpeg, whose static libraries need
-    # more than pkg-config lists, everything stays a DLL (run the game from MSYS2's shell, or copy its DLLs)
+    # more than pkg-config lists, everything stays a DLL, and the DLLs it uses are copied beside the program
     if(NOT RAC1_AVCODEC_FOUND)
         target_link_options(rac1-native PRIVATE -static)
+    else()
+        get_filename_component(RAC1_COMPILER_BIN "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        add_custom_command(TARGET rac1-native POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" "-DEXE=$<TARGET_FILE:rac1-native>" "-DSEARCH_DIR=${RAC1_COMPILER_BIN}"
+                    "-DOBJDUMP=${CMAKE_OBJDUMP}" -P "${CMAKE_SOURCE_DIR}/cmake/copy_runtime_dlls.cmake"
+            VERBATIM)
     endif()
 endif()
 
