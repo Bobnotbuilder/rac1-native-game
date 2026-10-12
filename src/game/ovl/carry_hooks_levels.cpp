@@ -1,0 +1,143 @@
+// See carry_hooks_levels.h: the dispatch of the levels' own class hooks by code address. Every row is a
+// function of a class's hook table (`class +0x2c`) in the level's overlay section 3 (class, update, hook table) that is
+// not Veldin's code at the address the overlay map gives (tools/re README's scan): the level's own port, or
+// Veldin's port where the level's function is the same code but the map pairs it with nothing or another hook.
+#include <game/ovl/carry_hooks_levels.h>
+
+#include <game/ovl/aridia_classes_tr.h>
+#include <game/ovl/batalia_mobys.h>
+#include <game/ovl/blarg_mobys.h>
+#include <game/ovl/carry_hooks.h>
+#include <game/ovl/eudora_mobys.h>
+#include <game/ovl/gaspar_mobys.h>
+#include <game/ovl/novalis_hooks.h>
+#include <game/ovl/orxon_mobys.h>
+#include <game/ovl/ovl_reloc.h>
+#include <game/ovl/pokitaru_mobys.h>
+#include <game/ovl/rilgar_mobys.h>
+#include <game/ovl/variants_l2.h>
+#include <game/ovl/variants_l3.h>
+#include <game/ovl/variants_l5.h>
+#include <game/ovl/variants_l6.h>
+#include <game/ovl/variants_l7.h>
+#include <game/ovl/variants_l8.h>
+#include <game/ovl/variants_l9.h>
+#include <game/ovl/variants_l10.h>
+#include <game/ovl/variants_l11.h>
+
+namespace rac1 {
+
+namespace {
+// a transliterated helper in the uniform ABI (TrRet: every argument register) called as a hook: a0 = the moby, a1 / a2 and
+// f12 passed on
+int32_t u_call(TrRet (*f)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, float, float, float, float,
+                          float, float, float, float),
+               uint32_t m, uint32_t a1, uint32_t a2, float f12) {
+    return static_cast<int32_t>(f(m, a1, a2, 0, 0, 0, 0, 0, f12, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f).v0);
+}
+}  // namespace
+
+// orig: (host) see carry_hooks_levels.h
+bool class_hook_call_level(uint32_t fn, uint32_t m, uint32_t a1, uint32_t a2, float f12, int32_t& ret) {
+    switch (ovl_reloc_level()) {
+    case 1: {  // Novalis: the Peckbot's and the Large Amoeboid's (novalis_hooks.cpp)
+        if (class_hook_call_l1(fn, m, a1, a2, f12, ret)) return true;
+        uint32_t r = 0;
+        if (!class_hook10_call_l1(fn, m, r)) return false;
+        ret = static_cast<int32_t>(r);
+        return true;
+    }
+    case 2:  // Aridia: the Sand Shark (class 0x244, table 0x1fb6dc)
+        switch (fn) {
+        case L2_ADDR(0x002d61c0): ret = ari_carry_hook0_l2(m, a1, a2, f12); return true;
+        case L2_ADDR(0x002d6210): ret = ari_carry_hook4_l2(m, a1, a2, f12); return true;
+        case L2_ADDR(0x002d6290): ret = ari_carry_hook8_l2(m, a1, a2, f12); return true;
+        case L2_ADDR(0x002d62e0): ret = e749_hookc(m, a1, a2, f12); return true;  // (Veldin's 0x2d57d0, the same code)
+        case L2_ADDR(0x002d6310): ret = static_cast<int32_t>(shark_hook_10_l2(m)); return true;
+        default: return false;
+        }
+    case 3:  // Kerwan: class 0x10e's hook +0xc (table 0x1e4114)
+        if (fn != L3_ADDR(0x002bcbd0)) return false;
+        ret = ker_carry_hookc_l3(m, a1, a2, f12);
+        return true;
+    case 4:  // Eudora: the Circular Saw Enemy (class 340, table 0x1dd11c)
+        switch (fn) {
+        case L4_ADDR(0x002c4030): ret = eud_carry_hook0_l4(m, a1, a2, f12); return true;
+        case L4_ADDR(0x002c4080): ret = eud_carry_hook4_l4(m, a1, a2, f12); return true;
+        case L4_ADDR(0x002c40d0): ret = eud_carry_hook8_l4(m, a1, a2, f12); return true;
+        case L4_ADDR(0x002c4180): ret = e749_hookc(m, a1, a2, f12); return true;  // (Veldin's 0x2d57d0, the same code)
+        case L4_ADDR(0x002c41b0): ret = u_call(eud_hook_10_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 5:  // Rilgar: classes 0x23c / 0x362 (tables 0x2193e8 / 0x219400)
+        switch (fn) {
+        case L5_ADDR(0x00300ad8): ret = ril_carry_hook0_l5(m, a1, a2, f12); return true;
+        case L5_ADDR(0x00300b48): ret = u_call(ril_hook_300b48_u, m, a1, a2, f12); return true;
+        case L5_ADDR(0x00300b98): ret = ril_carry_hook8_l5(m, a1, a2, f12); return true;
+        case L5_ADDR(0x00300be8): ret = ril_carry_hookc_l5(m, a1, a2, f12); return true;
+        case L5_ADDR(0x00300c18): ret = u_call(ril_hook_10_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 6:  // Blarg: class 0x10e's hook +0xc (table 0x20239c), class 0x33b (table 0x2023b4)
+        switch (fn) {
+        case L6_ADDR(0x002d8118): ret = blg_carry_hookc_l6(m, a1, a2, f12); return true;
+        case L6_ADDR(0x002ea5e0): ret = u_call(blg_hook_2ea5e0_u, m, a1, a2, f12); return true;
+        case L6_ADDR(0x002ea6a8): ret = u_call(blg_hook_2ea6a8_u, m, a1, a2, f12); return true;
+        case L6_ADDR(0x002ea738): ret = u_call(blg_hook_2ea738_u, m, a1, a2, f12); return true;
+        case L6_ADDR(0x002ea7c8): ret = u_call(blg_hook_2ea7c8_u, m, a1, a2, f12); return true;
+        case L6_ADDR(0x002ea800): ret = u_call(blg_hook_2ea800_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 7:  // Umbris: class 0x10e's hook +0xc (table 0x2125dc)
+        if (fn != L7_ADDR(0x002f44b0)) return false;
+        ret = umb_carry_hookc_l7(m, a1, a2, f12);
+        return true;
+    case 8:  // Batalia: class 0xfc (table 0x1fd200), class 0x10e's hook +0xc (table 0x1fd218)
+        switch (fn) {
+        case L8_ADDR(0x002d3f60): ret = u_call(bat_hook_2d3f60_u, m, a1, a2, f12); return true;
+        case L8_ADDR(0x002d3fb0): ret = u_call(bat_hook_2d3fb0_u, m, a1, a2, f12); return true;
+        case L8_ADDR(0x002d4000): ret = u_call(bat_hook_2d4000_u, m, a1, a2, f12); return true;
+        case L8_ADDR(0x002d4050): ret = u_call(bat_hook_2d4050_u, m, a1, a2, f12); return true;
+        case L8_ADDR(0x002d40d8): ret = u_call(bat_hook_2d40d8_u, m, a1, a2, f12); return true;
+        case L8_ADDR(0x002d8180): ret = bat_carry_hookc_l8(m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 9:  // Gaspar: class 0xc1 (table 0x209b00)
+        switch (fn) {
+        case L9_ADDR(0x002e2680): ret = u_call(gas_hook_2e2680_u, m, a1, a2, f12); return true;
+        case L9_ADDR(0x002e26d0): ret = u_call(gas_hook_2e26d0_u, m, a1, a2, f12); return true;
+        case L9_ADDR(0x002e2720): ret = u_call(gas_hook_2e2720_u, m, a1, a2, f12); return true;
+        case L9_ADDR(0x002e2770): ret = u_call(gas_hook_2e2770_u, m, a1, a2, f12); return true;
+        case L9_ADDR(0x002e27a0): ret = u_call(gas_hook_2e27a0_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 10:  // Orxon: class 0x10e's hook +0xc (table 0x1dde40), class 0x33b (table 0x1dde58)
+        switch (fn) {
+        case L10_ADDR(0x002bcc60): ret = orx_carry_hookc_l10(m, a1, a2, f12); return true;
+        case L10_ADDR(0x002ce618): ret = u_call(orx_hook_2ce618_u, m, a1, a2, f12); return true;
+        case L10_ADDR(0x002ce6e0): ret = u_call(orx_hook_2ce6e0_u, m, a1, a2, f12); return true;
+        case L10_ADDR(0x002ce770): ret = u_call(orx_hook_2ce770_u, m, a1, a2, f12); return true;
+        case L10_ADDR(0x002ce800): ret = u_call(orx_hook_2ce800_u, m, a1, a2, f12); return true;
+        case L10_ADDR(0x002ce838): ret = u_call(orx_hook_2ce838_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 11:  // Pokitaru: classes 0x23c / 0x362 (tables 0x21c008 / 0x21c020), class 0x4de (table 0x21c038)
+        switch (fn) {
+        case L11_ADDR(0x002fb780): ret = u_call(pok_hook_2fb780_u, m, a1, a2, f12); return true;
+        case L11_ADDR(0x002fb7f0): ret = u_call(pok_hook_2fb7f0_u, m, a1, a2, f12); return true;
+        case L11_ADDR(0x002fb840): ret = u_call(pok_hook_2fb840_u, m, a1, a2, f12); return true;
+        case L11_ADDR(0x002fb890): ret = u_call(pok_hook_2fb890_u, m, a1, a2, f12); return true;
+        case L11_ADDR(0x002fb8c0): ret = u_call(pok_hook_2fb8c0_u, m, a1, a2, f12); return true;
+        case L11_ADDR(0x00316160): ret = u_call(pok_hook_316160_u, m, a1, a2, f12); return true;
+        case L11_ADDR(0x00316210): ret = u_call(pok_hook_316210_u, m, a1, a2, f12); return true;
+        case L11_ADDR(0x00316270): ret = u_call(pok_hook_316270_u, m, a1, a2, f12); return true;
+        case L11_ADDR(0x003162d0): ret = u_call(pok_hook_3162d0_u, m, a1, a2, f12); return true;
+        case L11_ADDR(0x003162f0): ret = u_call(pok_hook_3162f0_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    default:
+        return false;
+    }
+}
+
+}  // namespace rac1

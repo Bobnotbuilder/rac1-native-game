@@ -1,0 +1,321 @@
+// The MRP's modern lighting (enhancement, "Modern lighting"; experiment of the dynamic-lighting worktree):
+// real shadows of the sun cast by the world (tfrag, tie, shrub: the foliage with its alpha cut-outs) and the mobys onto the world and
+// the mobys, by cascaded shadow maps. Host code: none of it is the game's, and none of it changes the game's state (it only reads
+// the frame the MRP draws). Off by default (the original's lighting, the reference); on, the original's drop shadows (mrp_shadows.h)
+// are not drawn: the mobys cast their own.
+//
+// How it plugs into the MRP (ADR 0010, "lighting / shadow modules"):
+//  - every MRP vertex shader (world CPU / tfrag path, world GPU path, mobys) ends its world-projection branch with `sh_clip(clip)`:
+//    the clip position as before; in the shadow pass (uShPass) the same vertex into the cascade's light clip space, the world point
+//    taken back from the camera's clip coordinates (the MRP's one projection, world_view_proj: x / P00, y / P11, view z = -w, then the
+//    view's inverse: no near / far cancellation). The game's culling decided what is drawn, so the casters are what the frame holds.
+//  - every MRP fragment shader darkens its vertex colour by `sh_apply(c)` before the texture function: the sun's part of the lit
+//    colour removed where the shadow map says the sun is hidden, on the faces turned to the sun (the faces turned away were already
+//    darkened by the original's lighting).
+#ifndef RAC1_GAME_RENDER_MRP_LIGHTING_H
+#define RAC1_GAME_RENDER_MRP_LIGHTING_H
+
+#include <cstdint>
+#include <vector>
+
+namespace rac1 {
+
+// orig: (host) 0 the original's lighting (default), 1 the modern shadows (RAC1_SHADOWS=0|1, the Graphics page, the debug menu)
+extern int g_modern_shadows;
+// orig: (host) the quality: the cascades' resolution 0 1024, 1 2048 (default), 2 4096 (RAC1_SHADOW_RES)
+extern int g_shadow_quality;
+// orig: (host) the shadows' strength, percent of the sun's part removed (RAC1_SHADOW_STRENGTH, default 55)
+extern int g_shadow_strength;
+// orig: (host) testing: 1 draws the cascades' index as a tint, 2 the visibility alone (RAC1_SHADOW_DEBUG)
+extern int g_shadow_debug;
+// orig: (host) 1 (default) the game's 8 dynamic point lights (0x1802c0) lit per pixel while the modern lighting is on
+// (RAC1_POINTS=0: as the game, per vertex)
+extern int g_modern_points;
+// orig: (host) 1 (default) the automatic emitters - lamps / glowing panels found in the ties' textures, our art choice - lit
+// per pixel with the game's point lights (RAC1_AUTO_LIGHTS=0: none)
+extern int g_auto_lights;
+// orig: (host) how far from the camera the mobys cast into the sun's shadows, units (0: as far as the cascades reach;
+// RAC1_SHADOW_MOBY_DIST; Options > Graphics > Shadow Distance)
+extern float g_shadow_moby_dist;
+// orig: (host) the shadows of far casters lighter (1, default; RAC1_SHADOW_FADE=0: as dark as the near ones' - the sun's
+// light scattered around a tall caster far away)
+extern int g_shadow_fade;
+// orig: (host) ambient occlusion on the 3D (screen space, from the depth; 0 off, the default; RAC1_AO; Options > Graphics)
+extern int g_ao;
+// orig: (host) the ambient occlusion over this frame's 3D (after the MRP world and mobys, before the effects and the 2D;
+// the framebuffer they were drawn into bound): nothing unless the modern lighting drew this frame and g_ao is on
+void mrp_lighting_ao_pass();
+
+// ---- (step 3) the lights placed by hand: our own art choices, per level (data/lights/level<N>.txt; RAC1_LIGHTS_DIR) ----
+// Lit per pixel as the automatic emitters (Secondary Lights: All), before them; their shadows as the emitters' (the mobys' alone).
+struct UserLight {
+    float pos[3] = {0.0f, 0.0f, 0.0f};
+    float col[3] = {1.0f, 0.8f, 0.55f};
+    float intensity = 1.0f;  // the colour's scale
+    float radius = 8.0f;     // units
+    float flicker = 0.0f;    // 0 steady .. 1 a flame's
+    bool on = true;
+};
+// orig: (host) the current level's lights (loaded at its first frame with the lighting on; -1 none yet)
+std::vector<UserLight>& mrp_user_lights();
+int mrp_user_lights_level();
+// orig: (host) the level's file: written (true when it was), read again (the edits since the last save dropped)
+bool mrp_user_lights_save();
+void mrp_user_lights_reload();
+const char* mrp_user_lights_path();
+// orig: (host) the debug menu's selected light (-1 none): it pulses, so that it is found
+extern int g_user_light_selected;
+// orig: (host) the tie classes whose automatic emitters the level's file turns off ("noauto <class>"), and on again
+bool mrp_user_lights_class_off(int o_class);
+void mrp_user_lights_class_set_off(int o_class, bool off);
+// orig: (host) the level's tie classes found glowing (mrp_world_renderer.cpp): the class, its glowing share, the hue, the
+// lights it gives (0: none - a warm material, or turned off), whether the heuristic took it for a material
+struct EmitterClass {
+    int o_class = 0;
+    float share = 0.0f, hue = 0.0f;
+    int lights = 0;
+    bool material = false;
+};
+std::vector<EmitterClass> mrp_world_emitter_classes();
+// orig: (host) the automatic emitters made again (a class turned on or off)
+void mrp_world_emitters_rebuild();
+// orig: (host) the automatic emitters within `reach` of `cam` (their sphere's edge), the nearest first, at most `max`: position +
+// radius, colour (w -1); returns the count (mrp_world_renderer.cpp)
+int mrp_world_emitters_near(const float cam[3], float reach, int max, float* pos_r, float* col);
+// orig: (host) the point lights' shadows ("dynamic shadows"): 0 off (default), 1 on - cube shadow maps for the nearest
+// few lit per pixel (RAC1_POINT_SHADOWS)
+extern int g_point_shadows;
+// orig: (host) true when the world's resident lit colours must not take the game's relighting now: the modern point
+// lights on and one of the game's lights active (its per-vertex term would count twice); read on the scene's worker (EE memory)
+bool mrp_lighting_points_freeze();
+
+// orig: (host) true when this frame gets the modern shadows: on, the MRP world and mobys drawn in the world's projection
+bool mrp_lighting_active();
+// orig: (host) at the start of a host frame's draw: no shadows until the frame's shadow pass ran
+void mrp_lighting_frame_begin();
+// orig: (host) the frame's shadow maps: the cascades fitted to the view, the world's and the mobys' casters drawn into them (call
+// after mrp_world_finish_frame and mrp_moby_prepare, before mrp_world_draw; restores the bound framebuffer and viewport)
+void mrp_lighting_shadow_pass();
+
+// orig: (host) what the world's casters outside the view are looked for with (mrp_world_static.h ShadowCull): the sun, the cascades'
+// far distances, how far toward the sun (from the camera: the shadow pass cuts every caster beyond that plane - uShCut -, wherever the
+// camera looks); false while the lighting is off (or before its first frame: the sun not known yet)
+bool mrp_lighting_cull_params(float sun[3], float splits[3], float* back, float* tan_x = nullptr, float* tan_y = nullptr);
+// orig: (host) the point lights whose shadows are drawn, by slot (position, radius; radius 0: none) - read on the scene's
+// worker (EE memory), the casters near them sorted into their cubes' views
+void mrp_lighting_point_casters(float pts[8][4]);
+// orig: (host) how much larger than the view's slices the casters outside the view are looked for (the cached cascades'
+// boxes: 1 when the cache is off)
+float mrp_lighting_caster_grow();
+// orig: (host) whether the next frame's casters outside the view are wanted (read on the scene's worker): a cached cascade
+// near its box's edge or drawn without them, or the cache off; the game's point lights' shadows want them besides (their slots)
+bool mrp_lighting_casters_wanted();
+// orig: (host) whether the level has a sun (its key light from above): else no sun's shadows, the game's drop shadows kept
+bool mrp_lighting_has_sun();
+// orig: (host) whether this frame's casters outside the view were made (mrp_world_renderer.cpp)
+bool mrp_world_casters_built();
+
+// The renderers' side. Uniform locations of the lighting in a program (the vertex and fragment snippets below).
+struct ShadowLocs {
+    int pass = -1, on = -1, inv_view = -1, proj = -1, light = -1, cut = -1;
+    int map = -1, casc = -1, cam = -1, sun = -1, param = -1, texel = -1, debug = -1;
+    int pt_n = -1, pt_pos = -1, pt_col = -1;  // (the game's point lights per pixel)
+    int pt_map = -1, pt_near = -1;           // (their shadows: the cube maps, the near plane)
+    int pt_tiles = -1, pt_vp = -1;           // (the screen tiles' lights, the view's world -> clip)
+    int opaque = -1;                         // (the shadow pass: the batch is opaque - no blending -: its depth alone)
+    int part = -1;                           // (the cascades' squares' share of their layer)
+    int depth = -1, range = -1, fade = -1;   // (the maps' depths, the cascades' ranges, the far casters' fade)
+    int sun_k = -1;                          // (the sun's shadows' weight)
+};
+// orig: (host) the locations of a linked program
+ShadowLocs mrp_lighting_locs(unsigned prog);
+// orig: (host) the receivers' uniforms for the frame's draw (the program bound): the lighting on or off, the shadow map on its unit
+void mrp_lighting_bind_receiver(const ShadowLocs& l, bool sky = false);
+// orig: (host) the shadow pass's uniforms (the program bound): the cascade's light view-projection
+void mrp_lighting_bind_caster(const ShadowLocs& l, const float* light_vp);
+// orig: (host) the uniforms back to "no lighting, no pass" (the program bound): the MRP's original image
+void mrp_lighting_bind_off(const ShadowLocs& l);
+
+// The draws the shadow pass asks of the renderers (mrp_world_renderer.cpp, mrp_moby_renderer.cpp): the frame's casters with the
+// light's view-projection `light_vp` into the bound depth buffer (depth only, alpha-tested cut-outs)
+// (`view` the shadow view - 0..2 a cascade, 3 + i point light slot i's cube: the world draws the casters sorted into it;
+// `sphere` (x, y, z, r) the mobys near a point light alone)
+void mrp_world_draw_casters(const float* light_vp, int view);
+// (`within` - x, y, z, distance - the parts within that distance of that point alone: the shadows' distance)
+void mrp_moby_draw_casters(const float* light_vp, const float* sphere = nullptr, const float* within = nullptr);
+// the distance from a point to the nearest moby part the frame draws (a large value when none)
+float mrp_moby_nearest_part(const float p[3]);
+// the light's clip-space rectangle (x0, y0, x1, y1) holding every moby part a caster pass draws (false: none)
+bool mrp_moby_caster_rect(const float* light_vp, float rect[4], const float* within = nullptr);
+
+}  // namespace rac1
+
+// The GLSL snippets (spliced into the MRP's shaders after their #version line and declarations).
+#define RAC1_SHADOW_VS                                                                                  \
+    "uniform int uShPass;\n"                                                                            \
+    "uniform int uShOn;\n"                                                                              \
+    "uniform mat4 uShInvView;\n"                                                                        \
+    "uniform vec2 uShProj;\n"                                                                           \
+    "uniform mat4 uShLight;\n"                                                                          \
+    "uniform vec4 uShCut;\n"                                                                            \
+    "uniform int uPtN;\n"                                                                               \
+    "smooth out vec3 vShWorld;\n"                                                                       \
+    "vec4 sh_clip(vec4 clip) {\n"                                                                       \
+    "    vShWorld = vec3(0.0);\n"                                                                       \
+    "    gl_ClipDistance[0] = 1.0;\n"                                                                   \
+    "    if (uShPass == 0 && uShOn == 0) return clip;\n"                                                \
+    "    vec4 wp = uShInvView * vec4(clip.x / uShProj.x, clip.y / uShProj.y, -clip.w, 1.0);\n"          \
+    "    vShWorld = wp.xyz;\n"                                                                          \
+    "    if (uShPass != 0) {\n"                                                                         \
+    "        gl_ClipDistance[0] = uShCut.w - dot(wp.xyz, uShCut.xyz);\n"                                \
+    "        return uShLight * vec4(wp.xyz, 1.0);\n"                                                    \
+    "    }\n"                                                                                           \
+    "    return clip;\n"                                                                                \
+    "}\n"
+
+#define RAC1_SHADOW_FS                                                                                  \
+    "uniform int uShPass;\n"                                                                            \
+    "uniform int uShOn;\n"                                                                              \
+    "uniform sampler2DArrayShadow uShMap;\n"                                                            \
+    "uniform mat4 uShCasc[3];\n"                                                                        \
+    "uniform vec3 uShCam;\n"                                                                            \
+    "uniform vec3 uShSun;\n"                                                                            \
+    "uniform vec4 uShParam;\n" /* x strength, y count, z the cascades' blend band, w the PCF radius */ \
+    "uniform vec3 uShTexel;\n" /* the cascades' texel in world units */                                \
+    "#if defined(SH_POINTS) || defined(SH_SPLIT)\n" /* (the lighting's variants only) */     \
+    "uniform sampler2DArray uShDepth;\n" /* the same maps, their depths (no compare) */                 \
+    "uniform vec3 uShRange;\n"           /* the cascades' depth ranges, units */                         \
+    "uniform vec4 uShFade;\n"            /* far casters: from, to (units), the shadow kept, on */        \
+    "uniform float uShSunK;\n"           /* the sun's shadows' weight (the zone's light; faded) */      \
+    "#endif\n"                                                                                          \
+    "uniform int uShDebug;\n"                                                                           \
+    "uniform int uPtN;\n"                                                                               \
+    "uniform vec4 uPtPos[96];\n"                                                                         \
+    "uniform vec4 uPtCol[96];\n"                                                                         \
+    "uniform samplerCubeArrayShadow uPtMap;\n"                                                          \
+    "uniform float uPtNear;\n"                                                                          \
+    "uniform usampler2D uPtTiles;\n" /* per screen tile the lights reaching it (bits 0..63) */ \
+    "uniform mat4 uPtVP;\n"           /* the view's world -> clip, the tiles' frame */                       \
+    "uniform int uShOpaque;\n"                                                                          \
+    "uniform vec3 uShPart;\n"                                                                           \
+    "smooth in vec3 vShWorld;\n"                                                                        \
+    "float sh_tap(int k, vec3 p) {\n"                                                                   \
+    "    vec4 q = uShCasc[k] * vec4(p, 1.0);\n"                                                         \
+    "    float r = uShParam.w / (float(textureSize(uShMap, 0).x) * uShPart[k]);\n"                      \
+    "    float s = 0.0;\n"                                                                              \
+    "    for (int y = -1; y <= 1; ++y)\n"                                                               \
+    "        for (int x = -1; x <= 1; ++x)\n"                                                           \
+    "            s += texture(uShMap, vec4((q.xy + vec2(x, y) * r) * uShPart[k], float(k), q.z));\n"    \
+    "    return s / 9.0;\n"                                                                             \
+    "}\n"                                                                                               \
+    "bool sh_inside(int k, vec3 p, float m) {\n"                                                        \
+    "    vec4 q = uShCasc[k] * vec4(p, 1.0);\n"                                                         \
+    "    return all(greaterThan(q.xy, vec2(m))) && all(lessThan(q.xy, vec2(1.0 - m))) && q.z < 1.0;\n" \
+    "}\n"                                                                                               \
+    "vec4 sh_state;\n" /* the visibility, the facing, the cascade, 1 when computed */                  \
+    "vec3 sh_n = vec3(0.0, 0.0, 1.0);\n"                                                                \
+    "void sh_prepare() {\n" /* (in uniform control flow: the derivatives) */                           \
+    "    sh_state = vec4(1.0, 0.0, -1.0, 0.0);\n"                                                       \
+    "    vec3 dx = dFdx(vShWorld), dy = dFdy(vShWorld);\n"                                              \
+    "    if (uShOn == 0) return;\n"                                                                     \
+    "    vec3 n = cross(dx, dy);\n"                                                                     \
+    "    float nl = length(n);\n"                                                                       \
+    "    n = nl > 0.0 ? n / nl : vec3(0.0, 0.0, 1.0);\n"                                                \
+    "    if (dot(n, uShCam - vShWorld) < 0.0) n = -n;\n"                                                \
+    "    sh_n = n;\n"                                                                                   \
+    "    float ndl = dot(n, uShSun);\n"                                                                 \
+    "    float facing = smoothstep(0.0, 0.25, ndl);\n"                                                  \
+    "    int count = int(uShParam.y);\n"                                                                \
+    "    float vis = 1.0;\n"                                                                            \
+    "    int casc = -1;\n"                                                                              \
+    "    for (int k = 0; k < count; ++k) {\n"                                                           \
+    "        vec3 p = vShWorld + n * (uShTexel[k] * 1.5) + uShSun * (uShTexel[k] * 1.0);\n"             \
+    "        if (!sh_inside(k, p, 0.02)) continue;\n"                                                   \
+    "        vis = sh_tap(k, p);\n"                                                                     \
+    "        casc = k;\n"                                                                               \
+    "        if (k + 1 < count && !sh_inside(k, p, 0.02 + uShParam.z)) {\n" /* the band: blend with the next */ \
+    "            vec3 p2 = vShWorld + n * (uShTexel[k + 1] * 1.5) + uShSun * uShTexel[k + 1];\n"           \
+    "            vec4 q = uShCasc[k] * vec4(p, 1.0);\n"                                                  \
+    "            vec2 e = min(q.xy - 0.02, 0.98 - q.xy);\n"                                              \
+    "            float t = clamp(min(e.x, e.y) / uShParam.z, 0.0, 1.0);\n"                               \
+    "            vis = mix(sh_tap(k + 1, p2), vis, t);\n"                                                \
+    "        }\n"                                                                                       \
+    "        break;\n"                                                                                  \
+    "    }\n"                                                                                           \
+    "#if defined(SH_POINTS) || defined(SH_SPLIT)\n"                                                    \
+    "    if (uShFade.w > 0.0 && casc >= 0 && vis < 1.0) {\n" /* a far caster's shadow lighter: the blockers' mean depth */ \
+    "        vec3 p = vShWorld + n * (uShTexel[casc] * 1.5) + uShSun * uShTexel[casc];\n"              \
+    "        vec4 q = uShCasc[casc] * vec4(p, 1.0);\n"                                                 \
+    "        float r = 3.0 / float(textureSize(uShDepth, 0).x) / uShPart[casc];\n"                    \
+    "        float sum = 0.0, cnt = 0.0;\n"                                                             \
+    "        for (int y = -1; y <= 1; ++y)\n"                                                          \
+    "            for (int x = -1; x <= 1; ++x) {\n"                                                    \
+    "                float b = texture(uShDepth, vec3((q.xy + vec2(x, y) * r) * uShPart[casc], float(casc))).r;\n" \
+    "                if (b < q.z - 0.0005) { sum += b; cnt += 1.0; }\n"                                \
+    "            }\n"                                                                                   \
+    "        if (cnt > 0.0) {\n"                                                                        \
+    "            float d = (q.z - sum / cnt) * uShRange[casc];\n"                                       \
+    "            float keep = mix(1.0, uShFade.z, smoothstep(uShFade.x, uShFade.y, d));\n"              \
+    "            vis = 1.0 - (1.0 - vis) * keep;\n"                                                     \
+    "        }\n"                                                                                       \
+    "    }\n"                                                                                           \
+    "    vis = 1.0 - (1.0 - vis) * uShSunK;\n"                                                         \
+    "#endif\n"                                                                                          \
+    "    sh_state = vec4(vis, facing, float(casc), 1.0);\n"                                             \
+    "}\n"                                                                                               \
+    "vec3 sh_points(vec3 c) {\n"                                                                        \
+    "    if (uShOn == 0 || uPtN <= 0) return uShDebug == 3 && uShOn != 0 ? vec3(0.0) : c;\n"            \
+    "    vec3 add = vec3(0.0);\n"                                                                       \
+    "    vec4 cp = uPtVP * vec4(vShWorld, 1.0);\n" /* this pixel's tile: its lights alone */              \
+    "    ivec2 ts = textureSize(uPtTiles, 0);\n"                                                         \
+    "    vec2 t01 = cp.w > 0.0 ? cp.xy / cp.w * 0.5 + 0.5 : vec2(0.5);\n"                                 \
+    "    uvec4 m = texelFetch(uPtTiles, clamp(ivec2(floor(t01 * vec2(ts))), ivec2(0), ts - 1), 0);\n"  \
+    "    while ((m.x | m.y | m.z) != 0u) {\n"                                                           \
+    "        int i;\n"                                                                                    \
+    "        if (m.x != 0u) { i = findLSB(m.x); m.x &= m.x - 1u; }\n"                                   \
+    "        else if (m.y != 0u) { i = 32 + findLSB(m.y); m.y &= m.y - 1u; }\n"                         \
+    "        else { i = 64 + findLSB(m.z); m.z &= m.z - 1u; }\n"                                         \
+    "        if (i >= uPtN) break;\n"                                                                     \
+    "        vec3 L = uPtPos[i].xyz - vShWorld;\n"                                                      \
+    "        float d = length(L);\n"                                                                    \
+    "        if (d >= uPtPos[i].w || d <= 0.0) continue;\n"                                             \
+    "        float att = 1.0 - d / uPtPos[i].w;\n"                                                      \
+    "        float sv = 1.0;\n"                                                                         \
+    "        if (uPtCol[i].w >= 0.0) {\n" /* the cube (the integer part) and its shadow's weight (0.05..0.95: fading in or out) */ \
+    "            float layer = floor(uPtCol[i].w), kw = clamp((fract(uPtCol[i].w) - 0.05) / 0.9, 0.0, 1.0);\n" \
+    "            vec3 v = vShWorld + sh_n * 0.04 - uPtPos[i].xyz;\n"                                    \
+    "            float f = uPtPos[i].w, nn = uPtNear;\n"                                                \
+    "            vec3 a = abs(v);\n"                                                                    \
+    "            float z = max(max(a.x, a.y), a.z);\n"                                                  \
+    "            float ref = 0.5 * ((f + nn) / (f - nn) - (2.0 * f * nn) / ((f - nn) * z)) + 0.5 - 0.0002;\n" \
+    "            float o = 0.015 * z;\n"                                                                \
+    "            sv = 0.25 * (texture(uPtMap, vec4(v + vec3(o, o, 0.0), layer), ref)\n"           \
+    "                 + texture(uPtMap, vec4(v + vec3(-o, 0.0, o), layer), ref)\n"                \
+    "                 + texture(uPtMap, vec4(v + vec3(0.0, -o, -o), layer), ref)\n"               \
+    "                 + texture(uPtMap, vec4(v + vec3(o, -o, o), layer), ref));\n"                \
+    "            sv = mix(1.0, sv, kw);\n"                                                              \
+    "        }\n"                                                                                       \
+    "        add += uPtCol[i].rgb * (max(dot(sh_n, L / d), 0.0) * att * 0.5 * sv);\n"                   \
+    "    }\n"                                                                                           \
+    "    if (uShDebug == 3) return add;\n"                                                              \
+    "    return c + add;\n"                                                                             \
+    "}\n"                                                                                               \
+    "vec3 sh_apply_split(vec3 full, vec3 nokey) {\n" /* the colour lit with / without the key light: mixed by the visibility */ \
+    "    if (sh_state.w == 0.0) return full;\n"                                                        \
+    "    if (uShDebug == 2) return vec3(sh_state.x);\n"                                                \
+    "    return mix(nokey, full, sh_state.x);\n"                                                       \
+    "}\n"                                                                                              \
+    "vec3 sh_apply(vec3 c) {\n"                                                                         \
+    "    if (sh_state.w == 0.0) return c;\n"                                                            \
+    "    if (uShDebug == 2) return vec3(sh_state.x * max(sh_state.y, 0.15));\n"                         \
+    "    float k = 1.0 - uShParam.x * (1.0 - sh_state.x) * sh_state.y;\n"                               \
+    "    vec3 o = c * k;\n"                                                                             \
+    "    if (uShDebug == 1) {\n"                                                                        \
+    "        int ci = int(sh_state.z);\n"                                                               \
+    "        vec3 tint = ci == 0 ? vec3(1.0, 0.6, 0.6) : ci == 1 ? vec3(0.6, 1.0, 0.6) : ci == 2 ? vec3(0.6, 0.6, 1.0) : vec3(1.0);\n" \
+    "        o *= tint;\n"                                                                              \
+    "    }\n"                                                                                           \
+    "    return o;\n"                                                                                   \
+    "}\n"
+
+#endif  // RAC1_GAME_RENDER_MRP_LIGHTING_H

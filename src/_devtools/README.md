@@ -1,0 +1,22 @@
+# `src/_devtools/` — openly invented development tools
+
+Per [ADR 0003](../../docs/decisions.md), this directory holds code that is **openly invented** to
+support development:
+
+- A dev menu inspired by R&C1's hidden Insomniac debug menu
+- Spawn / kill / teleport helpers
+- Render-state toggles (wireframe, no-cull, depth-test off)
+- Force-state controls (skip cutscene, give gadget, set checkpoint)
+- Visual-debug overlays (collision wireframes, bounding boxes, etc.)
+
+## Policy
+
+- **Openly invented**: there is no `// orig:` requirement here. This code is *not* a port; do not
+  pretend it is.
+- **Compiled only when** the `RAC1_DEVTOOLS` CMake option is ON (the default). A build with
+  `RAC1_DEVTOOLS=OFF` leaves this whole tree out.
+- **No header from here may be `#include`d by** `src/game/` or `runtime/`. Only `src/host/` and
+  other files in `src/_devtools/` may include them.
+- **Uses ImGui freely**: that is the point.
+- May read and write EE RAM and call the hardware layer in `runtime/`. It should not call functions
+  in `src/game/` that are not meant to be called from outside.
