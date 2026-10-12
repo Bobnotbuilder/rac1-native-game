@@ -38,7 +38,10 @@ third_party/
 tools/
   setup.py         the guided setup (run through setup.sh)
   overlay_match/   generates the per-level address maps from the player's disc
+  codegen/         the code generators and their inputs (see "The generated code" below)
 cmake/             dependencies downloaded at configure time
+assets/generated/src/
+                   the generated code, written by the setup from the player's disc (not in the repository)
 ```
 
 The build (`CMakeLists.txt`) produces one executable, `rac1-native`, from static libraries:
@@ -107,18 +110,64 @@ The rules a port follows are in [Overview](overview.md#the-porting-rules). In pr
   any arguments, does nothing, and returns a zero value of whatever type is expected.
 - **An FPU divide is `fpu_div`**, because the EE's divider rounds to nearest while the rest of its
   FPU rounds toward zero (`src/game/ovl/ovl_common.h`).
-- **Machine-transliterated files.** Files named `*_tr.cpp` or `*_tr_N.cpp` (82 of them) and
-  `*_asm.cpp` (34) were generated instruction by instruction from the original MIPS code by the
-  project's translation tools, then proved against the original. They are not edited by hand. Their
-  generators are not in this repository yet.
+- **Generated files.** Part of `src/game/` is not written by hand but generated from the game's
+  own code; those files are not in the repository (see [The generated code](#the-generated-code)).
 - **Translated VU microprograms** (`moby_vu1.cpp`, `world_vu1_*.cpp`, `particles_vu1.cpp`,
   `world_light_vu0.cpp`...) are the VU code the game uploads, translated instruction by instruction,
   in an exact form and a faster `_fast` form. They are registered by the hash of the code they
-  replace and run when the game starts that code.
+  replace and run when the game starts that code. Most of them are generated files.
 
 `src/game/render/` and `src/game/enhance/` are host code that sits beside the port: the renderer
 reads the game's state and draws it; the options pages are built from the game's own menu widgets
 and data. Neither changes the game's behaviour unless an enhancement is turned on.
+
+### The generated code
+
+About 140 source files of the port (some 30 MB of C++) are translated instruction by instruction
+from the game's own MIPS and VU code, by the generators in `tools/codegen/`. They are proved against
+the original like any port, and never edited by hand. Because they are a mechanical rewrite of the
+game's code, they are not in the repository: the setup generates them from the player's own disc,
+as other static-recompilation projects do.
+
+| Kind | Files | Generator | From |
+|---|---|---|---|
+| `*_tr.cpp`, `*_tr_N.cpp` and a few others (`sky_ee.cpp`, `novalis_birdbot.cpp`, `title_sky.cpp`...) | 86 | `gen_mkall.py`: `mkall.py` (`mkall_l8.py` .. `mkall_l11.py` for levels 8 to 11) and `mips2cpp.py`, whole functions and their callees | each level's overlay; the boot module |
+| `*_asm.cpp` | 34 | `gen_asm.py`: `asm2fn_batch.py` and `asm2fn.py` | the levels' overlays |
+| `moby_skin.cpp`, `moby_shadows_asm.cpp`, `world_cull.cpp`, `world_lighting.cpp` | 4 | `gen_asm2cpp.py`: `asm2cpp.py`, plus the reviewed changes kept as patches | Veldin's overlay |
+| `moby_vu0*.cpp`, `moby_vu1*.cpp`, `world_vu1_*.cpp`, `world_light_vu0*.cpp` | 18 | `gen_moby_vu_fast.py`, `gen_world_vu.py`, `gen_light_vu0.py`: `vu2cpp.py` and `vu2cpp_fast.py` | the VU microcode in the boot executable |
+
+`tools/codegen/generate_all.py` runs all of them (`--list` shows the units, `--files` the files they
+write). The generators read only:
+
+- the disc image: each level's overlay, read from the disc by `tools/overlay_match/`
+  (`tools/codegen/ovlist.py`), with `tools/codegen/r5900dis.py` disassembling it;
+- the boot executable, `assets/dumps/SCUS_971.99`, and the overlay address maps,
+  `assets/generated/overlay_map/`, both made from the disc by the setup;
+- their committed inputs in `tools/codegen/`, which hold no game data: `gen/mkall/` (each run: the
+  level, the entry functions with their names and signatures, the generator's options, and call-site
+  glue), `gen/asm2cpp/` (the routines and the review's patches), `asm2fn_specs/`, the `*.glue` files
+  (C++ statements for the calls into hand-written ports, keyed by address), and `gen/skel/`, the
+  skeleton of each output file (its head, includes, the hand-written C++ around the generated
+  functions, and where each generated function goes);
+- the headers of `src/game/`, whose `// orig: 0x...` declarations tell the generators which callees
+  are ported and with which signature, and the levels' variant tables (`src/game/ovl/variants_l<n>.cpp`).
+
+The headers that declare the generated functions stay in `src/game/` with the hand-written code,
+which calls through them.
+
+The setup runs `generate_all.py --out assets/generated --no-insn-comments`, so the files land in
+`assets/generated/src/game/...`, mirroring `src/`. `--no-insn-comments` leaves out the comment each
+translated line carries with its original instruction (`// lw a1,0xf0(sp)`); the code is the same,
+token for token. The setup also writes `assets/generated/src/generated_sources.cmake`: the list of
+the files, and a fingerprint of the generators and of the headers they read. `src/game/CMakeLists.txt`
+adds those files to `rac1_game` (`RAC1_GENERATED_SRC` points elsewhere if needed). Configuring fails
+with a message asking for `./setup.sh` when the list is missing, a file is missing, or the
+fingerprint no longer matches the sources (after a `git pull` that changed a generator or a header);
+`./setup.sh` then generates the code again before it builds.
+
+The generated files are built with the same include paths as the rest of `src/game/`
+(`#include <game/ovl/...>`), and compile to the same code as in the project's development
+repository, where they are committed with their instruction comments.
 
 ### `runtime/`: the hardware
 
@@ -197,6 +246,9 @@ The game runs from the repository's root: every path is relative to the working 
 | `assets/generated/overlay_map/` | the per-level address maps | `src/game/ovl/ovl_reloc.cpp` |
 | `assets/generated/mrp/moby/`, `assets/generated/mrp/world/` | the MRP's assets | `mrp_moby_renderer.cpp`, `mrp_world_renderer.cpp` |
 | `third_party/gamecontrollerdb/gamecontrollerdb.txt` | the controller database | `src/host/orig_main.cpp` |
+
+At build time, `assets/generated/src/` holds the generated code (see
+[The generated code](#the-generated-code)); the game does not read it while it runs.
 
 All of `assets/` is generated by the setup from the player's own disc (see [Setup](setup.md)) and is
 never committed. The player's own files (settings, controls, saves) live in the usual XDG

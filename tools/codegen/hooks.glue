@@ -1,0 +1,91 @@
+# The optional enhancements' hook points in the levels' own (transliterated) copies of the hero functions.
+#
+# The hand ports of Veldin's hero code (and Novalis's, the *_l1.cpp files) call src/game/enhance/advanced.h at the points
+# where R&C 3's movement, the strafe and the modern aim differ from the original. Rilgar (L5),
+# Blarg's Nebula G34 (L6), Batalia (L8) and Pokitaru (L11) run their own builds of those functions, machine-transliterated
+# (rilgar_hero_tr_*.cpp, blarg_hero_tr_*.cpp, batalia_hero_tr_*.cpp, pokitaru_hero_tr_*.cpp): the generator puts the same
+# calls there, at the instruction of the level's own code that corresponds to the hand port's point (the alignment of the
+# two instruction streams).
+#
+# Read by tools/codegen/mips2cpp.py (load_hooks; mkall.py sets MIPS2CPP_HOOKS to this file):
+#   L<n> 0xADDR: <statement>   emitted before the instruction at ADDR of level n's code, after its label
+#   L<n> 0xADDR label          ADDR made a label, for a statement's `goto L_<addr>`
+# With every enhancement off each statement is a test that fails (advanced_rac3_movement(), advanced_strafe_flip(), ...):
+# the code then runs as transliterated. Registers: the player block 0x13f350 is `<base> - 0xcb0` (a level's base register
+# is named in each line); `goto` targets are labels of the function.
+#
+# Veldin's points (0x217970 hero_state_update, 0x2223f8 hero_set_state, 0x229b70 hero_input_update, 0x214658
+# hero_horizontal_velocity, 0x211be8 hero_stick_speed), the hand ports' calls:
+#   A  0x21c000  run_update: R&C 3's "move along the stick" flag (advanced_rac3_along_stick), the original's rule skipped (to 0x21c0a4)
+#   B  0x21c168  run_update: R&C 3's turn springs (advanced_rac3_run_turn: f20, the acceleration factor), the original's turn skipped (to 0x21c2dc)
+#   C  0x21c308  run_update: the acceleration / deceleration factors 7.5 / 8.5 (f0 / f1) -> R&C 3's 37 / 30
+#   D  0x225790  enter_jump (the jump states' entry): advanced_rac3_jump before the 0x490 default
+#   E  0x22f2d4  run_jump: R&C 3's running jump rule (a0 = 9 / 7 for hero_set_state at 0x231c10)
+#   F  0x22b568  run_input: the strafe flip (state 0xb) instead of the jump, then the function's end (0x231c4c)
+#   G  0x22b968  run_input: R&C 3's stop (advanced_rac3_stop), then the original's standing path at 0x22ba70 (no skid, no 25 frames)
+#   H  0x22b390  swing_input: running out of a swing / the throw (advanced_rac3_swing_exit, s1 the combo row)
+#   I  0x2149c4  hero_horizontal_velocity, states 0xb / 0xc: the strafe flip's speed (to 0x214a58)
+#   J  0x214de0  hero_horizontal_velocity: R&C 3's air braking (f12 = k x 8 / 11, k = f4) instead of 2 / 6
+#   K  after each call of the level's own hero_stick_speed (Blarg, Pokitaru): advanced_move_speed, as hero_stick_speed (ovl_21.cpp)
+
+# ---- Rilgar (level 5): hero_state_update 0x244a70, hero_set_state 0x24cee8, hero_input_update 0x255960, hero_horizontal_velocity 0x242258
+L5 0x00249b10: if (advanced_rac3_movement()) { advanced_rac3_along_stick(); set32(s0, s5.w() + -0xcb0); goto L_249bb4; }  // enhancement (A)
+L5 0x00249c78: if (advanced_rac3_movement()) { fr[20] = advanced_rac3_run_turn(); goto L_249dec; }  // enhancement (B)
+L5 0x00249e18: if (advanced_rac3_movement()) { fr[0] = 37.0f; fr[1] = 30.0f; }  // enhancement (C)
+L5 0x0024feec: advanced_rac3_jump();  // enhancement (D)
+L5 0x00259b40: if (advanced_rac3_movement()) { set32(a0, advanced_rac3_running_jump() ? 9u : 7u); goto L_25afb4; }  // enhancement (E)
+L5 0x002572a8: if (advanced_strafe_flip()) { hero_set_state(0xb, 1); advanced_strafe_flip_entered(); set32(s0, s4.w() + -0xcb0); goto L_25aff0; }  // enhancement (F)
+L5 0x00257428: if (advanced_rac3_movement()) { advanced_rac3_stop(); set32(s0, s4.w() + -0xcb0); goto L_257530; }  // enhancement (G)
+L5 0x00257530 label
+L5 0x002570d0: if (advanced_rac3_swing_exit(s1.w())) { set32(s0, s4.w() + -0xcb0); goto L_25aff0; }  // enhancement (H)
+L5 0x00242540: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_2425d4; }  // enhancement (I)
+L5 0x00242940: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_242958; }  // enhancement (J)
+
+# ---- Blarg's Nebula G34 (level 6): hero_state_update 0x22e020, hero_set_state 0x2356a0, hero_input_update 0x23b440,
+# hero_horizontal_velocity 0x22b438, hero_stick_speed 0x228b40 (its own: K)
+L6 0x00230c60: if (advanced_rac3_movement()) { advanced_rac3_along_stick(); set32(s0, s6.w() + -0xcb0); goto L_230d04; }  // enhancement (A)
+L6 0x00230dc8: if (advanced_rac3_movement()) { fr[20] = advanced_rac3_run_turn(); goto L_230f3c; }  // enhancement (B)
+L6 0x00230f68: if (advanced_rac3_movement()) { fr[0] = 37.0f; fr[1] = 30.0f; }  // enhancement (C)
+L6 0x00237bf8: advanced_rac3_jump();  // enhancement (D)
+L6 0x0023fae4: if (advanced_rac3_movement()) { set32(a0, advanced_rac3_running_jump() ? 9u : 7u); goto L_2419d0; }  // enhancement (E)
+L6 0x0023c740: if (advanced_strafe_flip()) { hero_set_state(0xb, 1); advanced_strafe_flip_entered(); set32(s0, s4.w() + -0xcb0); goto L_241a0c; }  // enhancement (F)
+L6 0x0023c87c: if (advanced_rac3_movement()) { advanced_rac3_stop(); set32(s0, s4.w() + -0xcb0); goto L_23c984; }  // enhancement (G)
+L6 0x0023c984 label
+L6 0x0023c568: if (advanced_rac3_swing_exit(s1.w())) { set32(s0, s4.w() + -0xcb0); goto L_241a0c; }  // enhancement (H)
+L6 0x0022b7a4: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_22b838; }  // enhancement (I)
+L6 0x0022bba4: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_22bbbc; }  // enhancement (J)
+L6 0x00230d4c: advanced_move_speed();  // enhancement (K)
+L6 0x00232758: advanced_move_speed();  // enhancement (K)
+L6 0x0023c044: advanced_move_speed();  // enhancement (K)
+L6 0x0023c0e8: advanced_move_speed();  // enhancement (K)
+
+# ---- Batalia (level 8): hero_state_update 0x2284e0, hero_set_state 0x230b38, hero_input_update 0x2370d8, hero_horizontal_velocity 0x225ed0
+L8 0x0022c784: if (advanced_rac3_movement()) { advanced_rac3_along_stick(); set32(s0, s6.w() + -0xcb0); goto L_22c828; }  // enhancement (A)
+L8 0x0022c8ec: if (advanced_rac3_movement()) { fr[20] = advanced_rac3_run_turn(); goto L_22ca60; }  // enhancement (B)
+L8 0x0022ca8c: if (advanced_rac3_movement()) { fr[0] = 37.0f; fr[1] = 30.0f; }  // enhancement (C)
+L8 0x00233800: advanced_rac3_jump();  // enhancement (D)
+L8 0x0023c20c: if (advanced_rac3_movement()) { set32(a0, advanced_rac3_running_jump() ? 9u : 7u); goto L_23cec4; }  // enhancement (E)
+L8 0x00238a10: if (advanced_strafe_flip()) { hero_set_state(0xb, 1); advanced_strafe_flip_entered(); set32(s0, s4.w() + -0xcb0); goto L_23cf00; }  // enhancement (F)
+L8 0x00238bc4: if (advanced_rac3_movement()) { advanced_rac3_stop(); set32(s0, s4.w() + -0xcb0); goto L_238ccc; }  // enhancement (G)
+L8 0x00238ccc label
+L8 0x00238838: if (advanced_rac3_swing_exit(s1.w())) { set32(s0, s4.w() + -0xcb0); goto L_23cf00; }  // enhancement (H)
+L8 0x002261b8: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_22624c; }  // enhancement (I)
+L8 0x002265b8: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_2265d0; }  // enhancement (J)
+
+# ---- Pokitaru (level 11): hero_state_update 0x246b70, hero_set_state 0x24db50, hero_input_update 0x253a18,
+# hero_horizontal_velocity 0x244560, hero_stick_speed 0x241c98 (its own: K)
+L11 0x0024ad28: if (advanced_rac3_movement()) { advanced_rac3_along_stick(); set32(s0, s5.w() + -0xcb0); goto L_24adcc; }  // enhancement (A)
+L11 0x0024ae90: if (advanced_rac3_movement()) { fr[20] = advanced_rac3_run_turn(); goto L_24b004; }  // enhancement (B)
+L11 0x0024b030: if (advanced_rac3_movement()) { fr[0] = 37.0f; fr[1] = 30.0f; }  // enhancement (C)
+L11 0x002503c0: advanced_rac3_jump();  // enhancement (D)
+L11 0x00257a28: if (advanced_rac3_movement()) { set32(a0, advanced_rac3_running_jump() ? 9u : 7u); goto L_258698; }  // enhancement (E)
+L11 0x00255360: if (advanced_strafe_flip()) { hero_set_state(0xb, 1); advanced_strafe_flip_entered(); set32(s0, s4.w() + -0xcb0); goto L_2586d4; }  // enhancement (F)
+L11 0x002554e0: if (advanced_rac3_movement()) { advanced_rac3_stop(); set32(s0, s4.w() + -0xcb0); goto L_2555e8; }  // enhancement (G)
+L11 0x002555e8 label
+L11 0x00255188: if (advanced_rac3_swing_exit(s1.w())) { set32(s0, s4.w() + -0xcb0); goto L_2586d4; }  // enhancement (H)
+L11 0x00244848: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_2448dc; }  // enhancement (I)
+L11 0x00244c48: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_244c60; }  // enhancement (J)
+L11 0x0024ae14: advanced_move_speed();  // enhancement (K)
+L11 0x0024b5fc: advanced_move_speed();  // enhancement (K)
+L11 0x002545c0: advanced_move_speed();  // enhancement (K)
+L11 0x00254664: advanced_move_speed();  // enhancement (K)

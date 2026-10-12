@@ -1,0 +1,64 @@
+// Ported overlay code: the world's static lighting, the three hand-written EE / VU0
+// macro-mode routines that bake the light sets' colours into the level's tfrag / tie / shrub data
+// ("Static lighting"). Transliterated instruction by instruction
+// (tools/codegen/asm2cpp.py, reviewed) on 128-bit registers (ee_regs.h) and the shared VU0 registers.
+#include <game/ovl/world_lighting.h>
+
+#include <game/ovl/ovl_reloc.h>
+#include <game/ovl/ee_regs.h>
+#include <game/ovl/ovl.h>
+#include <game/ovl/vu0_regs.h>
+
+namespace rac1 {
+
+using namespace eer;
+using namespace vu0m;
+
+// The tfrag entries' (0x40 bytes at *(0x160f4c)) static lighting: for each index of the list at `list` (halfwords,
+// ended by 0xffff) the entry's per-vertex colours rebuilt from the vertices' base colour (1:5:5:5 at vertex + 4),
+// normal (two angle indices at vertex + 2, looked up in the (cos, sin) table 0x166080 copied to the scratchpad) and
+// light-set blend (vertex + 6), through the level's light sets (0x17fec0) -- or the single set entry[+0x34] >= 0 --
+// then the point lights named by the nibbles of entry[+0x36] (0x1802c0), into the scratchpad buffer 0x70001000 /
+// 0x70002000 (ping-pong) and from there (DMA fromSPR) to entry[+0x10] + s16 entry[+0x1e] (entry[+0x29] quadwords).
+// The caller's s registers are spilled to 0x70000800 (the vertex normals use 0x70000000.. : the list is at 0x70003000).
+// Called by the level load for every entry (gameplay_load) and by the render pass for the visible ones (list 0x1c5400).
+// orig: 0x00295350
+void world_tfrag_lighting(uint32_t list) {
+    Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, gp, sp, s8, ra, lo, hi;
+    (void)t7; (void)s7; (void)t8; (void)t9; (void)sp; (void)ra; (void)lo; (void)hi; (void)gp; (void)t0; (void)t1; (void)t2; (void)t3; (void)t4; (void)t5; (void)t6;
+    set32(a0, list);
+//@asm world_tfrag_lighting
+
+}
+
+// The tie instances' (bounds 0x20 bytes at *(0x160fc0), data 0x1c0 bytes at *(0x160fc8)) static lighting: per listed
+// instance the light sets of bounds[+0x1c] (blend of two sets by the upper byte) and the point lights of bounds[+0x1e]
+// brought into the instance's frame, then the class's normals (tie class table 0x1c5800, class byte bounds[+0x1a],
+// pointer at class + 0xc) and the 64 base colours at data + 0x140 run through the VU0 micro programs 0x58 / 0x84 (vcallms);
+// the RGBA8 results are written to data + 0x40 .. + 0x140. The dirty flag bounds[+0x1b] is cleared.
+// The caller's s registers are spilled to 0x70003fd8.
+// Called by the level load for every instance and by the render pass for the visible ones (list 0x1c7300; PAL: 0x295c50).
+// orig: 0x00297728
+void world_tie_lighting(uint32_t list) {
+    Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, gp, sp, s8, ra, lo, hi;
+    (void)t7; (void)s7; (void)t8; (void)t9; (void)sp; (void)ra; (void)lo; (void)hi; (void)gp; (void)t0; (void)t1; (void)t2; (void)t3; (void)t4; (void)t5; (void)t6;
+    set32(a0, list);
+//@asm world_tie_lighting
+
+}
+
+// The shrub instances' (bounds 0x20 bytes at *(0x160494), data 0x40 bytes at *(0x16049c)) static lighting: as the tie's,
+// the instance's three matrix rows normalised, the class's normals (shrub class table 0x1bc030, pointer at class + 0x2c) through
+// the VU0 micro programs 0x0 / 0x2c; one base colour (the packed word at data + 0xc); 24 RGBA8 results written to
+// *(0x1604a0) + 0x60 * index. The caller's s registers are spilled to 0x70003fe0.
+// Called by the level load for every instance and by the render pass for the visible ones (list 0x1bcfb0).
+// orig: 0x00288908
+void world_shrub_lighting(uint32_t list) {
+    Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, gp, sp, s8, ra, lo, hi;
+    (void)t7; (void)s7; (void)t8; (void)t9; (void)sp; (void)ra; (void)lo; (void)hi; (void)gp; (void)t0; (void)t1; (void)t2; (void)t3; (void)t4; (void)t5; (void)t6;
+    set32(a0, list);
+//@asm world_shrub_lighting
+
+}
+
+}  // namespace rac1

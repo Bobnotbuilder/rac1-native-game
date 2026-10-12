@@ -1,0 +1,110 @@
+{
+ "file": "src/game/ovl/moby_skin.cpp",
+ "level": 0,
+ "fragments": [
+  {
+   "name": "moby_skin",
+   "addr": "1ee858",
+   "gp_fold": false,
+   "patches": {
+    "1ee85c": {
+     "replace": [
+      "    // (sq ra,0x1ff0(at): the return address saved on the scratchpad)"
+     ]
+    },
+    "1ee8d0": {
+     "replace": [
+      "    // (ld t1,0x1c78(v0) / beq t1,zero: the original spins until the transfer has overwritten the",
+      "    // sentinel -- done at its kick here)",
+      "    t1.lo = ld_(v0.w() + 0x1c78);"
+     ]
+    },
+    "1ee8e4": {
+     "replace": []
+    },
+    "1ee944": {
+     "replace": [
+      "    vu0::drain();",
+      "    lanes(vf()[1], XYZW, [](int i) { return u2f(f2u(vf()[1].v[i]) & 0x7fffffffu); });"
+     ]
+    },
+    "1ee96c": {
+     "replace": [
+      "    vu0::drain();",
+      "    vu0m::sub(vf()[1], vf()[0], vf()[1], XYZW);"
+     ]
+    },
+    "1ee97c": {
+     "replace": [
+      "    vsqi(1, 1, 15);"
+     ]
+    },
+    "1eeac4": {
+     "replace": [
+      "    vsqi(1, 1, 15);"
+     ]
+    },
+    "1eead4": {
+     "replace": [
+      "    {  // bne t2,zero,0x001eea9c",
+      "        const bool c = t2.lo != zero.lo;",
+      "        vsqi(4, 1, 15);",
+      "        if (c) goto L_1eea9c;",
+      "    }"
+     ]
+    },
+    "1ef5b4": {
+     "replace": [
+      "    {  // bne a0,zero,0x001ef864",
+      "        const bool c = a0.lo != zero.lo;",
+      "        // (delay) lq ra,0x1ff0(at): the return address back",
+      "        if (c) goto L_1ef864;",
+      "    }",
+      "    // (delay) nop",
+      "    return v0.w();"
+     ]
+    },
+    "1ef5bc": {
+     "replace": []
+    },
+    "1ef8c8": {
+     "replace": [
+      "    vu0::drain();",
+      "    mulbc(vf()[28], vf()[28], vf()[1].v[0], XYZ);",
+      "    mulbc(vf()[29], vf()[29], vf()[1].v[0], XYZ);",
+      "    mulbc(vf()[30], vf()[30], vf()[1].v[0], XYZ);",
+      "    vf()[31].v[3] = vf()[3].v[0];",
+      "    addbc(vf()[31], vf()[0], vf()[2].v[0], XYZ);",
+      "    // (ld at,0x0(t7) / bne at,zero: the original spins until the transfer has overwritten the",
+      "    // sentinel -- done at its kick here)",
+      "    at.lo = ld_(t7.w() + 0x0);"
+     ]
+    },
+    "1ef8cc": {
+     "replace": []
+    },
+    "1ef8d0": {
+     "replace": []
+    },
+    "1ef8d4": {
+     "replace": []
+    },
+    "1ef8d8": {
+     "replace": []
+    },
+    "1ef8dc": {
+     "replace": []
+    },
+    "1ef8f0": {
+     "replace": []
+    },
+    "1efbc8": {
+     "replace": [
+      "L_1efbc8:",
+      "    set32(v0, gp.w() + 0x0);"
+     ]
+    }
+   }
+  }
+ ]
+}

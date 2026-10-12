@@ -1,0 +1,87 @@
+// Ported overlay code: the moby skinning (see moby_skin.h). Hand-written assembly, transliterated
+// instruction by instruction (tools/codegen/asm2cpp.py, then reviewed): its software pipeline hands
+// each vertex to the VU0 program it started (vcallms 0 / vcallmsr) and takes the results back in
+// a fixed order, so the instruction order is the port. The protocol is synchronised both ways
+// (the VU0 spins on vi1 / vi2 until the EE's CTC2 clears them; the EE polls the results' x lane
+// against the sentinel at VU0 0xff0 the program loads first), its outcome independent of the two
+// processors' pace (the original under the EE interpreter gives the same output with VU0 / EE
+// paces 1/2 to 4/1): the port runs the VU0 program at its start and at each CTC2 until it waits
+// again (runtime/vu/vu0.h), so the EE's polls find the results already there.
+//
+// Per record (a0, the ring's skinning record: +0 the packet count, +0x14 the second half's list,
+// +0x40.. the packet entries) the class's vertex packets are brought to the scratchpad (toSPR,
+// double-buffered at 0x2000 / 0x2800), skinned by 1 / 2 / 3 joints (the matrices from 0x0 +
+// 0x40 j, built by 0x250fe0), lit by the record's light rows (+0x40 .. +0x70 of its header) and
+// packed (positions s16, normals / colours bytes) into 0x3000 / 0x3400, sent by fromSPR into
+// the moby's VIF1 chain at the addresses the draw loop left; the second half (+0x14) skins the
+// listed vertices one at a time (vcallmsr 0x111 / 0x121 / 0x12d). Returns the next record.
+#include <game/enhance/advanced.h>
+#include <game/ovl/moby_skin.h>
+
+#include <game/ovl/ovl_reloc.h>
+#include <game/math/vecmath.h>
+#include <game/ovl/ovl_reloc.h>
+#include <game/ovl/ee_regs.h>
+#include <game/ovl/ovl_reloc.h>
+#include <game/ovl/moby_joints.h>
+#include <game/ovl/vu0_regs.h>
+#include <game/ovl/moby_pass.h>
+
+#include <chrono>
+#include <cstdlib>
+
+namespace rac1 {
+
+// orig: (host) the MRP scene state's observer of the poses (mrp_scene.h); null: nothing
+MobyPoseObserver g_moby_pose_observer = nullptr;
+// orig: (host) the MRP skip's next-record function (moby_skin.h)
+MobySkipNext g_moby_skip_next = nullptr;
+
+// orig: 0x001ee858
+uint32_t moby_skin(uint32_t rec, uint32_t work) {
+    using namespace eer;
+    using namespace vu0m;
+    Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, gp, sp, s8;
+    Q128 lo, hi;  // LO / HI (PMULTH)
+    set32(a0, rec);
+    set32(a1, work);
+//@asm moby_skin
+    return v0.w();  // jr ra
+
+}
+
+// orig: 0x002558e0
+void moby_skin_all(uint32_t rec, uint32_t work) {
+    // (the routine saves the callee-saved registers at 0x19b780 and keeps a0 / a1 in f0 / f1)
+    static const bool prof = std::getenv("RAC1_FRAME_PROF") != nullptr;
+    const auto t0 = prof ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point();
+    if (lw(rec) != 0) {
+        do {
+            moby_joints_pose(rec, work);
+            advanced_pose_hook(rec);  // enhancement: the strafe's lower body
+            if (g_moby_pose_observer != nullptr) g_moby_pose_observer(rec, work);  // (host)
+            // orig: (host) the MRP skip: the VU0 skinning 0x1ee858 only fills the moby's chain with
+            // vertices (and lights them) for the VU1 programs; the MRP does both in its shader from the pose.
+            // The next record comes from the draw loop's own record size (the MRP scene state); 0: unknown, skin.
+            const uint32_t skip_next = g_moby_mrp_skip && (g_moby_mrp_skip_parts & 1) && g_moby_skip_next != nullptr ? g_moby_skip_next(rec) : 0;
+            if (skip_next != 0 && !g_moby_mrp_skip_verify) {
+                rec = skip_next;
+            } else {
+                const uint32_t next = moby_skin(rec, work);
+                if (skip_next != 0) ++(next == skip_next ? g_moby_mrp_skip_next_ok : g_moby_mrp_skip_next_bad);
+                rec = next;
+            }
+        } while (lw(rec) != 0);
+    }
+    if (prof) g_prof_moby_skin_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    // (then waits for the fromSPR channel: its transfers are done at their kick here)
+}
+
+// orig: 0x0024fd80
+void moby_joints() {
+    // FlushCache(0) (0x118a80): the data cache written back -- none on the host
+    mem_copy128(0x70003800, OV(0x00166080), 0x800);
+    moby_skin_all(lwu(OV(0x0015f5f8)), lwu(OV(0x0015f5fc)));
+}
+
+}  // namespace rac1

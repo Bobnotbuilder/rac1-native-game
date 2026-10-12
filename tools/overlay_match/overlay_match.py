@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Match the code of Veldin's overlay (the one every src/game/ovl port is written against) in
-another level's overlay, relocations masked, and map the addresses (task 0300).
+another level's overlay, relocations masked, and map the addresses.
 
-Every R&C1 level ships its own overlay executable (docs/game-logic.md, "Levels and overlays"): the engine is
+Every R&C1 level ships its own overlay executable: the engine is
 compiled into each of them, linked at different addresses, with the level's own code and
 tables. This tool reads the overlays straight from your ISO and, for each level N:
 
@@ -17,7 +17,7 @@ tables. This tool reads the overlays straight from your ISO and, for each level 
   - with --ported, counts the ported functions (the `orig:` annotations of src/game) that have
     an equivalent in level N.
 
-Output (gitignored, generated from your ISO; see tools/setup_from_iso.py):
+Output (gitignored, generated from your ISO; see setup.sh):
   <out>/levelN.txt   "fn <veldin> <levelN> <size>" / "data <veldin> <levelN> <uses>" lines and a summary
                      (uses 0: a data object only data points to, paired through the mapped
                      objects' pointers)
@@ -375,7 +375,7 @@ def pairs_k(pairs, wv, wl, op, rs, rt, hv, hl):
 
 
 def data_pointer_pairs(V, L, pairs):
-    """More data pairs from the pointers the mapped data holds (task 0307): objects only data
+    """More data pairs from the pointers the mapped data holds: objects only data
     points to (the pause menu's pages and widgets, reached through other widgets' tables) get no
     pair from the code. From each mapped pair (Veldin a, level b), the words a + k / b + k up to
     the next mapped Veldin address (the object's extent, at most 0x400 bytes) that are both
@@ -424,11 +424,10 @@ REGIONS = [("base ELF (below 0x15ef00)", 0x100000, 0x15EF00), ("section 0 (0x15e
            ("section 1 bss (0x161e00..)", 0x161E00, 0x166000), ("section 2 data (0x166000..)", 0x166000, 0x1EA300)]
 
 
-def compare(V, L, level, out, ported):
+def map_overlays(V, L):
+    """V's functions and data addresses in L: (starts, fmap, exact, amb, missing, sizes, pairs, jal_bad)."""
     starts = V.function_starts()
     fmap, exact, amb, missing, sizes = match(V, L, starts)
-    total = sum(sizes.values())
-    mbytes = sum(sizes[a] for a in fmap)
     pairs, jal_bad = data_pairs(V, L, fmap, sizes)
     # the level tables (sections 3 / 4 / 5: class -> update function, camera types, sound
     # handlers): their rows are walked from the section's start, so a row's address is the
@@ -438,6 +437,24 @@ def compare(V, L, level, out, ported):
         for off in range(0, min(len(vb), len(lb)), 4):
             if vd + off not in pairs:
                 pairs[vd + off][ld + off] += 0
+    return starts, fmap, exact, amb, missing, sizes, pairs, jal_bad
+
+
+def map_lines(V, L, fmap, sizes, pairs):
+    """The map file's fn / data lines (levelN.txt's format)."""
+    lines = [f"fn {a:08x} {fmap[a]:08x} {sizes[a]:x}" for a in sorted(fmap)]
+    for a in sorted(pairs):
+        b, c = pairs[a].most_common(1)[0]
+        lines.append(f"data {a:08x} {b:08x} {sum(pairs[a].values())}")
+    for a, b in sorted(data_pointer_pairs(V, L, pairs).items()):  # (uses 0: reached through a data pointer)
+        lines.append(f"data {a:08x} {b:08x} 0")
+    return lines
+
+
+def compare(V, L, level, out, ported):
+    starts, fmap, exact, amb, missing, sizes, pairs, jal_bad = map_overlays(V, L)
+    total = sum(sizes.values())
+    mbytes = sum(sizes[a] for a in fmap)
     lines = []
     say = lines.append
     say(f"# level {level}: Veldin's overlay code matched in level {level}'s (tools/overlay_match, task 0300)")
@@ -469,13 +486,7 @@ def compare(V, L, level, out, ported):
         pv = [a for a in ported if V.code_base <= a < V.code_end]
         pm = [a for a in pv if a in fmap]
         say(f"# ported overlay functions (src/game orig:): {len(pv)}, with an equivalent in level {level}: {len(pm)}")
-    for a in sorted(fmap):
-        say(f"fn {a:08x} {fmap[a]:08x} {sizes[a]:x}")
-    for a in sorted(pairs):
-        b, c = pairs[a].most_common(1)[0]
-        say(f"data {a:08x} {b:08x} {sum(pairs[a].values())}")
-    for a, b in sorted(data_pointer_pairs(V, L, pairs).items()):  # (uses 0: reached through a data pointer)
-        say(f"data {a:08x} {b:08x} 0")
+    lines += map_lines(V, L, fmap, sizes, pairs)
     out.mkdir(parents=True, exist_ok=True)
     (out / f"level{level}.txt").write_text("\n".join(lines) + "\n")
     print("\n".join(l for l in lines if l.startswith("#")))

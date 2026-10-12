@@ -1,0 +1,43 @@
+{
+ "out": "src/game/ovl/tesla_asm.cpp",
+ "head": "// Ported overlay code: tesla. Transliterated instruction by instruction from the listing (tools/codegen/asm2fn.py,\n// spec tools/codegen/asm2fn_specs/tesla.json): the original's own control flow, constants and stale lanes, in EE RAM at the\n// original's addresses.",
+ "listings": "$RE_TMP",
+ "includes": [
+  "game/ovl/weapons.h",
+  "game/ovl/tesla.h",
+  "game/ovl/pause_menu.h"
+ ],
+ "functions": [
+  {
+   "addr": "2b9310",
+   "name": "tesla_2b9310",
+   "ret": "void",
+   "params": "uint32_t p0"
+  },
+  {
+   "addr": "2b94d0",
+   "name": "tesla_2b94d0",
+   "ret": "void",
+   "params": "uint32_t p0"
+  },
+  {
+   "addr": "2b87e0",
+   "name": "tesla_update",
+   "ret": "void",
+   "params": "uint32_t m",
+   "jr": [
+    "2b8ed4",
+    "2b8f30",
+    "2b9180",
+    "2b9058"
+   ]
+  }
+ ],
+ "register_fn": "tesla_fns_register",
+ "register": [
+  [
+   "2b87e0",
+   "tesla_update"
+  ]
+ ]
+}

@@ -1,0 +1,18 @@
+{
+ "file": "src/game/ovl/world_lighting.cpp",
+ "level": 0,
+ "fragments": [
+  {
+   "name": "world_tfrag_lighting",
+   "addr": "295350"
+  },
+  {
+   "name": "world_tie_lighting",
+   "addr": "297728"
+  },
+  {
+   "name": "world_shrub_lighting",
+   "addr": "288908"
+  }
+ ]
+}

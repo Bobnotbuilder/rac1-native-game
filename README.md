@@ -82,7 +82,8 @@ follows from that.
 - This repository contains **no game assets and none of the game's code**: no executable, no
   levels, textures, models, sounds or movies.
 - To play, you need **your own copy** of the game, the North American PS2 disc `SCUS-97199`, as an
-  ISO image you made yourself. The setup extracts and converts everything from it on your machine.
+  ISO image you made yourself. The setup extracts and converts everything from it on your machine,
+  including the part of the port that is a mechanical translation of the game's own code.
 - *Ratchet & Clank* is a trademark of Sony Interactive Entertainment. This project is not affiliated
   with, authorised or endorsed by Sony Interactive Entertainment or Insomniac Games.
 
@@ -96,8 +97,8 @@ cd rac1-native-game
 ./setup.sh --iso /path/to/your/ratchet.iso
 ```
 
-The setup checks your system (and tells you what to install), checks your disc, builds the game and
-generates the game's data. Run it again after a `git pull`: it redoes only what changed. Then play from the repository's root:
+The setup checks your system (and tells you what to install), checks your disc, generates part of the
+game's code from it, builds the game and generates the game's data. Run it again after a `git pull`: it redoes only what changed. Then play from the repository's root:
 
 ```bash
 ./build/rac1-native

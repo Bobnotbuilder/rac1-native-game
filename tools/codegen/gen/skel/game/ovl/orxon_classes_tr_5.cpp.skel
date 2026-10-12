@@ -1,0 +1,145 @@
+// Orxon (level 10) own code, transliterated: the level's own moby classes, the sound emitters, the class hooks, and their level-only callees. (part 5 of 6)
+// Transliterated instruction by instruction from level 10's own overlay with tools/codegen/mips2cpp.py (tools/codegen/mkall.py:
+// the original's control flow and PS2 float rules by construction), not rewritten
+// by hand: the names are the entries', the helpers `orx_<addr>_l10` (uniform ABI: TrRet).
+#include <game/lib/libc.h>
+#include <game/ovl/orxon_mobys.h>
+#include <game/ovl/quad_draw.h>
+#include <game/ovl/arrival.h>
+#include <game/ovl/carry_hooks.h>
+#include <game/ovl/checkpoint.h>
+#include <game/ovl/cutscene.h>
+#include <game/ovl/devastator.h>
+#include <game/ovl/enemy_749.h>
+#include <game/ovl/hydro.h>
+#include <game/ovl/level_change.h>
+#include <game/ovl/metal.h>
+#include <game/ovl/ovl.h>
+#include <game/ovl/screen_fade.h>
+#include <game/math/vecmath.h>
+#include <game/ovl/veldin_mobys.h>
+#include <game/ovl/visibomb_ball.h>
+#include <game/ovl/walker.h>
+#include <game/ovl/weapons.h>
+#include <game/math/vecmath.h>
+#include <game/ovl/arrival.h>
+#include <game/ovl/checkpoint.h>
+#include <game/ovl/cutscene.h>
+#include <game/ovl/level_change.h>
+#include <game/ovl/movie_mode.h>
+#include <game/ovl/veldin_mobys.h>
+#include <game/ovl/ee_regs.h>
+#include <game/ovl/enemy_749.h>
+#include <game/ovl/hero_l1.h>
+#include <game/ovl/novalis_mobys2.h>
+#include <game/ovl/ovl_reloc.h>
+#include <game/ovl/variants_l10.h>
+#include <game/ovl/vu0_regs.h>
+#include <game/ovl/walker.h>
+#include <game/port_stubs.h>
+#include <game/ovl/particle_16_spawn.h>
+
+namespace rac1 {
+
+using namespace eer;
+using namespace vu0m;
+
+//@gen orx_class1258_update_l10
+
+//@gen orx_2634e8_l10
+
+//@gen orx_2e7bf0_l10
+
+//@gen orx_class1302_update_l10
+
+//@gen orx_259700_l10
+
+//@gen orx_class1326_update_l10
+
+//@gen orx_class1344_update_l10
+
+//@gen orx_2e68b8_l10
+
+//@gen orx_class1346_update_l10
+
+//@gen orx_class1378_update_l10
+
+//@gen orx_2f5a50_l10
+
+//@gen orx_class1421_update_l10
+
+//@gen orx_class1424_update_l10
+
+//@gen orx_2ea4e8_l10
+
+//@gen orx_2ea7b0_l10
+
+//@gen orx_2eaa08_l10
+
+//@gen orx_class1544_update_l10
+
+//@gen orx_class1555_update_l10
+
+//@gen orx_class1806_update_l10
+
+//@gen orx_256e20_l10
+
+//@gen orx_class1855_update_l10
+
+//@gen orx_257470_l10
+
+//@gen orx_class1856_update_l10
+
+//@gen orx_class1857_update_l10
+
+//@gen orx_class1921_update_l10
+
+//@gen orx_2eba40_l10
+
+//@gen orx_2ec110_l10
+
+//@gen orx_2ec348_l10
+
+//@gen orx_class1973_update_l10
+
+//@gen orx_27ead0_l10
+
+//@gen orx_emitter3_l10
+
+//@gen orx_2f5a78_l10
+
+//@gen orx_cam_type19_accept_u
+
+//@gen orx_cam_type19_init_l10
+
+//@gen orx_cam_type19_update_l10
+
+//@gen orx_cam_type19_exit_l10
+
+//@gen orx_hook_2ce618_u
+
+//@gen orx_hook_2ce6e0_u
+
+//@gen orx_hook_2ce770_u
+
+//@gen orx_hook_2ce800_u
+
+//@gen orx_hook_2ce838_u
+
+//@gen orx_1de788_l10
+
+//@gen orx_cam0_hook_l10
+
+//@gen orx_cam_callback_l10
+
+//@gen orx_cb_2bd280_l10
+
+//@gen orx_cb_2ce868_l10
+
+//@gen orx_2568f0_l10
+
+//@gen orx_cb_2d7808_l10
+
+//@gen orx_1f3080_l10
+
+}  // namespace rac1

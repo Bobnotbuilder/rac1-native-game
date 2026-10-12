@@ -3,7 +3,9 @@
 From a fresh clone and your own disc image to the game running.
 
 This repository contains none of the game's code or data. Everything the game needs is extracted
-and generated from your own disc, on your machine.
+and generated from your own disc, on your machine: the game's data, and also part of the port's
+source code, the files that are a mechanical translation of the game's own code (see
+[Architecture](architecture.md#the-generated-code)).
 
 ## What you need
 
@@ -21,13 +23,14 @@ and generated from your own disc, on your machine.
 - **OpenGL**, **X11** and **Wayland** development files. The window library, GLFW, is built from
   source for both X11 and Wayland (it picks the one your desktop uses when the game starts), so it
   needs both: X11 with Xrandr, Xinerama, Xcursor, XInput and Xext, and Wayland with xkbcommon;
-- **Python 3.8** or newer (the setup tool, and one of its data steps, are written in Python; no extra
-  modules);
+- **Python 3.8** or newer (the setup tool, the code generators and the overlay matcher are written
+  in Python; no extra modules);
 - optionally **FFmpeg** development files (`libavcodec`, `libavutil`), to play the game's movies.
   Without them the game runs and skips the movies;
 - an internet connection for the first build (CMake downloads GLFW, GLM, Dear ImGui, TinyGLTF and
   miniaudio);
-- about 1 GB of free disk for the game's data, besides the disc image;
+- about 1 GB of free disk for the game's data and generated code, besides the disc image, plus about
+  2 GB for the build;
 - a GPU and driver with **OpenGL 4.6**.
 
 The setup tool checks all of this and tells you what is missing, with the command to install it on
@@ -60,19 +63,26 @@ sudo pacman -S --needed cmake base-devel pkgconf mesa libx11 libxrandr libxinera
    ./setup.sh --iso /path/to/your/ratchet.iso
    ```
 
-   (Without `--iso` it asks for the path.) It goes through four steps:
+   (Without `--iso` it asks for the path.) It goes through five steps:
 
    1. **Checks your system** and lists anything missing, with the install command for your
       distribution. It offers to run that command for you (it asks for your password); say no to
       run it yourself.
-   2. **Checks your disc image**: that it is Ratchet & Clank's North American disc, complete, and
-      the right size. The game reads the disc while it runs, so the setup makes
+   2. **Checks your disc image**: that it is Ratchet & Clank's North American disc and the right
+      size.
+   3. **Generates the game's code** from your disc, with Python only: it copies the game's boot
+      executable from the disc, matches each level's code against the first level's (the overlay
+      address maps), then translates the parts of the game's code the port takes over mechanically
+      into C++ under `assets/generated/src/` (about 140 files). This takes one to two minutes and
+      uses the same number of parallel jobs as the build.
+   4. **Builds the game** with CMake, in RelWithDebInfo, from the repository's sources and the
+      generated ones. The result is `build/rac1-native`. It uses one job per CPU core, fewer when
+      memory is short (`-j` changes that).
+   5. **Generates the game's data** into `assets/` from your disc, step by step, showing each level
+      as it goes. This takes a few minutes. First it checks the disc image fully (that every level
+      is inside it), and, because the game reads the disc while it runs, makes
       `assets/iso/rac1-ntsc-u.iso` point to your image (a link: nothing is copied). Keep the image
       where it is; if you move it, run the setup again with its new path.
-   3. **Builds the game** with CMake, in RelWithDebInfo. The result is `build/rac1-native`. It uses
-      one job per CPU core, fewer when memory is short (`-j` changes that).
-   4. **Generates the game's data** into `assets/` from your disc, step by step, showing each level
-      as it goes. This takes a few minutes.
 
    At the end it offers to start the game.
 
@@ -93,6 +103,7 @@ All of it goes into `assets/`, which git ignores:
 |---|---|
 | `assets/iso/rac1-ntsc-u.iso` | a link to your disc image, which the game reads while it runs |
 | `assets/dumps/SCUS_971.99` | the game's executable, copied from the disc |
+| `assets/generated/src/` | the generated part of the game's source code, and `generated_sources.cmake`, its list for the build (only the build reads it) |
 | `assets/extracted/level_wads/<n>_<name>/level.wad` | the data of each of the 19 levels |
 | `assets/generated/mrp/moby/` | the moby models and textures for the renderer, per level |
 | `assets/generated/mrp/world/` | the world's geometry and textures for the renderer, per level |
@@ -106,12 +117,16 @@ How these are made is described in [Rendering](rendering.md) and
 ## Running it again
 
 - **Run `./setup.sh` again at any time**, for example after a `git pull`. It rebuilds only what
-  changed (CMake recompiles only what needs it) and redoes a data step only when the code that
-  makes it changed, or when that step did not finish. A step added by an update (such as the
+  changed (CMake recompiles only what needs it), generates the code again only when the generators
+  (`tools/codegen/`), the overlay matcher or the headers they read changed, and redoes a data step
+  only when the code that makes it changed, or when that step did not finish. A step added by an update (such as the
   flight between planets) runs on its own, without redoing the others. It remembers the disc image's path.
   What was generated, and from which code, is recorded in `assets/setup-state.json`.
-- **`./setup.sh --force`** regenerates all the data; **`./setup.sh --force moby,world`** only those
-  steps.
+- **`./setup.sh --force`** regenerates the code and all the data; **`./setup.sh --force moby,world`**
+  only those steps.
+- If you build with CMake yourself (`cmake -S . -B build && cmake --build build`), run `./setup.sh`
+  once first: configuring stops with a message when the generated code is missing, or out of date
+  after a `git pull`.
 - **`./build/rac1-native --setup --status`** shows which parts of the data are present.
 
 ### All the options
@@ -121,10 +136,10 @@ How these are made is described in [Rendering](rendering.md) and
 | Option | Meaning |
 |---|---|
 | `--iso <path>` | your disc image (otherwise `$RAC1_ISO`, then `assets/iso/rac1-ntsc-u.iso`, then it asks) |
-| `--force [steps]` | regenerate the data even if it is up to date: all of it, or the steps given (`elf,wads,moby,world,flight,overlay`) |
-| `-j <n>`, `--jobs <n>` | parallel build jobs |
+| `--force [steps]` | regenerate even if up to date: everything, or the steps given (`elf,overlay,code,wads,moby,world,flight`) |
+| `-j <n>`, `--jobs <n>` | parallel jobs, for the code generation and the build |
 | `--no-build` | skip the build |
-| `--build-only` | only check the system and build |
+| `--build-only` | only check the system and build (generating the code first if it is missing or out of date, which needs the disc) |
 | `--no-play` | do not offer to start the game at the end |
 
 `./build/rac1-native --setup` (the data generation on its own, run from the repository's root):
@@ -139,7 +154,19 @@ How these are made is described in [Rendering](rendering.md) and
 | `--status` | show what is present |
 
 On its own, `--setup` skips a file that exists without checking whether it is up to date; that is
-what `./setup.sh` adds.
+what `./setup.sh` adds. `./setup.sh` makes the boot executable and the overlay maps itself, before
+the build, because the code generation needs them; the `elf` and `overlay` steps of `--setup` make
+the same files.
+
+The code generation on its own, from the repository's root (after `./setup.sh` has made the boot
+executable and the overlay maps):
+
+```bash
+python3 tools/codegen/generate_all.py --out assets/generated --no-insn-comments
+```
+
+`--list` shows its units, `--files` the files it writes, `--only <unit>` runs some of them. Without
+`--no-insn-comments`, each translated line keeps the original instruction as a comment.
 
 ## Troubleshooting
 
@@ -160,6 +187,10 @@ still work; if the game misbehaves, check your dump against the Redump record.
 
 **"your disc image was not found"** when starting the game: the image was moved or deleted since the
 setup. Run `./setup.sh --iso <new path>`.
+
+**"The game's generated sources are missing"** or **"... are out of date"** when building: the build
+needs the code that `./setup.sh` generates from your disc. Run `./setup.sh` (it generates the code,
+then builds). If the code generation itself fails, its full output is in `build/setup-codegen.log`.
 
 **"the game's data is missing"** when starting the game: it was started from another directory, or
 the setup did not finish. Run it from the repository's root, and run `./setup.sh` again.

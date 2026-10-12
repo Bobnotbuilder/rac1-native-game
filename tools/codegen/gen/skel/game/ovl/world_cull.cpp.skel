@@ -1,0 +1,279 @@
+// Ported overlay code: the EE side of the world's render passes: the culling and chain building of the tfrag, tie and shrub passes
+// (render_frame flags 2 / 4 / 8) with their packet parts and "end" routines. The passes' leaves are hand-written EE / VU0 macro-mode code
+// (frustum tests of every entry, double buffered through the scratchpad), transliterated instruction by instruction (tools/codegen/asm2cpp.py,
+// reviewed) on 128-bit registers (ee_regs.h) and the shared VU0 registers; the passes themselves are ported by hand. What they write: the
+// lists of the visible entries / those to relight and the frame packet's chain of the world (VIF / GIF packets).
+#include <game/ovl/world_cull.h>
+
+#include <game/math/vecmath.h>
+#include <game/ovl/ee_regs.h>
+#include <game/ovl/ovl.h>
+#include <game/ovl/ovl_reloc.h>
+#include <game/ovl/vu0_regs.h>
+#include <game/port_stubs.h>
+#include <runtime/kernel/bootstrap.h>
+
+namespace rac1 {
+
+using namespace eer;
+using namespace vu0m;
+
+namespace {
+WorldVisible g_visible;
+// orig: (host) the notes of what the passes decide (the transliteration's `// (host)` lines): world_visible()
+void note_tfrag(uint32_t entry, uint32_t lod) {
+    g_visible.tfrag.push_back({static_cast<uint16_t>((entry - lwu(OV(0x00160f4cu))) / 0x40), static_cast<uint8_t>(lod)});
+}
+void note_tie(uint32_t index) { g_visible.tie.push_back(static_cast<uint16_t>(index)); }
+void note_shrub(uint32_t index) { g_visible.shrub.push_back(static_cast<uint16_t>(index)); }
+}  // namespace
+
+// orig: (host) what the last passes kept visible
+const WorldVisible& world_visible() { return g_visible; }
+// orig: (host) the notes put back (the MRP LOD slider's shadow runs of the passes)
+void world_visible_restore(const WorldVisible& v) { g_visible = v; }
+
+// The tfrag culling pass (the VU0 macro mode frustum test of every entry of the 0x40-byte table at *(0x160f4c), the entries' bounding sphere
+// in the entry's first 16 bytes) and the chain builder in one: the visible entries' lists in the scratchpad and the DMA chain of their data
+// (REF tags by LOD) into the frame packet, double buffered through the scratchpad (DMA ch.9 in, ch.8 out).
+// orig: 0x00294368
+void world_tfrag_cull() {
+    [[maybe_unused]] Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, k0, k1, gp, sp, s8, ra, lo, hi;
+//@asm world_tfrag_cull
+}
+
+// The visible tfrag entries' textures: a flag per texture index (SPR 0x3c00) set for each entry of the visible list that passes the VU0 depth test
+// (the entries' second chain's textures).
+// orig: 0x00294f90
+void world_tfrag_visible_textures() {
+    [[maybe_unused]] Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, k0, k1, gp, sp, s8, ra, lo, hi;
+//@asm world_tfrag_visible_textures
+}
+
+// The texture upload packets of the visible tfrags: for each flagged texture (SPR 0x3c00) the GS packet (16 quadwords: BITBLTBUF / TRXPOS / TRXREG /
+// TRXDIR and the IMAGE data REF) into the frame packet, the VRAM word offset advanced; the per-texture table copied to 0x1c4d00 (the end routine's).
+// Returns the next VRAM offset (blocks << 8).
+// orig: 0x00295100
+uint32_t world_tfrag_texture_packets(uint32_t a0_) {
+    [[maybe_unused]] Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, k0, k1, gp, sp, s8, ra, lo, hi;
+    set32(a0, a0_);
+//@asm world_tfrag_texture_packets
+}
+
+// The tfrag pass's end: the records the culling queued at 0x1c5000 (address, count pairs, ended by a zero address; 0x50-byte records) get their
+// two VIF words' low 14 bits replaced by the per-texture table's (0x1c4d00, 2 halfwords by the record's byte +0x23).
+// orig: 0x002941a0
+void world_tfrag_end() {
+    [[maybe_unused]] Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, k0, k1, gp, sp, s8, ra, lo, hi;
+//@asm world_tfrag_end
+}
+
+// The tie culling pass and chain builder: the instances of the table at *(0x160fc0)/*(0x160fc8) (class table 0x1c5800) frustum tested, the visible
+// ones' packets into the frame packet, the lighting list (SPR 0x3000 -> 0x1c7300) and the end routine's records (0x1c7100).
+// orig: 0x00295fa0
+void world_tie_cull() {
+    [[maybe_unused]] Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, k0, k1, gp, sp, s8, ra, lo, hi;
+//@asm world_tie_cull
+}
+
+// The tie textures' upload packets (as 0x295100 for the tfrags); returns the next VRAM offset.
+// orig: 0x00297478
+uint32_t world_tie_texture_packets(uint32_t a0_) {
+    [[maybe_unused]] Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, k0, k1, gp, sp, s8, ra, lo, hi;
+    set32(a0, a0_);
+//@asm world_tie_texture_packets
+    return v0.w();  // jr ra
+}
+
+// The tie pass's end: for each class queued at 0x1c7100 (ended by a negative word) the class's records' two VIF words patched from the texture table 0x1c6b00.
+// orig: 0x00295b38
+void world_tie_end() {
+    [[maybe_unused]] Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, k0, k1, gp, sp, s8, ra, lo, hi;
+//@asm world_tie_end
+}
+
+// The shrub culling pass and chain builder (table *(0x160494), classes 0x1bc030): the visible instances' packets, the lighting list (SPR -> 0x1bcfb0)
+// and the end routine's records (0x1bceb0).
+// orig: 0x00286f10
+void world_shrub_cull() {
+    [[maybe_unused]] Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, k0, k1, gp, sp, s8, ra, lo, hi;
+//@asm world_shrub_cull
+}
+
+// The shrub textures' upload packets (as 0x295100 for the tfrags); returns the next VRAM offset.
+// orig: 0x00288658
+uint32_t world_shrub_texture_packets(uint32_t a0_) {
+    [[maybe_unused]] Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, k0, k1, gp, sp, s8, ra, lo, hi;
+    set32(a0, a0_);
+//@asm world_shrub_texture_packets
+    return v0.w();  // jr ra
+}
+
+// The shrub pass's end: the classes queued at 0x1bceb0 (ended by a negative word) get their records' VIF words patched from the texture table 0x1bc9b0.
+// orig: 0x00286d58
+void world_shrub_end() {
+    [[maybe_unused]] Q128 zero, at, v0, v1, a0, a1, a2, a3, t0, t1, t2, t3, t4, t5, t6, t7, s0, s1, s2, s3, s4, s5, s6, s7, t8, t9, k0, k1, gp, sp, s8, ra, lo, hi;
+//@asm world_shrub_end
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// The passes' own code (the calls: ported by hand)
+
+namespace {
+constexpr OvConst<0x001611c0u> CUR{};     // the frame packet's cursor
+constexpr OvConst<0x00169ff0u> EN{};      // the render enables (render_enables_init)
+constexpr OvConst<0x0015ee74u> TEXBASE{}; // the first free GS memory word offset for the world's textures (copied from 0x15ee78 by each pass)
+
+// orig: (helper) repeated in 0x00294058 / 0x002959f8 / 0x00286c18: the packet part of a world pass. The tag reserved at the pass's start (`start`)
+// is made a NEXT to the packet cursor of that time; then, when the pass's lists are enabled (`en_a` and `en_b` of the render enables), the
+// textures' upload packets (`tex`, the first free GS word offset in, the next out) and a REF of the fixed GS packet 0x1c2f00; the pass's end tag;
+// the frame's maximum of the offset kept at `maxv`.
+template <class F>
+void world_pass_packets(uint32_t start, uint32_t en_a, uint32_t en_b, uint32_t maxv, F tex) {
+    const uint32_t s1 = lwu(CUR);
+    sw(CUR, s1 + 0x10);
+    sw(lwu(start) + 0, 0x20000000u);
+    sw(lwu(start) + 4, lwu(CUR));
+    sw(lwu(start) + 8, 0);
+    sw(lwu(start) + 0xc, 0);
+    uint32_t v1 = lwu(CUR);
+    if (lw(EN + en_a) != 0 && lw(EN + en_b) != 0) {
+        const int32_t s0 = static_cast<int32_t>(tex(lwu(TEXBASE)));
+        packet_ref_1c2f00();
+        if (0x400000 < s0) debug_printf_stub();  // (0x1eb078: a message about the texture memory, the stub's)
+        if (lw(maxv) < s0) sw(maxv, static_cast<uint32_t>(s0));
+        v1 = lwu(CUR);
+    }
+    sw(v1, 0x20000000u);
+    sw(lwu(CUR) + 4, lwu(start) + 0x10);
+    sw(lwu(CUR) + 8, 0);
+    sw(lwu(CUR) + 0xc, 0);
+    sw(CUR, lwu(CUR) + 0x10);
+    sw(s1 + 0, 0x20000000u);
+    sw(s1 + 0xc, 0);
+    sw(s1 + 4, lwu(CUR));
+    sw(s1 + 8, 0);
+}
+}  // namespace
+
+// orig: 0x001ff180 -- the scratchpad out to main memory: DMA channel 8, `qwc` quadwords from the scratchpad address `spr` to `dst`
+void spr_to_ram(uint32_t dst, uint32_t spr, uint32_t qwc) {
+    sw_(0x1000d080u, spr);
+    sw_(0x1000d010u, dst);
+    sw_(0x1000d020u, qwc);
+    sw_(0x1000d000u, 0x100);
+}
+
+// orig: 0x002a0ab0 -- a CNT tag (qwc quadwords) with VIF codes STCYCL (4, 4) and UNPACK V4-32 (qwc, to VU1 memory address `addr`) and the
+// `qwc` quadwords copied from `src` into the frame packet
+void packet_vif_unpack(uint32_t addr, uint32_t src, uint32_t qwc) {
+    sw(lwu(CUR), qwc | 0x10000000u);
+    const uint32_t code = (addr | (qwc << 16)) | 0x6c000000u;
+    sw(lwu(CUR) + 4, 0);
+    sw(lwu(CUR) + 8, 0x01000404u);
+    sw(lwu(CUR) + 0xc, code);
+    const uint32_t d = lwu(CUR) + 0x10;
+    sw(CUR, d);
+    mem_copy128(d, src, static_cast<int32_t>(qwc << 4));
+    sw(CUR, lwu(CUR) + (qwc << 4));
+}
+
+// orig: 0x00294058 -- the tfrag pass's packet part (see world_pass_packets): the flags of the visible entries' textures first (0x294f90)
+void world_tfrag_packets() {
+    world_pass_packets(OV(0x00160f7cu), 0x10, 0xc, OV(0x00160f84u), [](uint32_t base) {
+        world_tfrag_visible_textures();
+        return world_tfrag_texture_packets(base);
+    });
+}
+
+// orig: 0x002959f8 -- the tie pass's packet part
+void world_tie_packets() {
+    world_pass_packets(OV(0x00160fd8u), 0x18, 0x14, OV(0x00160fe4u), [](uint32_t base) { return world_tie_texture_packets(base); });
+}
+
+// orig: 0x00286c18 -- the shrub pass's packet part
+void world_shrub_packets() {
+    world_pass_packets(OV(0x001604b0u), 0x20, 0x1c, OV(0x001604b8u), [](uint32_t base) { return world_shrub_texture_packets(base); });
+}
+
+// orig: 0x00294240 -- the tfrag pass of the frame (render_frame, flag 2): the view's matrix (the camera's translation scaled by -1024 into
+// the view matrix 0x166cc0) uploaded to VU1 memory 5 and 0x14d, the culling and chain building (when the pass is enabled: EN + 0x10), the
+// packet part, then the lighting list (SPR 0x3000, 0x40 quadwords) copied out to 0x1c5400
+void world_tfrag_pass() {
+    g_visible.tfrag.clear();
+    const uint32_t v0 = lwu(CUR), v1 = lwu(OV(0x0015ee78u));
+    sw(OV(0x00160f7cu), v0);
+    sw(OV(0x0015ee74u), v1);
+    sw(CUR, v0 + 0x10);
+    prof_mark_end(OV(0x00160f30u), 1);
+    const uint32_t sp = ee_stack_alloc(0x70);
+    mat4_identity(M(sp));
+    vec3_scale(V(sp + 0x30), V(OV(0x00166dc0u)), -1024.0f);
+    swc1(sp + 0x3c, 1.0f);
+    mat4_mul(M(sp), M(OV(0x00166dc0u) - 0x100), M(sp));
+    packet_vif_unpack(5, sp, 4);
+    packet_vif_unpack(0x14d, sp, 4);
+    ee_stack_free(0x70);
+    if (lw(EN + 0x10) != 0) {
+        FlushCache(0);
+        world_tfrag_cull();
+    }
+    prof_mark_end(OV(0x00160f40u), 2);
+    world_tfrag_packets();
+    if (lw(EN + 0x10) != 0) spr_to_ram(OV(0x001c5400u), 0x3000, 0x40);
+    prof_mark(OV(0x00160f40u), 2);
+}
+
+// orig: 0x00295c80 -- the tie pass (render_frame, flag 4)
+void world_tie_pass() {
+    g_visible.tie.clear();
+    const uint32_t v0 = lwu(CUR), v1 = lwu(OV(0x0015ee78u));
+    sw(OV(0x00160fd8u), v0);
+    sw(OV(0x0015ee74u), v1);
+    sw(CUR, v0 + 0x10);
+    prof_mark_end(OV(0x00160fa0u), 1);
+    if (lw(EN + 0x18) != 0) {
+        FlushCache(0);
+        world_tie_cull();
+        spr_to_ram(OV(0x001c7300u), 0x3600, 0x40);
+    }
+    prof_mark_end(OV(0x00160fb0u), 5);
+    world_tie_packets();
+    mem_copy128(lwu(CUR), OV(0x001c3130u), 0x20);  // (the fixed packet's tail written at the cursor, which is not advanced)
+    prof_mark(OV(0x00160fb0u), 5);
+}
+
+// orig: 0x00286e60 -- the shrub pass (render_frame, flag 8)
+void world_shrub_pass() {
+    g_visible.shrub.clear();
+    const uint32_t v0 = lwu(CUR), v1 = lwu(OV(0x0015ee78u));
+    sw(OV(0x001604b0u), v0);
+    sw(OV(0x0015ee74u), v1);
+    sw(CUR, v0 + 0x10);
+    prof_mark_end(OV(0x00160470u), 1);
+    if (lw(EN + 0x20) != 0) {
+        FlushCache(0);
+        world_shrub_cull();
+        spr_to_ram(OV(0x001bcfb0u), 0x3200, 0x40);
+    }
+    prof_mark_end(OV(0x00160480u), 7);
+    world_shrub_packets();
+    prof_mark(OV(0x00160480u), 7);
+}
+
+// orig: 0x0024f6e0 -- (render_frame's first call after the view setup; its name in the port was "tfrag culling": it is not) the 16-slot table of
+// the moby animation lerps (0x196cc0, filled by 0x24f698) loses the slots whose moby is dead (bit 0x80 of its byte +0x20) or whose byte +0x52 is
+// not 0xff
+void moby_anim_lerp_slots_validate() {
+    for (uint32_t i = 0; i < 16; ++i) {
+        const uint32_t slot = OV(0x00196cc0u) + 4 * i, m = lwu(slot);
+        if (m == 0) continue;
+        if ((lbu(m + 0x20) & 0x80) != 0) {
+            sw(slot, 0);
+            continue;
+        }
+        if (lbu(m + 0x52) != 0xff) sw(slot, 0);
+    }
+}
+
+}  // namespace rac1

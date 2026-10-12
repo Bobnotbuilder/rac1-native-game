@@ -1,0 +1,17 @@
+{
+ "level": "front",
+ "tool": "mips2cpp.py",
+ "env": {},
+ "args": [
+  "--uniform",
+  "--const-wrap",
+  "none"
+ ],
+ "entries": [
+  "22ae70:front_sky_shells_tr"
+ ],
+ "glue_files": [],
+ "files": [
+  "src/game/boot/title_sky.cpp"
+ ]
+}

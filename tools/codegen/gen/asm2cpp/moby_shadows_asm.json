@@ -1,0 +1,52 @@
+{
+ "file": "src/game/ovl/moby_shadows_asm.cpp",
+ "level": 0,
+ "fragments": [
+  {
+   "name": "shadow_points",
+   "addr": "285a68",
+   "patches": {
+    "285ac8": {
+     "replace": [
+      "    moby_pose_matrices(a0.w(), static_cast<int32_t>(a1.w()), static_cast<int32_t>(a2.w()), t8.w(), t9.w());"
+     ]
+    }
+   }
+  },
+  {
+   "name": "shadow_points_clip",
+   "addr": "286848"
+  },
+  {
+   "name": "shadow_point_draw",
+   "addr": "2860a8"
+  },
+  {
+   "name": "shadow_segment_draw",
+   "addr": "2861f8",
+   "patches": {
+    "2862d4": {
+     "replace": [
+      "    fr[0] = asin_f(fr[12]);"
+     ]
+    }
+   }
+  },
+  {
+   "name": "shadow_packets",
+   "addr": "2868c0"
+  },
+  {
+   "name": "shadow_quads",
+   "addr": "285d30",
+   "patches": {
+    "286018": {
+     "replace": [
+      "L_286018:",
+      "    zero = qmfc2(0);"
+     ]
+    }
+   }
+  }
+ ]
+}

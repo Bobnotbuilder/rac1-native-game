@@ -157,7 +157,9 @@ Much of the level-only code is not written by hand. Files named `*_tr*.cpp` (and
 transliterated instruction by instruction from the overlay's MIPS code by a generator, then proved
 against the original with the oracle. They keep the original's control flow and the PS2's float
 rules by construction, and use a uniform calling convention (`TrRet` in
-`src/game/ovl/novalis_mobys2.h`). Their generator is not part of this repository yet.
+`src/game/ovl/novalis_mobys2.h`). They are not in the repository: the setup generates them from your
+disc with the generators in `tools/codegen/` (see
+[Architecture](architecture.md#the-generated-code)).
 
 ## Mobys
 

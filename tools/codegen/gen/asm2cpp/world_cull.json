@@ -1,0 +1,124 @@
+{
+ "file": "src/game/ovl/world_cull.cpp",
+ "level": 0,
+ "fragments": [
+  {
+   "name": "world_tfrag_cull",
+   "addr": "294368",
+   "patches": {
+    "2947f8": {
+     "replace": [
+      "    note_tfrag(s3.w(), t2.w());  // (host) not in the original",
+      "    set32(s8, s8.w() + 0x40);"
+     ]
+    },
+    "294888": {
+     "replace": [
+      "    note_tfrag(s3.w(), t2.w());  // (host) not in the original",
+      "    set32(s8, s8.w() + 0x30);"
+     ]
+    },
+    "2948cc": {
+     "replace": [
+      "    note_tfrag(s3.w(), t2.w());  // (host) not in the original",
+      "    sb_(sp.w() + 0x0, v1.w());"
+     ]
+    },
+    "294da4": {
+     "replace": [
+      "    note_tfrag(s4.w(), t2.w());  // (host) not in the original",
+      "    set32(t3, lw_(s4.w() + 0x10));"
+     ]
+    }
+   }
+  },
+  {
+   "name": "world_tfrag_visible_textures",
+   "addr": "294f90"
+  },
+  {
+   "name": "world_tfrag_texture_packets",
+   "addr": "295100",
+   "patches": {
+    "295340": {
+     "replace": [
+      "L_295340:",
+      "    set32(v0, t1.w() << 8);",
+      "    return v0.w();"
+     ]
+    }
+   }
+  },
+  {
+   "name": "world_tfrag_end",
+   "addr": "2941a0"
+  },
+  {
+   "name": "world_tie_cull",
+   "addr": "295fa0",
+   "jr": [
+    "002968b8",
+    "00297098",
+    "00296c34",
+    "00296c5c",
+    "00296c84"
+   ],
+   "patches": {
+    "296640": {
+     "replace": [
+      "    note_tie(((lw_(ra.w() + 0x3f0c) + (s4.w() & 0xfff)) - lw_(ra.w() + 0x3f1c)) >> 5);  // (host) not in the original",
+      "    vmacro();  // (the VU0 program, if one runs, ends first)",
+      "    subbc(vf()[2], vf()[16], vf()[1].v[1], 7);"
+     ]
+    }
+   }
+  },
+  {
+   "name": "world_tie_texture_packets",
+   "addr": "297478",
+   "patches": {
+    "29771c": {
+     "replace": [
+      "    set32(v0, t9.w() << 8);"
+     ]
+    }
+   }
+  },
+  {
+   "name": "world_tie_end",
+   "addr": "295b38"
+  },
+  {
+   "name": "world_shrub_cull",
+   "addr": "286f10",
+   "jr": [
+    "0028750c",
+    "00288290"
+   ],
+   "patches": {
+    "28733c": {
+     "replace": [
+      "    note_shrub(t2.w());  // (host) not in the original",
+      "    vmacro();  // (the VU0 program, if one runs, ends first)",
+      "    mulbc(vf()[2], vf()[1], vf()[24].v[3], 1);"
+     ]
+    }
+   }
+  },
+  {
+   "name": "world_shrub_texture_packets",
+   "addr": "288658",
+   "patches": {
+    "2888fc": {
+     "replace": [
+      "    set32(v0, t9.w() << 8);"
+     ]
+    }
+   }
+  },
+  {
+   "name": "world_shrub_end",
+   "addr": "286d58"
+  }
+ ]
+}
