@@ -166,6 +166,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_OWN_OVERLAY` | 0 = run every level on Veldin's overlay image; anything else or unset = each level on its own overlay | For comparison, makes every level run on the first level's overlay instead of its own. |
 | `RAC1_PACE_GAME` | 0 = off; default on | When the frame cap is set, also paces the game to 60 Hz times the speed factor. Setting 0 stops the game loop being held to that rate; for timing comparisons. |
 | `RAC1_PACING` | 0 = the older pacing; default the current frame pacer | Switches the host frame pacer back to the older legacy mode, to compare. |
+| `RAC1_PAD_FALLBACK` | `force`, `0`; default: on for controllers with no mapping | On Linux, a controller with no mapping and the Xbox driver's layout gets the Xbox layout ([Input](input.md#how-the-host-builds-the-packet)). `force` gives it even to a mapped controller of that layout (to test the fallback with a known pad); `0` turns the fallback off. |
 | `RAC1_PART_TRACE` | any value = on; default off | Every 30 frames prints the live particles counted by type. |
 | `RAC1_PICKUP_LOG` | integer period in frames; unset = off | Every given number of frames prints the live item pickups and crates within 15 units of the hero (class, state, item, amount, timer, velocity). |
 | `RAC1_PIPELINE` | 0 = off, any other integer = on; unset = the saved setting | Forces the host's pipelining setting on or off, for comparison. |

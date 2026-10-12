@@ -43,6 +43,7 @@
 // explicitly decides for its part)
 #include <runtime/ee/ps2_fpu.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -1037,13 +1038,57 @@ void load_controller_db() {
     if (const char* env = std::getenv("SDL_GAMECONTROLLERCONFIG"); env != nullptr && *env != 0) glfwUpdateGamepadMappings(env);
 }
 
+// A joystick no mapping covers, on Linux, with the layout every controller of the kernel's Xbox driver (xpad) has: 11
+// buttons, 6 axes and a hat, in the evdev order GLFW keeps (A B X Y, LB RB, Back Start Guide, the sticks' clicks; the
+// left stick, LT, the right stick, RT). Many Xbox-compatible pads missing from the database are such (issue #1): one is
+// given the Xbox layout as its mapping, under its own GUID. Any other unmapped joystick stays unused, and the log says
+// how to add its mapping. RAC1_PAD_FALLBACK=force gives the layout to such a pad even when it is mapped (a test: a
+// mapped Xbox pad then plays as an unknown one would); RAC1_PAD_FALLBACK=0 turns the fallback off.
+std::array<std::string, GLFW_JOYSTICK_LAST + 1> g_joystick_seen;  // the GUID each slot was looked at with ("" none)
+
+void joystick_check(int j) {
+    if (!glfwJoystickPresent(j)) {
+        g_joystick_seen[j].clear();
+        return;
+    }
+    const char* guid = glfwGetJoystickGUID(j);
+    if (guid == nullptr || g_joystick_seen[j] == guid) return;
+    g_joystick_seen[j] = guid;
+    const char* mode = std::getenv("RAC1_PAD_FALLBACK");
+    const bool force = mode != nullptr && std::strcmp(mode, "force") == 0, off = mode != nullptr && std::strcmp(mode, "0") == 0;
+    int buttons = 0, axes = 0, hats = 0;
+    glfwGetJoystickButtons(j, &buttons);
+    glfwGetJoystickAxes(j, &axes);
+    glfwGetJoystickHats(j, &hats);
+    buttons -= 4 * hats;  // (GLFW lists each hat's four directions after the buttons too: GLFW_JOYSTICK_HAT_BUTTONS)
+    std::string name = glfwGetJoystickName(j) != nullptr ? glfwGetJoystickName(j) : "unknown controller";
+#if defined(__linux__)
+    const bool xpad_layout = (buttons == 11 || buttons == 12) && axes == 6 && hats == 1;  // (12: the Series pads' Share button, last)
+#else
+    const bool xpad_layout = false;  // (Windows: XInput pads have GLFW's own mappings)
+#endif
+    if (!off && xpad_layout && (force || !glfwJoystickIsGamepad(j))) {
+        std::replace(name.begin(), name.end(), ',', ' ');  // (the mapping's separator)
+        const std::string mapping = std::string(guid) + "," + name +
+            ",a:b0,b:b1,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,back:b6,start:b7,guide:b8,leftstick:b9,rightstick:b10,"
+            "leftx:a0,lefty:a1,lefttrigger:a2,rightx:a3,righty:a4,righttrigger:a5,dpup:h0.1,dpright:h0.2,dpdown:h0.4,dpleft:h0.8,"
+            "platform:Linux,";
+        glfwUpdateGamepadMappings(mapping.c_str());
+        std::printf("[controls] joystick %d: %s (GUID %s)%s: given the Xbox layout (if its buttons are wrong, add its "
+                    "mapping: docs/input.md)\n", j, name.c_str(), guid, force ? "" : ", not in the controller database");
+    } else if (glfwJoystickIsGamepad(j)) {
+        std::printf("[controls] joystick %d: %s as %s\n", j, name.c_str(), glfwGetGamepadName(j));
+    } else {
+        std::printf("[controls] joystick %d: %s (GUID %s, %d buttons, %d axes, %d hats): no mapping, not used (add its "
+                    "mapping: docs/input.md)\n", j, name.c_str(), guid, buttons, axes, hats);
+    }
+    std::fflush(stdout);
+}
+
 void host_input_init(GLFWwindow* win) {
     load_controller_db();
     g_bindings = hi::load_or_create(hi::controls_path());
-    for (int j = GLFW_JOYSTICK_1; j <= GLFW_JOYSTICK_LAST; ++j)
-        if (glfwJoystickPresent(j))
-            std::printf("[controls] joystick %d: %s%s%s\n", j, glfwGetJoystickName(j), glfwJoystickIsGamepad(j) ? " as " : " (no mapping: not used)",
-                        glfwJoystickIsGamepad(j) ? glfwGetGamepadName(j) : "");
+    for (int j = GLFW_JOYSTICK_1; j <= GLFW_JOYSTICK_LAST; ++j) joystick_check(j);
     if (glfwRawMouseMotionSupported()) glfwSetInputMode(win, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     g_input_ready = true;
 }
@@ -1099,6 +1144,7 @@ hi::HostState host_state(GLFWwindow* win, bool raw = false) {
     GLFWgamepadstate s;
     g_pad_name.clear();
     for (int j = GLFW_JOYSTICK_1; j <= GLFW_JOYSTICK_LAST; ++j) {
+        if (g_input_ready) joystick_check(j);  // (a pad connected while the game runs)
         if (!glfwJoystickIsGamepad(j) || !glfwGetGamepadState(j, &s)) continue;
         st.pad_present = true;
         if (const char* n = glfwGetGamepadName(j)) g_pad_name = n;
