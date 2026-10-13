@@ -47,6 +47,10 @@
   "30a770:gas_class1850_update_l9:void:a0",
   "30ab80:gas_class1885_update_l9:void:a0",
   "30b3b0:gas_class1886_update_l9:void:a0",
+  "2ef750:gas_class317_draw_l9:void:a0",
+  "2fb078:gas_class832_draw_l9:void:a0",
+  "305c10:gas_class1212_draw_l9:void:a0",
+  "306570:gas_class1213_draw_l9:void:a0",
   "3158e8:gas_emitter1_l9:void:a0",
   "315c88:gas_emitter3_l9:void:a0",
   "2e2680:gas_hook_2e2680_u",
@@ -61,6 +65,7 @@
  "files": [
   "src/game/ovl/gaspar_classes_tr_1.cpp",
   "src/game/ovl/gaspar_classes_tr_2.cpp",
-  "src/game/ovl/gaspar_classes_tr_3.cpp"
+  "src/game/ovl/gaspar_classes_tr_3.cpp",
+  "src/game/ovl/gaspar_classes_tr_4.cpp"
  ]
 }

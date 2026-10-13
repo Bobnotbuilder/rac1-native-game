@@ -62,6 +62,11 @@ void gaspar_moby_fns_register() {
     ovl_register_level_moby_fn(GASPAR, L9_ADDR(0x0030a770), gas_class1850_update_l9);
     ovl_register_level_moby_fn(GASPAR, L9_ADDR(0x0030ab80), gas_class1885_update_l9);
     ovl_register_level_moby_fn(GASPAR, L9_ADDR(0x0030b3b0), gas_class1886_update_l9);
+    // (task 0418) the classes' draw-list callbacks (queued with draw_list_add / L9:0x218748, 0x218810, 0x218950; run by the frame's draw lists)
+    ovl_register_level_moby_fn(GASPAR, L9_ADDR(0x002ef750), gas_class317_draw_l9);
+    ovl_register_level_moby_fn(GASPAR, L9_ADDR(0x002fb078), gas_class832_draw_l9);
+    ovl_register_level_moby_fn(GASPAR, L9_ADDR(0x00305c10), gas_class1212_draw_l9);
+    ovl_register_level_moby_fn(GASPAR, L9_ADDR(0x00306570), gas_class1213_draw_l9);
     ovl_register_level_moby_fn(GASPAR, L9_ADDR(0x002e2680), gas_hook_2e2680_m);
     ovl_register_level_moby_fn(GASPAR, L9_ADDR(0x002e2720), gas_hook_2e2720_m);
     ovl_register_level_moby_fn(GASPAR, L9_ADDR(0x002e2770), gas_hook_2e2770_m);
