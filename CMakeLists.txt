@@ -186,7 +186,8 @@ set(RAC1_HOST_SOURCES
     src/host/update_check.cpp
 )
 if(WIN32)
-    list(APPEND RAC1_HOST_SOURCES src/host/host_priority_win32.cpp src/platform/win32/rac1-native.rc)
+    list(APPEND RAC1_HOST_SOURCES src/host/host_priority_win32.cpp src/host/gpu_preference_win32.cpp
+         src/platform/win32/rac1-native.rc)
 else()
     list(APPEND RAC1_HOST_SOURCES src/host/host_priority_posix.cpp)
 endif()

@@ -257,6 +257,9 @@ What differs from Linux:
 - **The DLLs.** Built without FFmpeg, the program needs only Windows' own DLLs (the C++ runtime is
   linked in). Built with FFmpeg (the movies), it uses MSYS2's DLLs: the build copies them into
   `build\`, beside the program.
+- **The GPU.** On a laptop with two (an integrated one and an NVIDIA or AMD one), the program asks
+  the drivers for the dedicated one (`src/host/gpu_preference_win32.cpp`). A choice made in Windows'
+  Settings (System > Display > Graphics) or in the driver's control panel still wins.
 
 ## Troubleshooting
 
