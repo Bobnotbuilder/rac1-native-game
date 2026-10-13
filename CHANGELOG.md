@@ -3,6 +3,17 @@
 What changed in each release. Releases are source only: you build the game with `./setup.sh`
 (`setup.cmd` on Windows) from your own disc. Issue numbers refer to this repository's issues.
 
+## 0.2.1
+
+Windows fixes, confirmed by a player on a laptop with an NVIDIA GPU (#35):
+- On laptops with two GPUs, the game now starts on the dedicated one (NVIDIA or AMD) instead of the
+  integrated one. A choice made in Windows' settings or in the driver's panel still wins.
+- The flickering (the title's scene in a wrong view, the menus' frames disappearing) is gone: a
+  frame that came sooner than the game's next one was drawn again with the wide-screen projection
+  applied twice.
+- `play.cmd` checks that the setup is up to date and, after a new version or an unfinished setup,
+  offers to run it again. The setup no longer redoes everything when run from another Windows shell.
+
 ## 0.2.0
 
 ### New
