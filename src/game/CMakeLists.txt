@@ -58,6 +58,7 @@ add_library(rac1_game STATIC
     ovl/rilgar_part2.cpp
     ovl/umbris_part2.cpp
     ovl/veldin_extras.cpp
+    ovl/weapon_classes.cpp
     ovl/blarg_mobys.cpp
     ovl/blarg_hooks.cpp
     ovl/blarg_part2.cpp
