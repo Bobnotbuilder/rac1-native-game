@@ -67,6 +67,7 @@ add_library(rac1_game STATIC
     ovl/gaspar_hooks.cpp
     ovl/batalia_mobys.cpp
     ovl/batalia_hooks.cpp
+    ovl/batalia_part2.cpp
     ovl/orxon_mobys.cpp
     ovl/orxon_hooks.cpp
     ovl/pokitaru_hooks.cpp

@@ -2,7 +2,7 @@
 
 > **Current state:** apart from a few small bugs and glitches, the game is playable without major
 > problems up to **Umbris** (included). The planets after it all load and some may already be largely
-> playable (Batalia, for example, apart from its rain), but they are only partly ported: expect missing
+> playable (Batalia, for example, is ported but not played through yet), but they are only partly ported: expect missing
 > effects or sections that can't be finished. Everything after Umbris is work in progress.
 > See [Status](docs/status.md).
 

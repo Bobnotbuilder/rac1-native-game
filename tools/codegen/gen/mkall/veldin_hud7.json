@@ -1,0 +1,15 @@
+{
+ "level": 0,
+ "tool": "mkall.py",
+ "env": {
+  "MKALL_HELPER_PREFIX": "h7_"
+ },
+ "entries": [
+  "235dc0:hud_slot7_start_tr:void:a0",
+  "23a218:hud_slot7_update_tr:void:a0"
+ ],
+ "glue_files": [],
+ "files": [
+  "src/game/ovl/hud_slot7_tr.cpp"
+ ]
+}
