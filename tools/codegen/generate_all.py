@@ -19,6 +19,10 @@
 #                   uses no __LINE__), i.e. that --no-insn-comments compiles to the same object code
 # --list / --files  the units / every generated file (relative paths), nothing generated
 # Environment: RAC1_ASSETS (default assets/): iso/rac1-ntsc-u.iso, dumps/SCUS_971.99, generated/overlay_map/ (setup.sh).
+#   RAC1_ISO: the disc. On another region's disc (the PAL one: iso/rac1-pal.iso, dumps/SCES_509.16) the overlays are read at
+#   NTSC-U addresses through the region table (tools/overlay_match/region_view.py), and the generators' maps are
+#   generated/overlay_map/codegen/; a function the region changed is translated from that disc's code as a labelled
+#   stand-in (RAC1_PAL_CHANGED=fail stops instead).
 import concurrent.futures
 import filecmp
 import glob

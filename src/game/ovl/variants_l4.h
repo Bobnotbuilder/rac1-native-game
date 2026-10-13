@@ -22,8 +22,13 @@ constexpr int EUDORA = 4;
 // orig: (host) the current translation target is Eudora's overlay
 inline bool on_eudora() { return on_level(EUDORA); }
 
-// An Eudora address of the port's own (level-only data / code, not a Veldin equivalent): never translated.
-#define L4_ADDR(a) (a)
+// An Eudora address of the port's own (level-only data / code, not a Veldin equivalent): no Veldin
+// translation; on another region's disc, the region table's.
+#define L4_ADDR(a) LVL_ADDR(4, a)
+// the same address as a `case` label: its switch compares lvl_key(pointer)
+#define L4_CASE(a) (a)
+// a `lui` half kept apart from its low half (ovl_reloc.h lvl_page): never translated
+#define L4_PAGE(a) LVL_PAGE(a)
 
 }  // namespace rac1
 

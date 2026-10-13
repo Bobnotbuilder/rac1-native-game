@@ -11,10 +11,12 @@ source code, the files that are a mechanical translation of the game's own code 
 
 ### Your game disc, as an ISO image
 
-- **Ratchet & Clank**, North American release (NTSC-U), serial **`SCUS-97199`**.
-- An unmodified ISO image of the disc. A good dump is 4,214,095,872 bytes (the size in the Redump
-  database); a different size is accepted with a warning.
-- The European release (PAL, `SCES-50916`) is not supported: its code sits at different addresses.
+- **Ratchet & Clank**, North American release (NTSC-U), serial **`SCUS-97199`**, or the European
+  release (PAL), serial **`SCES-50916`**. Either disc alone is enough. PAL support is new and still
+  being tested: see [The European PAL disc](#the-european-pal-disc).
+- An unmodified ISO image of the disc. A good dump is 4,214,095,872 bytes for the North American
+  disc and 4,213,997,568 bytes for the PAL one; a different size is accepted with a warning.
+- Other releases (the Japanese one, `SCPS-15055`) are not supported.
 
 ### A Linux system with
 
@@ -103,25 +105,71 @@ All of it goes into `assets/`, which git ignores:
 
 | Path | What |
 |---|---|
-| `assets/iso/rac1-ntsc-u.iso` | a link to your disc image, which the game reads while it runs |
+| `assets/iso/rac1-ntsc-u.iso` (`rac1-pal.iso` for the PAL disc) | a link to your disc image, which the game reads while it runs |
 | `assets/iso/disc-path.txt` | on Windows, when the link cannot be made: your disc image's path, which the game reads instead |
-| `assets/dumps/SCUS_971.99` | the game's executable, copied from the disc |
+| `assets/dumps/SCUS_971.99` (`SCES_509.16` for the PAL disc) | the game's executable, copied from the disc |
 | `assets/generated/src/` | the generated part of the game's source code, and `generated_sources.cmake`, its list for the build (only the build reads it) |
 | `assets/extracted/level_wads/<n>_<name>/level.wad` | the data of each of the 19 levels |
 | `assets/generated/mrp/moby/` | the moby models and textures for the renderer, per level |
 | `assets/generated/mrp/world/` | the world's geometry and textures for the renderer, per level |
 | `assets/generated/mrp/{moby,world}/flight/` | the loading screen's scene: the ship's flight between planets |
-| `assets/generated/overlay_map/` | the per-level address maps (made by `tools/overlay_match/`) |
+| `assets/generated/overlay_map/` | the per-level address maps (made by `tools/overlay_match/`; for the PAL disc also `region_level<n>.txt`, `region_boot.txt` and `codegen/`, see below) |
 | `assets/setup-state.json` | what the setup generated, and from which code (so a re-run redoes only what changed) |
 
 How these are made is described in [Rendering](rendering.md) and
 [Architecture](architecture.md#per-level-overlays-and-the-ov-macros).
 
+## The European PAL disc
+
+The port is written against the North American build: every address in it is that build's. The PAL
+release is the same game built five days later, with most of its code moved by a few bytes, a few
+functions changed, and some data changed (its translations, some art, the collision of four levels).
+
+**How it works.** The region table, `data/regions/SCES-50916.txt`, says where the PAL build put each
+piece of the North American build's code and data: runs of addresses and their shifts, and nothing of
+the game's bytes. With it, from the PAL disc alone:
+
+- the setup makes the overlay maps from the table (`tools/overlay_match/region_maps.py apply`);
+- the code generators rebuild each overlay's code at the North American addresses before they translate
+  it (`tools/overlay_match/region_view.py`), so the generated sources are the same as from the North
+  American disc;
+- while the game runs, the addresses of the level-only and title code go through the table
+  ([Architecture](architecture.md#the-region-layer)).
+
+The game runs in the PAL game's own 60 Hz mode (its Options offer 50 Hz or 60 Hz). The 50 Hz mode is
+not supported yet.
+
+**What differs from the North American disc.**
+
+- The PAL disc's own data: its corrected French, German, Spanish and Italian texts, some re-exported
+  art (for example Veldin's swaying plant, Kerwan's shrubs and textures, Eudora's tree), the collision
+  of four levels.
+- The save folder is the PAL game's (`BESCES-50916RATCHET`).
+- The intro movie, the copyright screen and the title's attract movies are the North American ones
+  (the Sony Computer Entertainment America logo). The game picks them by the video mode, not by the
+  disc: the PAL disc carries both versions, and in its 60 Hz mode the PAL game plays the 60 Hz ones. A
+  European PS2 starts the game at 50 Hz, so there the intro is the European one until the player
+  switches to 60 Hz. Nothing of these movies is in the repository: they are read from your disc.
+
+**Known gaps.** A few functions are different code in the PAL build:
+
+- Where the port has a hand-written port of the North American function, that port runs in its place
+  (the table maps one to the other). So the PAL fixes in these functions are missing: hero sound 1 on
+  the hero's velocity, Rilgar's skill point message, the PAL text wrapping, the PAL new game keeping two
+  settings, and the removed developer profile.
+- Ten generated functions are on the PAL disc only in their PAL form: the memory card / result screen
+  (`screen_draw_tr.cpp`), the hero's horizontal velocity on Rilgar, Blarg, Batalia and Pokitaru, the HUD
+  counters on Rilgar (two), Blarg and Umbris, and Rilgar's class 918. From the PAL disc these are
+  translated from the PAL code, as temporary stand-ins: they are marked `STAND-IN` in the generated
+  sources and are not yet proved against the original. The four hero velocity stand-ins carry the same
+  enhancement hook points as the North American code (R&C 3 movement's air braking and the strafe flip's
+  speed), placed at the matching instructions of the PAL code (`PAL:` lines in `tools/codegen/hooks.glue`).
+
 ## Running it again
 
 - **Run `./setup.sh` again at any time**, for example after a `git pull`. It rebuilds only what
   changed (CMake recompiles only what needs it), generates the code again only when the generators
-  (`tools/codegen/`), the overlay matcher or the headers they read changed, and redoes a data step
+  (`tools/codegen/`), the overlay matcher, the region table or the headers they read changed, and redoes a data step
   only when the code that makes it changed, or when that step did not finish. A step added by an update (such as the
   flight between planets) runs on its own, without redoing the others. It remembers the disc image's path.
   What was generated, and from which code, is recorded in `assets/setup-state.json`.
@@ -138,7 +186,7 @@ How these are made is described in [Rendering](rendering.md) and
 
 | Option | Meaning |
 |---|---|
-| `--iso <path>` | your disc image (otherwise `$RAC1_ISO`, then `assets/iso/rac1-ntsc-u.iso`, then it asks) |
+| `--iso <path>` | your disc image (otherwise `$RAC1_ISO`, then `assets/iso/rac1-ntsc-u.iso` or `rac1-pal.iso`, then it asks) |
 | `--force [steps]` | regenerate even if up to date: everything, or the steps given (`elf,overlay,code,wads,moby,world,flight`) |
 | `-j <n>`, `--jobs <n>` | parallel jobs, for the code generation and the build |
 | `--no-build` | skip the build |
@@ -149,7 +197,7 @@ How these are made is described in [Rendering](rendering.md) and
 
 | Option | Meaning |
 |---|---|
-| `--iso <path>` | the disc image (default: `$RAC1_ISO`, then `assets/iso/rac1-ntsc-u.iso`) |
+| `--iso <path>` | the disc image (default: `$RAC1_ISO`, then `assets/iso/rac1-ntsc-u.iso` or `rac1-pal.iso`) |
 | `--assets <dir>` | where to write the data (default `assets`; the game itself only reads `assets/`) |
 | `--force` | regenerate even if present |
 | `--step elf\|wads\|moby\|world\|flight\|overlay\|all` | run one step only |
@@ -181,7 +229,8 @@ The Windows build is made with **clang** (or GCC) from **MSYS2**, not with Visua
 (see [Platforms](platforms.md)).
 
 1. Get the repository (with git, or as a zip) and **double-click `setup.cmd`** in its folder (or drop
-   your disc image on it, or run `setup.cmd --iso C:\Users\you\Games\ratchet.iso`).
+   your disc image on it, or run `setup.cmd --iso "C:\Users\you\Games\ratchet.iso"`; the quotes are
+   needed when the path has spaces or characters such as `&`).
 
    Nothing needs to be installed first. The first time, the setup downloads the tools that build the
    game (about 1 GB, a few minutes): a private copy of [MSYS2](https://www.msys2.org) in the
@@ -193,7 +242,9 @@ The Windows build is made with **clang** (or GCC) from **MSYS2**, not with Visua
    With your own MSYS2, the setup can also run from its **CLANG64** shell (`./setup.sh`, or
    `setup.cmd`): it then uses that shell's tools and tells you which packages to install.
 
-2. **Play**: double-click `build\rac1-native.exe`.
+2. **Play**: double-click **`play.cmd`** in the repository's folder. (The game must start from the
+   repository's folder, where it finds `assets\`: `build\rac1-native.exe` double-clicked on its own
+   would not find them. From a terminal in that folder, `build\rac1-native.exe` works too.)
 
 What differs from Linux:
 
@@ -209,8 +260,15 @@ What differs from Linux:
 
 ## Troubleshooting
 
-**"This is Ratchet & Clank's PAL disc"** (or NTSC-J): only the North American disc, `SCUS-97199`,
-is supported for now. The other releases' code sits at different addresses.
+**"This is Ratchet & Clank's NTSC-J disc"**: only the North American disc, `SCUS-97199`, and the
+European PAL disc, `SCES-50916`, are supported for now.
+
+**"... is missing: the PAL disc needs it"**: the region table `data/regions/SCES-50916.txt` is part of
+the repository; restore it (`git checkout data/regions`).
+
+**"... is not the build the table was made from (sha1 differs)"**: the PAL disc image is not the
+release the region table describes (another PAL edition, such as a Platinum re-release, or a damaged
+dump). Only the original PAL release is supported.
 
 **"not a PlayStation 2 disc image"** or **"This is not a disc image (ISO 9660)"**: the file is not a
 plain ISO. Use an unmodified `.iso` dump, not a compressed format (`.chd`, `.cso`, `.gz`) or a

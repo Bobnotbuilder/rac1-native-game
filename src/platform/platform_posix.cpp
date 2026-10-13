@@ -107,6 +107,17 @@ std::filesystem::path executable_path() {
     return ec ? std::filesystem::path() : p;
 }
 
+std::string system_language() {
+    for (const char* v : {"LC_ALL", "LC_MESSAGES", "LANG"}) {
+        const char* s = std::getenv(v);
+        if (s == nullptr || *s == 0) continue;
+        std::string l;
+        for (const char* c = s; *c >= 'a' && *c <= 'z' && l.size() < 3; ++c) l += *c;  // ("it_IT.UTF-8" -> "it")
+        return l.size() == 2 ? l : std::string();
+    }
+    return {};
+}
+
 // ---- Processes and the environment ----
 
 int run_quiet(const std::vector<std::string>& args) {

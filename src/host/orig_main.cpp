@@ -24,7 +24,8 @@
 //   nice -10 game threads; default on in a window), RAC1_AUDIO_QUEUE=0354 (the earlier queue policy, for comparison),
 //   RAC1_AUDIO_LOG=1 (the queue's summary every 10 s), RAC1_AUDIO_PERIOD_MS / RAC1_AUDIO_PERIODS (the device's buffer),
 //   RAC1_FRAME_PROF_LONG=ms (with RAC1_FRAME_PROF: the host frames longer than that, stage by stage; default 30), a headless
-//   run with RAC1_FPS_CAP=n paced at n (testing the audio device at 60 fps)
+//   run with RAC1_FPS_CAP=n paced at n (testing the audio device at 60 fps), RAC1_REALTIME=1 (a headless run stepped on the
+//   wall clock as a window; with RAC1_AUDIO_DEVICE=null, the null sound device; RAC1_DEVICE_DUMP=file what the device plays)
 // ADR 0013: RAC1_IOP_MIRROR=0 (the game's IOP's output played, not
 //   the host's mirror of the IOP), RAC1_IOP_VERIFY=1 (the mirror never alone, each of its vsyncs compared with the game's
 //   IOP's mix: counted at exit), RAC1_LOAD_PROF=1 (each load's steps timed: "[load]" lines)
@@ -43,6 +44,7 @@
 // explicitly decides for its part)
 #include <runtime/ee/ps2_fpu.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -63,6 +65,8 @@
 #include <vector>
 
 #include <platform/platform.h>
+
+#include "host_language.h"
 
 #include <game/enhance/advanced.h>
 #include <game/enhance/controls.h>
@@ -131,6 +135,7 @@
 #include "sample_prof.h"
 #include "sim_autopilot.h"
 #include "sim_script.h"
+#include "update_check.h"
 #include <_devtools/item_give_quiet.h>  // (header only: also without the dev tools)
 #ifdef RAC1_DEVTOOLS
 #include <_devtools/dev_menu.h>
@@ -142,6 +147,7 @@ bool audio_out_start();  // audio_out.cpp
 void audio_out_push(const int16_t* pcm, int frames);
 void audio_out_set_alone(bool ok);
 uint64_t audio_out_alone_total();
+void audio_out_step(bool in_step);
 namespace rac1 {
 void gs_texture_cache_clear();  // runtime/gs/gs_renderer.cpp (its header clashes with gs_emu.h)
 }
@@ -1037,13 +1043,57 @@ void load_controller_db() {
     if (const char* env = std::getenv("SDL_GAMECONTROLLERCONFIG"); env != nullptr && *env != 0) glfwUpdateGamepadMappings(env);
 }
 
+// A joystick no mapping covers, on Linux, with the layout every controller of the kernel's Xbox driver (xpad) has: 11
+// buttons, 6 axes and a hat, in the evdev order GLFW keeps (A B X Y, LB RB, Back Start Guide, the sticks' clicks; the
+// left stick, LT, the right stick, RT). Many Xbox-compatible pads missing from the database are such (issue #1): one is
+// given the Xbox layout as its mapping, under its own GUID. Any other unmapped joystick stays unused, and the log says
+// how to add its mapping. RAC1_PAD_FALLBACK=force gives the layout to such a pad even when it is mapped (a test: a
+// mapped Xbox pad then plays as an unknown one would); RAC1_PAD_FALLBACK=0 turns the fallback off.
+std::array<std::string, GLFW_JOYSTICK_LAST + 1> g_joystick_seen;  // the GUID each slot was looked at with ("" none)
+
+void joystick_check(int j) {
+    if (!glfwJoystickPresent(j)) {
+        g_joystick_seen[j].clear();
+        return;
+    }
+    const char* guid = glfwGetJoystickGUID(j);
+    if (guid == nullptr || g_joystick_seen[j] == guid) return;
+    g_joystick_seen[j] = guid;
+    const char* mode = std::getenv("RAC1_PAD_FALLBACK");
+    const bool force = mode != nullptr && std::strcmp(mode, "force") == 0, off = mode != nullptr && std::strcmp(mode, "0") == 0;
+    int buttons = 0, axes = 0, hats = 0;
+    glfwGetJoystickButtons(j, &buttons);
+    glfwGetJoystickAxes(j, &axes);
+    glfwGetJoystickHats(j, &hats);
+    buttons -= 4 * hats;  // (GLFW lists each hat's four directions after the buttons too: GLFW_JOYSTICK_HAT_BUTTONS)
+    std::string name = glfwGetJoystickName(j) != nullptr ? glfwGetJoystickName(j) : "unknown controller";
+#if defined(__linux__)
+    const bool xpad_layout = (buttons == 11 || buttons == 12) && axes == 6 && hats == 1;  // (12: the Series pads' Share button, last)
+#else
+    const bool xpad_layout = false;  // (Windows: XInput pads have GLFW's own mappings)
+#endif
+    if (!off && xpad_layout && (force || !glfwJoystickIsGamepad(j))) {
+        std::replace(name.begin(), name.end(), ',', ' ');  // (the mapping's separator)
+        const std::string mapping = std::string(guid) + "," + name +
+            ",a:b0,b:b1,x:b2,y:b3,leftshoulder:b4,rightshoulder:b5,back:b6,start:b7,guide:b8,leftstick:b9,rightstick:b10,"
+            "leftx:a0,lefty:a1,lefttrigger:a2,rightx:a3,righty:a4,righttrigger:a5,dpup:h0.1,dpright:h0.2,dpdown:h0.4,dpleft:h0.8,"
+            "platform:Linux,";
+        glfwUpdateGamepadMappings(mapping.c_str());
+        std::printf("[controls] joystick %d: %s (GUID %s)%s: given the Xbox layout (if its buttons are wrong, add its "
+                    "mapping: docs/input.md)\n", j, name.c_str(), guid, force ? "" : ", not in the controller database");
+    } else if (glfwJoystickIsGamepad(j)) {
+        std::printf("[controls] joystick %d: %s as %s\n", j, name.c_str(), glfwGetGamepadName(j));
+    } else {
+        std::printf("[controls] joystick %d: %s (GUID %s, %d buttons, %d axes, %d hats): no mapping, not used (add its "
+                    "mapping: docs/input.md)\n", j, name.c_str(), guid, buttons, axes, hats);
+    }
+    std::fflush(stdout);
+}
+
 void host_input_init(GLFWwindow* win) {
     load_controller_db();
     g_bindings = hi::load_or_create(hi::controls_path());
-    for (int j = GLFW_JOYSTICK_1; j <= GLFW_JOYSTICK_LAST; ++j)
-        if (glfwJoystickPresent(j))
-            std::printf("[controls] joystick %d: %s%s%s\n", j, glfwGetJoystickName(j), glfwJoystickIsGamepad(j) ? " as " : " (no mapping: not used)",
-                        glfwJoystickIsGamepad(j) ? glfwGetGamepadName(j) : "");
+    for (int j = GLFW_JOYSTICK_1; j <= GLFW_JOYSTICK_LAST; ++j) joystick_check(j);
     if (glfwRawMouseMotionSupported()) glfwSetInputMode(win, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
     g_input_ready = true;
 }
@@ -1099,6 +1149,7 @@ hi::HostState host_state(GLFWwindow* win, bool raw = false) {
     GLFWgamepadstate s;
     g_pad_name.clear();
     for (int j = GLFW_JOYSTICK_1; j <= GLFW_JOYSTICK_LAST; ++j) {
+        if (g_input_ready) joystick_check(j);  // (a pad connected while the game runs)
         if (!glfwJoystickIsGamepad(j) || !glfwGetGamepadState(j, &s)) continue;
         st.pad_present = true;
         if (const char* n = glfwGetGamepadName(j)) g_pad_name = n;
@@ -1581,7 +1632,7 @@ int main(int argc, char** argv) {
                              "  ./setup.sh --iso <path-to-your-iso>\n"
                              "and start the game from the repository's root.\n\n",
                      have_disc ? "the game's data is missing (assets/)."
-                               : "your disc image was not found (assets/iso/rac1-ntsc-u.iso, or $RAC1_ISO).");
+                               : "your disc image was not found (assets/iso/rac1-ntsc-u.iso or rac1-pal.iso, or $RAC1_ISO).");
         return 1;
     }
     const bool headless = std::getenv("RAC1_HEADLESS") != nullptr;
@@ -1601,6 +1652,10 @@ int main(int argc, char** argv) {
     // a headless run ignores the player's Advanced settings (~/.config/rac1-native/advanced_options.txt, save<N>.pc): tests are
     // deterministic, the enhancements off; RAC1_ADVANCED=1 keeps them (testing an enhancement)
     if (headless && std::getenv("RAC1_ADVANCED") == nullptr) rac1::g_advanced_disabled = true;
+    std::printf("[orig] rac1-native %s\n", rac1::update_check::version_text().c_str());
+    // the update check (Options > Advanced > Update Check): one anonymous request to GitHub in the background, never
+    // in a headless run; what it finds is shown at the main menu (the update notice)
+    rac1::update_check::start(headless);
     if (const char* ck = std::getenv("RAC1_CLOCK")) g_host_clock_fixed = static_cast<std::time_t>(std::strtoll(ck, nullptr, 0));
     const uint64_t max_frames = std::getenv("RAC1_FRAMES") ? std::strtoull(std::getenv("RAC1_FRAMES"), nullptr, 10) : (headless ? 300 : 0);
 
@@ -1825,10 +1880,17 @@ int main(int argc, char** argv) {
     // contents, the level's header and its files (0x204428) before it runs the overlay.
     sw(0x0015ed84, static_cast<uint32_t>(level));
     sw(0x0015ed80, 0);
+    // the disc's region 0x15ee90 (1: PAL), which the overlay's main (0x23d598, not ported) sets from the
+    // disc's SYSTEM.CNF (the Options' Video page, the save's settings size and folder): set on another region's disc
+    // only. Its video mode stays 0: the PAL game's own 60 Hz mode (Daino's decision).
+    if (disc_other_region()) sw(0x0015ee90, 1);
     // The language 0x15ed88: the overlay's main (0x23d598, not ported) sets it from the console's
     // language (0x12d240; 1 English → 0, 2 French → 2, 3 Spanish → 4, 4 German → 3, 5 Italian
     // → 5, others 0) before the level's load copies the texts of that language (0x241940). The
-    // host has no console settings: English (0), or the debug menu's saved choice.
+    // host stands in for the console's settings (host_language.h): the language the player last
+    // chose in the game, else the system's; English in a headless run. Then the debug menu's saved
+    // choice, then RAC1_LANGUAGE.
+    sw(0x0015ed88, rac1::host_language::console_language(!headless));
 #ifdef RAC1_DEVTOOLS
     if (!headless || std::getenv("RAC1_DEVMENU_SHOT") != nullptr) rac1::devtools::dev_language_boot();
 #endif
@@ -1886,7 +1948,7 @@ int main(int argc, char** argv) {
                 }
                 return true;
             })) {
-            std::fprintf(stderr, "rac1-native: cannot read the level from the ISO (assets/iso/rac1-ntsc-u.iso or $RAC1_ISO)\n");
+            std::fprintf(stderr, "rac1-native: cannot read the level from the ISO (%s)\n", disc_path().c_str());
             return 1;
         }
         std::printf("[orig] sound bank %08x\n", lwu(0x0015ed5c));
@@ -1993,7 +2055,20 @@ int main(int argc, char** argv) {
     int display_settle = 0;  // (frames after a change before the window's size is reported back: the window manager answers late)
     bool unlock_done = false;  // RAC1_UNLOCK_PLANETS done
     int hero_at_done = 0;  // RAC1_HERO_AT: the entries placed (several, '/'-separated, in order)
+    // (testing, RAC1_REALTIME) the game's speed over the run, 60 = real time
+    const auto run_t0 = std::chrono::steady_clock::now();
+    uint64_t run_host_frames = 0;
+    bool pace_reported = false;
+    auto pace_report = [&] {
+        if (std::getenv("RAC1_REALTIME") == nullptr || pace_reported) return;
+        pace_reported = true;
+        const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - run_t0).count();
+        std::printf("[pace] %llu game steps in %llu host frames, %.2f s: %.2f game steps a second, %.2f host frames a second\n",
+                    static_cast<unsigned long long>(frame), static_cast<unsigned long long>(run_host_frames), secs, static_cast<double>(frame) / secs,
+                    static_cast<double>(run_host_frames) / secs);
+    };
     while (running && !glfwWindowShouldClose(window)) {
+        ++run_host_frames;
         glfwPollEvents();
         if (!headless) {  // Options > Graphics: the window's settings changed there applied now; the window as it is reported
             const bool is_fs = glfwGetWindowMonitor(window) != nullptr;
@@ -2022,6 +2097,7 @@ int main(int argc, char** argv) {
             }
         }
         rac1::graphics_frame();
+        rac1::update_check::poll();  // (the update check's answer, when it has come: to the main menu's notice)
         if (!headless) {
             bool cursor_free = false;  // (the debug menu has the cursor while it is open)
 #ifdef RAC1_DEVTOOLS
@@ -2042,8 +2118,11 @@ int main(int argc, char** argv) {
         if (host_delay_ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(host_delay_ms));  // (testing: a slow host frame)
         bool iop_alone = true;  // (the IOP's mirror may play alone while the game's thread stalls; not while the host holds the game)
 #ifdef RAC1_DEVTOOLS
-        if (!headless) {
-            dt::dev_menu_poll(window);
+        // (testing) RAC1_REALTIME=1: a headless run steps the game as a window does (60 game frames a second of the wall
+        // clock, the stalls not caught up), with RAC1_FPS_CAP its host frames' rate and RAC1_AUDIO_DEVICE=null the sound's queue
+        static const bool realtime_test = headless && std::getenv("RAC1_REALTIME") != nullptr && std::atoi(std::getenv("RAC1_REALTIME")) != 0;
+        if (!headless || realtime_test) {
+            if (!headless) dt::dev_menu_poll(window);
             const dt::DevSettings& ds = dt::dev_settings();
             const bool paused = ds.paused || (ds.open && ds.pause_when_open);
             iop_alone = !paused && ds.speed == 1.0f;
@@ -2088,6 +2167,7 @@ int main(int argc, char** argv) {
             }
 #endif
             const auto t0 = std::chrono::steady_clock::now();
+            audio_out_step(true);  // (the IOP's mirror plays alone only while the game's thread is stuck inside a step: a stall)
             render_view_projection_undo();  // (the game's own projection back before its update: its state is a 4:3 run's)
             {  // the MRP skips what only the GS / VU1 path needs: asked
                // before the update, for a frame the MRP will draw (not the title, the level exit, a movie, the debug diffs)
@@ -2122,6 +2202,7 @@ int main(int argc, char** argv) {
             // the game's frame on the EE thread's coroutine (ADR 0012): a vsync wait inside a blocking loop (the screen fade
             // 0x1f9838) suspends it, this host frame shows that frame and the next one resumes it (the lambda not called again)
             if (!ee_thread_suspended()) g_mode_at_update = boot_active() ? -100 : lw(OV(0x0015f5c4));
+            rac1::host_language::note(lwu(0x0015ed88));  // (a language chosen in the game: kept as the console's)
             ee_thread_run([&] {
                 if (exiting) {  // the level exit's loops (the loading screen, the load), then the new level
                     static uint64_t flight_frames = 0, flight_first = 0;  // (the frames the loading screen's flight was drawn)
@@ -2162,6 +2243,7 @@ int main(int argc, char** argv) {
                 if (ramhash != nullptr) ram_hash_frame(ramhash, game_frame);
                 ++game_frame;
             }
+            audio_out_step(false);
             const double step_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
             update_ms += step_ms;
             g_last_steps_ms = std::max(g_last_steps_ms, step_ms);
@@ -2497,7 +2579,7 @@ int main(int argc, char** argv) {
                     char* e = nullptr;
                     const long id = std::strtol(q, &e, 0);
                     if (e == q) break;
-                    devtools::item_give_quiet(static_cast<int32_t>(id), 0);  // (no "Paradox" for another level's item)
+                    devtools::item_give_quiet(static_cast<int32_t>(id), 0);  // (no placeholder message for another level's item)
                     q = *e == ',' ? e + 1 : e;
                 }
             }
@@ -2914,6 +2996,7 @@ int main(int argc, char** argv) {
         if (title_view) mrp_world_drop_frame();  // (a pending scene's capture done before the bytes go back: none when drawn)
         mrp_title_view_swap_out();
         if (max_frames != 0 && frame >= max_frames) {
+            pace_report();
             sample_prof_stop();
             mrp_scene_report();
             mrp_moby_report();
@@ -2980,6 +3063,7 @@ int main(int argc, char** argv) {
             }
         }
     }
+    pace_report();
     sample_prof_stop();
     fprof.report();
     if (fprof.on && !pacer.legacy)

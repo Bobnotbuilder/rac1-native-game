@@ -14,6 +14,7 @@ W = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, W + '/tools/overlay_match')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import overlay_match as om  # noqa: E402
+import region_view as rv  # noqa: E402
 
 _cache = {}
 ASSETS = os.environ.get('RAC1_ASSETS') or W + '/assets'  # (another asset root, e.g. a clean one made by setup.sh --code)
@@ -23,14 +24,34 @@ FRONT = 'front'  # the boot module (SCUS_971.99's own engine build): `level` 'fr
 
 
 def overlay(level, iso_path=None):
+    """The level's overlay (or the boot module's) at the NTSC-U addresses the ports use: on another region's disc, its
+    code rebuilt at NTSC-U's through the region table (tools/overlay_match/region_view.py)."""
     if level not in _cache:
+        iso_path = iso_path or rv.disc_path(ASSETS)
+        _ser, elf, table = rv.disc_of(iso_path)
         if level == FRONT:
             import front_match as fm  # noqa: E402
-            _cache[level] = om.Overlay(fm.boot_module(open(ASSETS + '/dumps/SCUS_971.99', 'rb').read()), 0x1E9658)
+            b = open(os.path.join(ASSETS, 'dumps', elf), 'rb').read()
+            _cache[level] = rv.boot_view(b, table) if table else om.Overlay(fm.boot_module(b), 0x1E9658)
+        elif table:
+            _cache[level] = rv.level_view(iso_path, level, table)
         else:
-            iso = open(iso_path or os.environ.get('RAC1_ISO') or ASSETS + '/iso/rac1-ntsc-u.iso', 'rb')
-            _cache[level] = om.Overlay(*om.level_overlay(iso, level))
+            with open(iso_path, 'rb') as iso:
+                _cache[level] = om.Overlay(*om.level_overlay(iso, level))
     return _cache[level]
+
+
+def map_dir():
+    """The overlay maps the generators read (NTSC-U Veldin -> NTSC-U level N): the setup's on the NTSC-U disc; on another
+    region's disc, those made on the rebuilt NTSC-U code (region_view.py maps), as the game's own maps there go to the
+    disc's addresses."""
+    other = rv.disc_of(rv.disc_path(ASSETS))[2] is not None
+    return os.path.join(ASSETS, 'generated', 'overlay_map', 'codegen' if other else '')
+
+
+def _known(O, a):
+    if hasattr(O, 'is_known') and not O.is_known(a):
+        raise SystemExit('[ovlist] 0x%08x: code the region changed (its NTSC-U code is not on this disc)' % a)
 
 
 def _text(w, a):
@@ -60,8 +81,19 @@ def _jump_table(O, win):
     return [t for t in (O.data_word(base + 4 * k) for k in range(bound)) if t]
 
 
+STANDINS = []  # (NTSC-U address, PAL address) of the stand-ins listed (another region's disc: see listing)
+
+
 def listing(level, addr, maxwords=40000):
     O = overlay(level)
+    if hasattr(O, 'standin') and not O.is_known(addr) and os.environ.get('RAC1_PAL_CHANGED', 'standin') == 'standin':
+        # code the region changed: the disc's own build of the function, at its NTSC-U entry (a temporary stand-in,
+        # labelled by the generators; RAC1_PAL_CHANGED=fail stops instead)
+        S = O.standin(addr)
+        if S is not None:
+            STANDINS.append((addr, S.pal))
+            sys.stderr.write('[ovlist] STANDIN %08x PAL %08x\n' % (addr, S.pal))
+            O = S
     starts = sorted(O.function_starts())
     nxt = next((s for s in starts if s > addr), O.code_end)
     out = []
@@ -74,6 +106,7 @@ def listing(level, addr, maxwords=40000):
         a = addr + 4 * k
         if a >= nxt and a > maxt:  # (the matcher's function starts include a switch's cases: the cap yields to the branch / jump-table targets seen)
             break
+        _known(O, a)
         w = O.code[i0 + k]
         op = w >> 26
         if op in (4, 5, 6, 7, 0x14, 0x15, 0x16, 0x17) or (op == 1 and ((w >> 16) & 0x1f) in (0, 1, 2, 3)) or (op in (0x11, 0x12) and ((w >> 21) & 0x1f) == 8):

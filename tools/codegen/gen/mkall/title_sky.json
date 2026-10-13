@@ -5,7 +5,7 @@
  "args": [
   "--uniform",
   "--const-wrap",
-  "none"
+  "FR"
  ],
  "entries": [
   "22ae70:front_sky_shells_tr"

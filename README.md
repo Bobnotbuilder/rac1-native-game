@@ -1,15 +1,17 @@
 # rac1-native
 
-> **Current state:** apart from a few small bugs and glitches, the game is playable without major
-> problems up to **Umbris** (included). The planets after it all load and some may already be largely
-> playable (Batalia, for example, apart from its rain), but they are only partly ported: expect missing
-> effects or sections that can't be finished. Everything after Umbris is work in progress.
+> **Current state (0.2.0):** apart from a few small bugs and glitches, the game is playable up to
+> **Umbris**, and now also **Batalia**, **Gaspar** and **Orxon**. The planets after them all load, but
+> they are only partly ported: expect missing effects or sections that can't be finished. Everything
+> after Orxon is work in progress.
 > See [Status](docs/status.md).
 
 A native PC port of **Ratchet & Clank** (PlayStation 2, 2002), for Linux, and experimentally for Windows.
 
 The game's own code is ported to C++, function by function, from the original North American release
-(`SCUS-97199`), and each port is proved against the original code. It is not an emulator: all of the game's
+(`SCUS-97199`), and each port is proved against the original code. Support for the
+European PAL release (`SCES-50916`) is new and awaits testing: it goes through a table of where the PAL
+build put the same code (see [Setup](docs/setup.md#the-european-pal-disc)). It is not an emulator: all of the game's
 code, the PS2's vector-unit microcode included, runs as native C++ while you play. The 3D is drawn by a native OpenGL renderer from the game's own decisions, which
 makes widescreen, high resolutions, full-detail textures and longer draw distances possible without
 changing how the game behaves.
@@ -20,7 +22,8 @@ changing how the game behaves.
 
 **Milestone 1 is reached: the game is playable up to Umbris.** Veldin, Novalis, Aridia, Kerwan,
 Eudora, Rilgar, Blarg / Nebula G34 and Umbris, the eight planets, have been played through, apart from a few small bugs
-and glitches. Batalia and the planets after it are only partly ported or not yet, so they are not playable end to
+and glitches. Since 0.2.0, Batalia, Gaspar and Orxon are ported too and have been played through.
+Pokitaru and the planets after it are only partly ported or not yet, so they are not playable end to
 end yet. The port as a whole is still in progress. See [Status](docs/status.md) (which also maps the names
 the code uses for the levels to the names in the game), the [Roadmap](docs/roadmap.md) and the
 [History](docs/history.md).
@@ -90,15 +93,22 @@ follows from that.
 
 - This repository contains **no game assets and none of the game's code**: no executable, no
   levels, textures, models, sounds or movies.
-- To play, you need **your own copy** of the game, the North American PS2 disc `SCUS-97199`, as an
-  ISO image you made yourself. The setup extracts and converts everything from it on your machine,
-  including the part of the port that is a mechanical translation of the game's own code.
+- To play, you need **your own copy** of the game, as an ISO image you made yourself: the North
+  American PS2 disc `SCUS-97199`, or the European PAL disc `SCES-50916`. Either disc alone is enough.
+  The setup extracts and converts everything from it on your machine, including the part of the port
+  that is a mechanical translation of the game's own code.
+- One kind of file about the game is committed: the region table, `data/regions/SCES-50916.txt`.
+  It lists where the PAL build put the code and data of the North American build the port is written
+  against. The rule (Daino's decision): addresses, and the shifts between two builds' addresses, may
+  be committed like `orig:` annotations (the region table); never bytes of code, data or text. The
+  table holds addresses, shifts and the PAL executable's checksum, nothing else.
 - *Ratchet & Clank* is a trademark of Sony Interactive Entertainment. This project is not affiliated
   with, authorised or endorsed by Sony Interactive Entertainment or Insomniac Games.
 
 ## Quick start
 
-You need Linux (or Windows, [experimental](#windows-support-is-experimental)), a GPU with OpenGL 4.6, and your ISO of the game.
+You need Linux (or Windows, [experimental](#windows-support-is-experimental)), a GPU with OpenGL 4.6, and your
+ISO of the game (the North American or the European PAL disc).
 
 ```bash
 git clone https://github.com/daino-selvatico/rac1-native-game.git
@@ -114,8 +124,12 @@ game's code from it, builds the game and generates the game's data. Run it again
 ```
 
 The full guide, with requirements and troubleshooting: [Setup](docs/setup.md).
-On Windows, run `setup.cmd` instead (double-click it, or drop your disc image on it): see
-[Setup](docs/setup.md#on-windows-experimental). Windows support is experimental.
+On Windows, run `setup.cmd` instead (double-click it, or drop your disc image on it), then play with
+`play.cmd`: see [Setup](docs/setup.md#on-windows-experimental). Windows support is experimental.
+
+At start the game checks, in the background, whether a newer version is out, and says so at the main menu
+(it downloads nothing; this is new and still a work in progress). That is one anonymous request to GitHub's API, no telemetry; Options > Advanced >
+Update Check turns it off. See [The update check](docs/settings.md#the-update-check).
 
 ## Documentation
 
@@ -123,7 +137,7 @@ For players:
 
 - [Setup](docs/setup.md): requirements, step by step, troubleshooting.
 - [Settings](docs/settings.md): the Graphics, Controls and Advanced pages, the Original, Modern and Experimental modes,
-  where settings are kept, the debug tools.
+  the update check, where settings are kept, the debug tools.
 - [Input](docs/input.md): controllers, keyboard and mouse, rebinding.
 - [Saves](docs/saves.md): where your saves are. Saving and loading work, but the save files may still change: they have not been checked by hand yet.
 - [Platforms](docs/platforms.md): Windows (experimental) and macOS later.
@@ -138,6 +152,8 @@ For contributors, and for reverse-engineering and decompilation people:
 
 - [Overview](docs/overview.md): the approach; port, emulation and decompilation; what "faithful"
   means; how a port is proved.
+- [The oracle](docs/oracle.md): the proof of the ports against the original code; building and
+  running it, adding a batch. Every change to ported game code ships with a batch.
 - [Decisions](docs/decisions.md): the project's architectural decisions.
 - [Architecture](docs/architecture.md): the source tree, the layers, the `// orig:` annotations, the
   per-level overlays.

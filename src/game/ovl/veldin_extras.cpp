@@ -1,9 +1,12 @@
 // Veldin's engine functions first reached unported on Rilgar (see veldin_extras.h).
 #include <game/ovl/veldin_extras.h>
 
+#include <game/ovl/helmet_tr.h>
 #include <game/ovl/ovl.h>
 #include <game/ovl/ovl_common.h>
+#include <game/ovl/particle_28_tr.h>
 #include <game/ovl/particle_types_tr.h>
+#include <game/ovl/particle_types2_tr.h>
 #include <game/ovl/shared_classes_tr.h>
 
 namespace rac1 {
@@ -24,11 +27,19 @@ void veldin_extras_register() {
     ovl_register_moby_fn(0x00271c88, particle_30_update);  // (particle type 0x30)
     ovl_register_moby_fn(0x00271df8, particle_32_update);  // (particle type 0x32)
     ovl_register_moby_fn(0x00271ec8, particle_33_update);  // (particle type 0x33)
+    ovl_register_moby_fn(0x00268d48, particle_00_update);  // (particle type 0: met on Batalia)
+    ovl_register_moby_fn(0x00268fe8, particle_01_update);  // (particle type 1: met on Batalia)
+    ovl_register_moby_fn(0x00275860, particle_4d_update);  // (particle type 0x4d: met on Batalia)
+    ovl_register_moby_fn(0x002710a0, particle_2b_update);  // (particle type 0x2b: met on Batalia)
+    ovl_register_moby_fn(0x00275510, particle_4a_update);  // (particle type 0x4a, the Sandmouse's: met on Batalia)
     ovl_register_moby_fn(0x00273448, particle_3d_update);  // (particle type 0x3d)
     ovl_register_moby_fn(0x00273ee0, particle_41_update);  // (particle type 0x41)
     ovl_register_moby_fn(0x00272bc0, particle_3a_update);  // (particle type 0x3a)
+    ovl_register_moby_fn(0x00271d20, particle_31_update);  // (particle type 0x31: the bullets of Kerwan's helicopter, L3:0x260210)
     ovl_register_moby_fn(0x002b4198, class167_update_tr);  // (class 167, the Thruster-Pack's jets)
     ovl_register_moby_fn(0x002b3628, class167_draw_tr);    // (its draw-list callback)
+    ovl_register_moby_fn(0x002e03a0, helmet_update_tr);    // (class 1290, the Pilot's Helmet pickup: Gaspar)
+    ovl_register_moby_fn(0x0026ff10, particle_28_update);  // (particle type 0x28: Orxon)
 }
 
 }  // namespace rac1

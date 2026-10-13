@@ -19,9 +19,13 @@ constexpr int ARIDIA = 2;
 // orig: (host) the current translation target is Aridia's overlay
 inline bool on_aridia() { return on_level(ARIDIA); }
 
-// An Aridia address of the port's own (not a Veldin equivalent: level-only data / code): never
-// translated.
-#define L2_ADDR(a) (a)
+// An Aridia address of the port's own (not a Veldin equivalent: level-only data / code): the same
+// on every level's overlay (no Veldin translation); on another region's disc, the region table's.
+#define L2_ADDR(a) LVL_ADDR(2, a)
+// the same address as a `case` label: its switch compares lvl_key(pointer)
+#define L2_CASE(a) (a)
+// a `lui` half kept apart from its low half (ovl_reloc.h lvl_page): never translated
+#define L2_PAGE(a) LVL_PAGE(a)
 
 }  // namespace rac1
 

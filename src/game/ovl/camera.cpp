@@ -131,11 +131,11 @@ int32_t camera_type_call(uint32_t fn, uint32_t cam, uint32_t other) {
         if (rilgar_camera_type_call(fn, cam, other, &r)) return r;
     }
     if (on_eudora()) {  // Eudora's own camera type (1: accept / init / update / exit at its own addresses, no Veldin equivalent)
-        switch (fn) {
-        case L4_ADDR(0x002ed850): return static_cast<int32_t>(eud_cam_type1_accept_u(cam, other, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f).v0);
-        case L4_ADDR(0x002ed920): eud_cam_type1_init_l4(cam); return 0;
-        case L4_ADDR(0x002ed940): eud_cam_type1_update_l4(cam); return 0;
-        case L4_ADDR(0x002ed960): eud_cam_type1_exit_l4(cam); return 0;
+        switch (lvl_key(fn)) {
+        case L4_CASE(0x002ed850): return static_cast<int32_t>(eud_cam_type1_accept_u(cam, other, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f).v0);
+        case L4_CASE(0x002ed920): eud_cam_type1_init_l4(cam); return 0;
+        case L4_CASE(0x002ed940): eud_cam_type1_update_l4(cam); return 0;
+        case L4_CASE(0x002ed960): eud_cam_type1_exit_l4(cam); return 0;
         default: break;
         }
     }

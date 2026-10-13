@@ -32,7 +32,8 @@ os.makedirs(SCR, exist_ok=True)
 # (without MKALL_ISO / MKALL_LVL: a Ghidra project's listings; the setup never runs that way)
 GH = os.environ.get('MKALL_GH')  # runs Listing.java / Dis2.java on the level's project
 OV = os.environ.get('MKALL_OV')  # the overlay's sections, with their manifest.csv
-MAPF = (os.environ.get('RAC1_ASSETS') or W + '/assets') + '/generated/overlay_map/level%s.txt' % LEVEL  # (RAC1_ASSETS)
+MAPF = os.path.join(ovlist.map_dir(), 'level%s.txt' % LEVEL) if LVL is not None else \
+    (os.environ.get('RAC1_ASSETS') or W + '/assets') + '/generated/overlay_map/level%s.txt' % LEVEL  # (RAC1_ASSETS)
 # the enhancements' hook points in the levels' own code (tools/codegen/mips2cpp.py load_hooks)
 os.environ.setdefault('MIPS2CPP_HOOKS', W + '/tools/codegen/hooks.glue')
 
@@ -61,6 +62,24 @@ HELPER_FMT = (os.environ.get('MKALL_HELPER_PREFIX') or ('ovl_' if VELDIN else 'n
 UNIFORM_NAMES = {x for x in os.environ.get('MKALL_UNIFORM', '').split(',') if x}  # (entries of the uniform ABI whose names do not end in `_u`)
 UNIFORM_ENTRY = lambda nm: nm.endswith('_u') or nm in UNIFORM_NAMES  # an entry in the uniform ABI (TrRet, every argument register): its glue is preset
 FORCE = {int(x, 16) for x in os.environ.get('MKALL_FORCE', '').split(',') if x}
+
+
+def standin_hooks(ad):
+    """A hooks file for the stand-in at `ad` (tools/codegen/ovlist.py): the `L<n> PAL:0x...` lines of hooks.glue inside the PAL
+    function it is made from, their addresses and `L_PAL_<addr>` labels moved to the stand-in's (its NTSC-U entry + the
+    offset in the PAL function)."""
+    pal, end, n = ovlist.overlay(LVL).standin(ad).local
+    move = lambda a: n + (a - pal)
+    out = []
+    for line in open(os.environ['MIPS2CPP_HOOKS']):
+        m = re.match(r'^L(\d+)\s+PAL:(0x[0-9a-fA-F]+)(.*)$', line.rstrip('\n'))
+        if m and int(m.group(1)) == LVL and pal <= int(m.group(2), 16) < end:
+            rest = re.sub(r'L_PAL_([0-9a-f]+)', lambda x: 'L_%x' % move(int(x.group(1), 16)), m.group(3))
+            out.append('L%d 0x%08x%s' % (LVL, move(int(m.group(2), 16)), rest))
+    path = os.path.join(SCR, 'standin_hooks_%x.glue' % ad)
+    open(path, 'w').write('\n'.join(out) + '\n')
+    print('    %x: a stand-in (PAL:0x%x), its %d hook point(s) from the PAL build' % (ad, pal, len(out)), file=sys.stderr)
+    return path
 
 
 def word(a):
@@ -417,7 +436,10 @@ def main():
             cmd += ['--wide-gpr', ','.join(wide_gpr[ad])]
         for j, tl in jts.items():
             cmd += ['--jt', '%x=%s' % (j, ','.join('%x' % x for x in tl))]
-        r = subprocess.run(cmd, capture_output=True, text=True)
+        env = None
+        if LVL is not None and ad in dict(ovlist.STANDINS):  # (another region's disc: the disc's own build of a function the
+            env = dict(os.environ, MIPS2CPP_HOOKS=standin_hooks(ad))  # region changed: its own hook points, `PAL:` lines)
+        r = subprocess.run(cmd, capture_output=True, text=True, env=env)
         if r.returncode != 0:
             print('FAILED', '%x' % ad, r.stderr[-500:], file=sys.stderr)
             continue

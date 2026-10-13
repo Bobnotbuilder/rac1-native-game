@@ -58,6 +58,7 @@ add_library(rac1_game STATIC
     ovl/rilgar_part2.cpp
     ovl/umbris_part2.cpp
     ovl/veldin_extras.cpp
+    ovl/weapon_classes.cpp
     ovl/blarg_mobys.cpp
     ovl/blarg_hooks.cpp
     ovl/blarg_part2.cpp
@@ -67,6 +68,7 @@ add_library(rac1_game STATIC
     ovl/gaspar_hooks.cpp
     ovl/batalia_mobys.cpp
     ovl/batalia_hooks.cpp
+    ovl/batalia_part2.cpp
     ovl/orxon_mobys.cpp
     ovl/orxon_hooks.cpp
     ovl/pokitaru_hooks.cpp
@@ -136,6 +138,7 @@ add_library(rac1_game STATIC
     enhance/advanced.cpp
     enhance/graphics.cpp
     enhance/controls.cpp
+    enhance/update_notice.cpp
     ovl/bomb_glove.cpp
     ovl/pyrocitor.cpp
     ovl/blaster.cpp

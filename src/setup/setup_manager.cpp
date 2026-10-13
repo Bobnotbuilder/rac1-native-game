@@ -23,15 +23,21 @@ namespace {
 
 namespace fs = std::filesystem;
 
-// where the game reads the disc while it runs (runtime/kernel/disc.cpp), relative to assets/
+// where the game reads the disc while it runs (runtime/kernel/disc.cpp), relative to assets/: one link per region
 constexpr const char* GAME_ISO = "iso/rac1-ntsc-u.iso";
+constexpr const char* GAME_ISO_PAL = "iso/rac1-pal.iso";
+
+const char* game_iso(const KnownDisc* disc) {
+    return disc != nullptr && std::string(disc->region) == "PAL" ? GAME_ISO_PAL : GAME_ISO;
+}
 
 void print_usage(const char* prog) {
     std::cout << "Usage: " << prog << " --setup [options]\n\n"
-              << "Generates the game's data into assets/ from your Ratchet & Clank disc image (NTSC-U, SCUS-97199).\n"
+              << "Generates the game's data into assets/ from your Ratchet & Clank disc image (NTSC-U SCUS-97199,\n"
+              << "or PAL SCES-50916).\n"
               << "Run it from the repository's root. ./setup.sh runs it for you.\n\n"
               << "Options:\n"
-              << "  --iso <path>       your disc image (default: $RAC1_ISO, then assets/iso/rac1-ntsc-u.iso)\n"
+              << "  --iso <path>       your disc image (default: $RAC1_ISO, then assets/iso/rac1-ntsc-u.iso or rac1-pal.iso)\n"
               << "  --assets <dir>     where to write the data (default: assets; the game reads assets/)\n"
               << "  --force            regenerate files that already exist\n"
               << "  --step <step>      run one step only: elf, wads, moby, world, flight, overlay (default: all)\n"
@@ -56,8 +62,10 @@ void print_status(const fs::path& root) {
         std::cout << "  [" << (ok ? "OK" : "MISSING") << "] " << desc << " (" << count << " files in " << p.string() << ")\n";
     };
 
-    check_file("Disc image", fs::exists(root / GAME_ISO) || !fs::exists(root / "iso/disc-path.txt") ? root / GAME_ISO : fs::path(disc_path()));
-    check_file("Boot executable", root / "dumps/SCUS_971.99");
+    const bool pal = !fs::exists(root / GAME_ISO) && fs::exists(root / GAME_ISO_PAL);
+    const fs::path link = root / (pal ? GAME_ISO_PAL : GAME_ISO);
+    check_file("Disc image", fs::exists(link) || !fs::exists(root / "iso/disc-path.txt") ? link : fs::path(disc_path()));
+    check_file("Boot executable", root / (pal ? "dumps/SCES_509.16" : "dumps/SCUS_971.99"));
     count_dir("Level data", root / "extracted/level_wads", 19);
     count_dir("Moby models and textures", root / "generated/mrp/moby", 20);
     count_dir("World geometry and textures", root / "generated/mrp/world", 20);
@@ -66,13 +74,16 @@ void print_status(const fs::path& root) {
     std::cout << "\n";
 }
 
-// Makes the game find the disc while it runs: assets/iso/rac1-ntsc-u.iso, a link to the image
-// when it is elsewhere. A file the player put there is never replaced. Where a link cannot be made
-// (Windows, without Developer Mode or the administrator's right), the image's path goes into
-// assets/iso/disc-path.txt instead, which the game reads (runtime/kernel/disc.cpp).
-bool link_iso(const fs::path& assets, const fs::path& iso) {
-    const fs::path dest = assets / GAME_ISO;
+// Makes the game find the disc while it runs: assets/iso/rac1-ntsc-u.iso (rac1-pal.iso for the PAL disc), a
+// link to the image when it is elsewhere. A file the player put there is never replaced. The other region's
+// link is removed: assets/ holds one disc's data. Where a link cannot be made (Windows, without Developer
+// Mode or the administrator's right), the image's path goes into assets/iso/disc-path.txt instead, which the
+// game reads (runtime/kernel/disc.cpp).
+bool link_iso(const fs::path& assets, const fs::path& iso, const KnownDisc* disc) {
+    const fs::path dest = assets / game_iso(disc);
     std::error_code ec;
+    const fs::path other = assets / (game_iso(disc) == GAME_ISO ? GAME_ISO_PAL : GAME_ISO);
+    if (fs::is_symlink(fs::symlink_status(other, ec))) fs::remove(other, ec);
     const fs::path target = fs::absolute(iso);
     if (fs::exists(dest, ec) && fs::equivalent(dest, target, ec)) return true;
     if (fs::is_symlink(fs::symlink_status(dest, ec))) {
@@ -116,7 +127,7 @@ fs::path repo_root() {
 // Runs a program (looked up in PATH) with its standard output discarded; returns its exit code (-1: not started).
 int run_quiet(const std::vector<std::string>& args) { return platform::run_quiet(args); }
 
-bool overlay_maps(const fs::path& assets, const std::string& iso_path) {
+bool overlay_maps(const fs::path& assets, const std::string& iso_path, const KnownDisc* disc) {
     const fs::path tools = repo_root() / "tools/overlay_match";
     const fs::path out = assets / "generated/overlay_map";
     if (!fs::exists(tools / "overlay_match.py")) {
@@ -124,11 +135,26 @@ bool overlay_maps(const fs::path& assets, const std::string& iso_path) {
         return false;
     }
     fs::create_directories(out);
-    // the boot module (the title and its menu) first, then each level against Veldin's (level 0)
-    std::cout << " title" << std::flush;
-    int r = run_quiet({platform::python_program(), (tools / "front_match.py").string(), "--elf", (assets / "dumps/SCUS_971.99").string(),
-                       "--iso", iso_path, "--out", out.string()});
-    for (int lv = 1; lv <= 18 && r == 0; ++lv) {
+    const fs::path elf = assets / "dumps" / disc->boot_file;
+    const std::string py = platform::python_program();
+    int r = 0;
+    if (std::string(disc->region) != "NTSC-U") {
+        // another region's disc: through its region table (data/regions/<serial>.txt): the game's maps, then the code
+        // generators' (tools/setup.py does the same)
+        const fs::path table = repo_root() / "data/regions" / (std::string(disc->serial) + ".txt");
+        std::cout << " (region table)" << std::flush;
+        r = run_quiet({py, (tools / "region_maps.py").string(), "apply", "--iso", iso_path, "--elf", elf.string(),
+                       "--table", table.string(), "-o", out.string()});
+        if (r == 0)
+            r = run_quiet({py, (tools / "region_view.py").string(), "maps", "--iso", iso_path, "--table", table.string(),
+                           "-o", (out / "codegen").string()});
+    } else {
+        // the boot module (the title and its menu) first, then each level against Veldin's (level 0)
+        std::cout << " title" << std::flush;
+        r = run_quiet({py, (tools / "front_match.py").string(), "--elf", elf.string(), "--iso", iso_path, "--out",
+                       out.string()});
+    }
+    for (int lv = 1; lv <= 18 && r == 0 && std::string(disc->region) == "NTSC-U"; ++lv) {
         std::cout << " " << lv << std::flush;
         r = run_quiet({platform::python_program(), (tools / "overlay_match.py").string(), "--iso", iso_path, "--out", out.string(),
                        "--levels", std::to_string(lv)});
@@ -203,10 +229,11 @@ int run_setup(int argc, char** argv) {
     }
 
     if (iso_path.empty()) {
-        const fs::path default_iso = assets_path / GAME_ISO;
+        fs::path default_iso = assets_path / GAME_ISO;
+        if (!fs::exists(default_iso)) default_iso = assets_path / GAME_ISO_PAL;
         if (!fs::exists(default_iso)) {
             std::cerr << "[setup] Error: no disc image given.\n"
-                      << "  Run ./setup.sh, or give the path to your Ratchet & Clank (NTSC-U) ISO:\n"
+                      << "  Run ./setup.sh, or give the path to your Ratchet & Clank ISO (NTSC-U or PAL):\n"
                       << "    " << argv[0] << " --setup --iso <path/to/game.iso>\n";
             return 1;
         }
@@ -224,7 +251,7 @@ int run_setup(int argc, char** argv) {
         std::cout << "[setup] Disc image: Ratchet & Clank, " << val.disc->region << " (" << val.disc->serial << ")\n";
         if (!val.message.empty()) std::cout << "[setup] Warning: " << val.message << "\n";
     }
-    if (!link_iso(assets_path, iso_path)) return 1;
+    if (!link_iso(assets_path, iso_path, val.disc)) return 1;
     if (check_only) return 0;
 
     MappedFile iso_file(iso_path);
@@ -240,12 +267,12 @@ int run_setup(int argc, char** argv) {
     auto skip = [](int n, const char* what) { std::cout << "[setup] [" << n << "/6] " << what << ": already there\n"; };
 
     if (want("elf")) {
-        const fs::path elf_dest = assets_path / "dumps/SCUS_971.99";
+        const fs::path elf_dest = assets_path / "dumps" / val.disc->boot_file;
         if (!force && fs::exists(elf_dest)) {
             skip(1, "Boot executable");
         } else {
             begin(1, "Copying the boot executable");
-            if (!extract_boot_elf(iso_span, elf_dest.string(), true)) {
+            if (!extract_boot_elf(iso_span, elf_dest.string(), true, val.disc->boot_file)) {
                 std::cerr << " failed\n";
                 return 1;
             }
@@ -303,12 +330,16 @@ int run_setup(int argc, char** argv) {
     if (want("overlay")) {
         const fs::path ovl = assets_path / "generated/overlay_map";
         bool present = fs::exists(ovl / "front_reloc.txt");
-        for (int lv = 1; lv <= 18; ++lv) present = present && fs::exists(ovl / ("level" + std::to_string(lv) + ".txt"));
+        const bool other = std::string(val.disc->region) != "NTSC-U";
+        for (int lv = 1; lv <= 18; ++lv) {
+            present = present && fs::exists(ovl / ("level" + std::to_string(lv) + ".txt"));
+            if (other) present = present && fs::exists(ovl / ("codegen/level" + std::to_string(lv) + ".txt"));
+        }
         if (!force && present) {
             skip(6, "Overlay address maps");
         } else {
             begin(6, "Matching each level's code to Veldin's, level");
-            if (!overlay_maps(assets_path, iso_path)) return 1;
+            if (!overlay_maps(assets_path, iso_path, val.disc)) return 1;
             std::cout << " done\n";
         }
     }

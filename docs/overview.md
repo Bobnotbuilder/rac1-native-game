@@ -131,8 +131,9 @@ sequenceDiagram
     C->>C: A must equal B
 ```
 
-1. A snapshot of the EE's RAM is saved from the game running in PCSX2, at a known moment (Ratchet
-   standing, running, jumping, in a fight...). Snapshots are the user's own data and are never
+1. The EE's RAM is set up at a known moment (Ratchet standing, running, jumping, in a fight...):
+   a level laid out from the player's own disc, or a snapshot of the game running, saved from
+   PCSX2 or from a headless run of the game. Snapshots are the user's own data and are never
    committed.
 2. The original function is run from the snapshot by an R5900 interpreter
    (`runtime/ee/ee_interpreter.cpp`). Its memory writes and its return value are recorded. The
@@ -153,5 +154,6 @@ divide, which rounds to nearest on the EE, is written `fpu_div(a, b)` in a port.
 Vendor's animation ended on a different value than on the PS2, and a later function looped
 forever.
 
-The oracle harness and the RAM snapshots are not part of this repository yet. The interpreters
-are, so the method can be followed from the code.
+The oracle is in `tests/oracle/`: how to build and run it, how to add a batch, and where its RAM
+snapshots go (they are never committed) are in [The oracle](oracle.md). Every change to ported game
+code ships with a batch and passes it before it is merged.

@@ -36,6 +36,7 @@ void particle_3d_update(uint32_t a0_in);
 void particle_41_update(uint32_t a0_in);
 TrRet ovl_2729c8_tr(uint32_t a0_in, uint32_t a1_in, uint32_t a2_in, uint32_t a3_in, uint32_t t0_in, uint32_t t1_in, uint32_t t2_in, uint32_t t3_in, float f12_in, float f13_in, float f14_in, float f15_in);
 void particle_3a_update(uint32_t a0_in);
+void particle_31_update(uint32_t a0_in);
 
 //@gen ovl_259430_tr
 
@@ -56,5 +57,7 @@ void particle_3a_update(uint32_t a0_in);
 //@gen ovl_2729c8_tr
 
 //@gen particle_3a_update
+
+//@gen particle_31_update
 
 }  // namespace rac1

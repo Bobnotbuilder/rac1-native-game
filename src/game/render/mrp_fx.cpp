@@ -323,11 +323,23 @@ bool init_gl() {
 // ---- the resident textures: an atlas of kLayer x kLayer layers, a texture in a layer's corner, by its pixels ------------------------
 
 constexpr int kLayer = 256;
+// The atlas is bounded: an effect whose texture the game writes anew every frame (Aridia's sand sea, L2:0x2a4818's texture upload: a
+// 64 x 64 texture of new pixels each frame) took a new layer every frame, the atlas doubled without end (2048 layers after ~34 s,
+// 4096 after ~68 s), and where the GL's GL_MAX_ARRAY_TEXTURE_LAYERS is 2048 (NVIDIA) the growth to 4096 failed: the array was left
+// without storage and every effect drew untextured or black from then on - the glows, trails and smoke, the bolts, the enemies'
+// shots, the sand sea itself (issue #19), until the game was restarted. Now the atlas grows up to kAtlasCap layers (or the GL's
+// maximum, if lower), then reuses the layer least recently drawn with (never one drawn with this frame: its batches are pending).
+constexpr int kAtlasCap = 1024;  // (256 MB at most)
+constexpr size_t kIdsPerLayer = 64;  // (the decodes remembered per layer; past it they are found by their pixels' hash again)
 struct Atlas {
     GLuint tex = 0;
-    int layers = 0, used = 0;
+    int layers = 0, used = 0, cap = 0;
     std::unordered_map<uint64_t, int> by_hash;  // the pixels' hash (and size) -> layer
     std::unordered_map<uint64_t, int> by_id;    // TexImage::id -> layer (the hash not taken again)
+    std::vector<uint64_t> hash;                 // per layer: its texture's hash
+    std::vector<std::vector<uint64_t>> ids;     // per layer: the decodes in by_id that point to it
+    std::vector<uint64_t> last;                 // per layer: the frame it was last drawn with (g_st.frames)
+    uint64_t reused = 0, full = 0, grow_failed = 0;
 } g_atlas;
 
 uint64_t tex_hash(const gs::TexImage& t) {
@@ -336,51 +348,116 @@ uint64_t tex_hash(const gs::TexImage& t) {
     return h;
 }
 
-// orig: (host) the layer holding texture `t` (uploaded at its first use; the atlas grown, its layers copied, when full); -1: too big
+// orig: (host) the array grown to `n` layers, the used ones copied; false: the GL refused it (the old array kept)
+bool atlas_grow(Atlas& A, int n) {
+    while (glGetError() != GL_NO_ERROR) {
+    }
+    GLuint nt = 0;
+    glGenTextures(1, &nt);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, nt);
+    glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, kLayer, kLayer, n, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    if (glGetError() != GL_NO_ERROR) {
+        glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+        glDeleteTextures(1, &nt);
+        if (A.grow_failed++ == 0) std::fprintf(stderr, "[mrp-fx] the effects' texture atlas could not grow to %d layers: kept at %d\n", n, A.layers);
+        return false;
+    }
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BASE_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    if (A.tex != 0) {
+        using PfnCopy = void(APIENTRYP)(GLuint, GLenum, GLint, GLint, GLint, GLint, GLuint, GLenum, GLint, GLint, GLint, GLint, GLsizei, GLsizei, GLsizei);
+        static const PfnCopy copy = reinterpret_cast<PfnCopy>(glfwGetProcAddress("glCopyImageSubData"));
+        if (copy != nullptr && A.used > 0) {
+            copy(A.tex, GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, nt, GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, kLayer, kLayer, A.used);
+        } else if (copy == nullptr) {  // (no copy: the textures uploaded again as they come)
+            A.by_hash.clear();
+            A.by_id.clear();
+            A.hash.clear();
+            A.ids.clear();
+            A.last.clear();
+            A.used = 0;
+        }
+        glDeleteTextures(1, &A.tex);
+    }
+    A.tex = nt;
+    A.layers = n;
+    return true;
+}
+
+// orig: (host) layer `l` emptied for another texture: its hash and decodes forgotten
+void atlas_evict(Atlas& A, int l) {
+    if (auto it = A.by_hash.find(A.hash[static_cast<size_t>(l)]); it != A.by_hash.end() && it->second == l) A.by_hash.erase(it);
+    for (uint64_t id : A.ids[static_cast<size_t>(l)]) A.by_id.erase(id);
+    A.ids[static_cast<size_t>(l)].clear();
+    ++A.reused;
+}
+
+// orig: (host) decode `id` of layer `l` remembered (a few per layer: a texture decoded again every frame finds its layer by its hash)
+void atlas_note_id(Atlas& A, int l, uint64_t id) {
+    std::vector<uint64_t>& ids = A.ids[static_cast<size_t>(l)];
+    if (ids.size() >= kIdsPerLayer) {
+        for (uint64_t old : ids) A.by_id.erase(old);
+        ids.clear();
+    }
+    ids.push_back(id);
+    A.by_id[id] = l;
+}
+
+// orig: (host) the layer holding texture `t` (uploaded at its first use; the atlas grown, its layers copied, up to its cap; then the
+// least recently drawn layer reused); -1: too big, or every layer drawn with this frame
 int atlas_layer(const gs::TexImage& t) {
     Atlas& A = g_atlas;
-    if (auto it = A.by_id.find(t.id); it != A.by_id.end()) return it->second;
+    const uint64_t now = g_st.frames;
+    if (auto it = A.by_id.find(t.id); it != A.by_id.end()) {
+        A.last[static_cast<size_t>(it->second)] = now;
+        return it->second;
+    }
     if (t.w > kLayer || t.h > kLayer || t.w <= 0 || t.h <= 0 || t.px.size() < static_cast<size_t>(t.w) * static_cast<size_t>(t.h)) {
         ++g_st.tex_big;
         return -1;
     }
     const uint64_t h = tex_hash(t);
     if (auto it = A.by_hash.find(h); it != A.by_hash.end()) {
-        A.by_id[t.id] = it->second;
+        atlas_note_id(A, it->second, t.id);
+        A.last[static_cast<size_t>(it->second)] = now;
         return it->second;
     }
-    if (A.used == A.layers) {
-        const int n = std::max(32, A.layers * 2);
-        GLuint nt = 0;
-        glGenTextures(1, &nt);
-        glBindTexture(GL_TEXTURE_2D_ARRAY, nt);
-        glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, kLayer, kLayer, n, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BASE_LEVEL, 0);
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAX_LEVEL, 0);
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        if (A.tex != 0) {
-            using PfnCopy = void(APIENTRYP)(GLuint, GLenum, GLint, GLint, GLint, GLint, GLuint, GLenum, GLint, GLint, GLint, GLint, GLsizei, GLsizei, GLsizei);
-            static const PfnCopy copy = reinterpret_cast<PfnCopy>(glfwGetProcAddress("glCopyImageSubData"));
-            if (copy != nullptr) {
-                copy(A.tex, GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, nt, GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, kLayer, kLayer, A.layers);
-            } else {  // (no copy: the textures uploaded again as they come)
-                A.by_hash.clear();
-                A.by_id.clear();
-                A.used = 0;
-            }
-            glDeleteTextures(1, &A.tex);
-        }
-        A.tex = nt;
-        A.layers = n;
+    if (A.cap == 0) {
+        GLint max_layers = 0;
+        glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &max_layers);
+        A.cap = std::max(32, std::min(kAtlasCap, static_cast<int>(max_layers)));
+        if (const char* e = std::getenv("RAC1_MRP_FX_ATLAS_CAP"); e != nullptr && std::atoi(e) > 0) A.cap = std::atoi(e);  // (testing: a smaller cap)
     }
-    const int layer = A.used++;
+    int layer = -1;
+    if (A.used == A.layers && A.layers < A.cap && !atlas_grow(A, std::min(A.cap, std::max(32, A.layers * 2)))) A.cap = A.layers;  // (refused: kept)
+    if (A.used < A.layers) {
+        layer = A.used++;
+        A.hash.resize(static_cast<size_t>(A.used), 0);
+        A.ids.resize(static_cast<size_t>(A.used));
+        A.last.resize(static_cast<size_t>(A.used), 0);
+    } else {  // full: the layer least recently drawn with, not this frame
+        uint64_t oldest = now;
+        for (int l = 0; l < A.used; ++l)
+            if (A.last[static_cast<size_t>(l)] < oldest) {
+                oldest = A.last[static_cast<size_t>(l)];
+                layer = l;
+            }
+        if (layer < 0) {
+            ++A.full;
+            return -1;
+        }
+        atlas_evict(A, layer);
+    }
     glBindTexture(GL_TEXTURE_2D_ARRAY, A.tex);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
     glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer, t.w, t.h, 1, GL_RGBA, GL_UNSIGNED_BYTE, t.px.data());
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
     A.by_hash[h] = layer;
-    A.by_id[t.id] = layer;
+    A.hash[static_cast<size_t>(layer)] = h;
+    atlas_note_id(A, layer, t.id);
+    A.last[static_cast<size_t>(layer)] = now;
     ++g_st.tex_new;
     return layer;
 }
@@ -1194,6 +1271,8 @@ void mrp_fx_report() {
                 static_cast<double>(g_st.batches) / f, static_cast<double>(g_st.draws) / f, g_atlas.used, static_cast<unsigned long long>(g_st.tex_big),
                 static_cast<unsigned long long>(g_st.tex_mip), static_cast<unsigned long long>(g_st.region), static_cast<unsigned long long>(g_st.fst),
                 static_cast<unsigned long long>(g_st.fge), g_st.ms_build / f, g_st.ms_gl / f);
+    std::printf("[mrp-fx] atlas: %d of %d layers (cap %d), %llu reused, %llu textures not drawn (every layer in use)\n", g_atlas.used, g_atlas.layers, g_atlas.cap,
+                static_cast<unsigned long long>(g_atlas.reused), static_cast<unsigned long long>(g_atlas.full));
     if (g_st.kc_starts != 0)
         std::printf("[mrp-fx] kick check: %llu particle program starts, %llu kicks, %llu quadwords against the VU interpreter on the uploaded microcode: "
                     "%llu starts and %llu quadwords differ\n",

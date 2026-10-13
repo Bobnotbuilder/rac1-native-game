@@ -5,6 +5,7 @@
 // the frame capture, the planet map / ship screens).
 #include <game/enhance/advanced.h>
 #include <game/enhance/graphics.h>
+#include <game/enhance/update_notice.h>
 #include <game/boot/title_menu.h>
 #include <game/ovl/memory_card.h>
 #include <game/ovl/ovl_reloc.h>
@@ -48,7 +49,7 @@ void moby_anim_last(uint32_t m, uint32_t set) {
 // change of focus; the ported ones, others reported once (0 returned)
 int32_t menu_widget_call(uint32_t fn, uint32_t w, int32_t a1) {
     if (ovl_reloc_level() == OVL_FRONT) {  // (the boot module's own widget functions, its main menu's Options)
-        switch (fn) {
+        switch (region_to_ntsc(OVL_FRONT, fn)) {  // (the NTSC-U boot module's addresses)
             case 0x0021a1b0: return title_options_list_focus_in(w);
             case 0x00219d80: return title_label_update(w);
             case 0x0021a308: return title_nop_focus(w);
@@ -554,7 +555,10 @@ int32_t menu_button_update(uint32_t w) {
         };
         switch (static_cast<uint32_t>(action) < 0xcu ? action : -1) {
             case 2: moby_sound_start(2, 0x11, lwu(w + 0x14)); break;
-            case 3: page_go(); break;
+            case 3:
+                update_notice_choice(w);  // enhancement: the update notice's Skip Version
+                page_go();
+                break;
             case 4:
             case 5: {
                 if (action == 4) graphics_new_game_choice(w);  // enhancement: the new game popup's mode

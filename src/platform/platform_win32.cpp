@@ -135,6 +135,14 @@ std::filesystem::path config_dir() {
 
 std::filesystem::path data_dir() { return config_dir(); }
 
+std::string system_language() {
+    wchar_t name[LOCALE_NAME_MAX_LENGTH] = {};
+    if (GetUserDefaultLocaleName(name, LOCALE_NAME_MAX_LENGTH) == 0) return {};
+    std::string l;
+    for (const wchar_t* c = name; *c >= L'a' && *c <= L'z' && l.size() < 3; ++c) l += static_cast<char>(*c);  // ("it-IT" -> "it")
+    return l.size() == 2 ? l : std::string();
+}
+
 std::filesystem::path executable_path() {
     std::wstring buf(MAX_PATH, L'\0');
     for (;;) {

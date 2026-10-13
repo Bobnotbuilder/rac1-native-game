@@ -1,0 +1,556 @@
+#!/usr/bin/env python3
+"""The ports' overlay maps for a disc of another region (docs/architecture.md, "The region layer").
+
+The ports carry NTSC-U addresses (SCUS-97199: Veldin's overlay for OV / OVF, level N's for the
+level-only ports, the boot module's for `front:`). On the NTSC-U disc tools/overlay_match matches
+NTSC-U Veldin's code in every level. A player who owns only the PAL disc (SCES-50916) has no
+NTSC-U code to match against. This tool closes the gap with a *region table*: for each overlay
+(the boot module, levels 0..18) the NTSC-U address ranges and where the PAL build put them
+(ranges of addresses and displacements, nothing of the game's bytes). With it:
+
+  table   (both discs: the developer's side) writes the region table from the two discs:
+          each overlay's NTSC-U code / data matched in the PAL overlay of the same level
+          (relocations masked, tools/overlay_match's matcher), as runs of equal displacement.
+  apply   (one disc + the table: the player's side) writes the maps the runtime reads, as
+          tools/overlay_match / front_match write them on the NTSC-U disc:
+            levelN.txt (N = 0..18)  NTSC-U Veldin -> the disc's level N: the disc's own Veldin
+                                    matched in its level N (the same matcher, one disc),
+                                    composed with the table's level 0 (NTSC-U Veldin -> the
+                                    disc's Veldin); level 0 is the table's level 0 itself
+            front_reloc.txt         NTSC-U Veldin -> the disc's boot module, the same way
+            region_levelN.txt, region_boot.txt  the table's runs (NTSC-U level N / boot module ->
+                                    the disc's), for the level-only and boot module ports
+  check   (both discs) compares apply's maps with the direct ones (NTSC-U Veldin matched in the
+          PAL overlays) on every address the ports name.
+  check-levels (both discs) the level-only and boot module literals (L<n>_ADDR / L<n>_CASE /
+          LvlConst, FR / FrConst) translated as the runtime does (region_levelN / region_boot runs)
+          against the direct maps (NTSC-U level N / boot module matched in the PAL one).
+
+The table (committed as data/regions/<serial>.txt, Daino's decision: addresses and
+their shifts only, never bytes of code, data or text) has, per overlay, `code lo hi d` / `data lo hi d` runs
+and `entry n p` lines: the entries of the functions the PAL build changed (no run covers them), so that
+the NTSC-U port stands in for them until their PAL variants are ported; and `fix a d` lines for the code
+generators (tools/overlay_match/region_view.py).
+
+Usage (repo root):
+  tools/overlay_match/region_maps.py table --pal ISO --ntsc ISO -o TABLE
+  tools/overlay_match/region_maps.py apply --iso ISO --elf ELF --table TABLE -o OUTDIR
+  tools/overlay_match/region_maps.py check --pal ISO --ntsc ISO --maps OUTDIR
+  tools/overlay_match/region_maps.py check-levels --table data/regions/SCES-50916.txt
+"""
+import argparse
+import bisect
+import collections
+import hashlib
+import re
+import struct
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import overlay_match as om  # noqa: E402
+import front_match as fm  # noqa: E402
+
+ROOT = Path(__file__).resolve().parents[2]
+SECTOR = 2048
+CORE_END = 0x15EF00  # the base ELF below the boot module / overlays: the same at the same addresses
+
+
+# ---- the disc ---------------------------------------------------------------------------------
+
+def root_file(iso, name):
+    """A file of the ISO's root directory (bytes), None when absent."""
+    iso.seek(16 * SECTOR)
+    pvd = iso.read(SECTOR)
+    lba, size = struct.unpack_from("<I", pvd, 156 + 2)[0], struct.unpack_from("<I", pvd, 156 + 10)[0]
+    iso.seek(lba * SECTOR)
+    d = iso.read(size)
+    o = 0
+    while o < len(d):
+        ln = d[o]
+        if ln == 0:
+            o = (o // SECTOR + 1) * SECTOR
+            continue
+        r = d[o:o + ln]
+        if r[33:33 + r[32]].split(b";")[0] == name.encode():
+            iso.seek(struct.unpack_from("<I", r, 2)[0] * SECTOR)
+            return iso.read(struct.unpack_from("<I", r, 10)[0])
+        o += ln
+    return None
+
+
+def disc_region(iso):
+    """(serial, boot ELF name, vmode) from SYSTEM.CNF: ('SCUS-97199', 'SCUS_971.99', 'NTSC')."""
+    cnf = root_file(iso, "SYSTEM.CNF")
+    if cnf is None:
+        raise SystemExit("[region_maps] no SYSTEM.CNF in the ISO's root: not a PS2 game disc")
+    txt = cnf.decode("ascii", "replace")
+    m = re.search(r"BOOT2\s*=\s*cdrom0:\\([A-Z]{4}_\d{3}\.\d{2})", txt)
+    if not m:
+        raise SystemExit(f"[region_maps] SYSTEM.CNF has no BOOT2 line: {txt!r}")
+    elf = m.group(1)
+    vm = re.search(r"VMODE\s*=\s*(\w+)", txt)
+    return elf[:4] + "-" + elf[5:8] + elf[9:11], elf, vm.group(1) if vm else "NTSC"
+
+
+def boot_overlay(elf):
+    return om.Overlay(fm.boot_module(elf), fm.boot_entry(elf))
+
+
+# ---- runs -------------------------------------------------------------------------------------
+
+def code_runs(fmap, sizes):
+    """[(lo, hi, delta)]: contiguous matched functions with the same displacement."""
+    runs = []
+    for a in sorted(fmap):
+        d = fmap[a] - a
+        if runs and runs[-1][2] == d and runs[-1][1] == a:
+            runs[-1][1] = a + sizes[a]
+        else:
+            runs.append([a, a + sizes[a], d])
+    return [tuple(r) for r in runs]
+
+
+def data_runs(points):
+    """[(lo, hi, delta)]: consecutive mapped data addresses with the same displacement (lo, hi the
+    first and last address of the run; an address between two of them moves the same way)."""
+    runs = []
+    for a in sorted(points):
+        d = points[a] - a
+        if runs and runs[-1][2] == d:
+            runs[-1][1] = a
+        else:
+            runs.append([a, a, d])
+    return [tuple(r) for r in runs]
+
+
+def changed_entries(V, L, fmap, sizes, pts, cr):
+    """{NTSC-U entry: the disc's}: the functions the region changed (outside every code run) whose entry
+    the matched code names: the jal targets of the matched functions, the code pointers it builds. The
+    runtime lets the NTSC-U port stand in for them."""
+    R = Region()
+    R.code = cr
+    seen = collections.defaultdict(collections.Counter)
+    for a, b in fmap.items():
+        i, j = (a - V.code_base) // 4, (b - L.code_base) // 4
+        for k in range(sizes[a] // 4):
+            wv, wl = V.code[i + k], L.code[j + k]
+            if wv >> 26 == 3:
+                tv, tl = (wv & 0x3FFFFFF) << 2, (wl & 0x3FFFFFF) << 2
+                if V.in_code(tv) and R.code_fwd(tv) is None and L.in_code(tl):
+                    seen[tv][tl] += 1
+    for a, b in pts.items():
+        if V.in_code(a) and R.code_fwd(a) is None and L.in_code(b):
+            seen[a][b] += 1
+    # the code pointers the data holds (a menu widget's functions, a callback table), word by word through the data runs
+    for lo, hi, d in data_runs(pts):
+        if hi - lo > 0x100000:
+            continue  # (a matcher noise span)
+        for a in range(lo & ~3, hi + 1, 4):
+            x, y = V.data_word(a), L.data_word(a + d)
+            if x is not None and y is not None and V.in_code(x) and R.code_fwd(x) is None and L.in_code(y):
+                seen[x][y] += 1
+    # the level tables (sections 3 / 4 / 5: class -> update function, camera types, sound handlers), row by row
+    for k in (3, 4, 5):
+        if k >= len(V.secs) or k >= len(L.secs):
+            continue
+        (_vd, _vt, vb), (_ld, _lt, lb) = V.secs[k], L.secs[k]
+        vw, lw = om.words(vb), om.words(lb)
+        for x, y in zip(vw, lw):
+            if V.in_code(x) and R.code_fwd(x) is None and L.in_code(y):
+                seen[x][y] += 1
+    # (a word of data that only looks like a code address, such as "   " 0x00202020, moves by no displacement of the code)
+    ds = [d for _lo, _hi, d in cr]
+    lo_d, hi_d = min(ds) - 0x200, max(ds) + 0x40
+    return {a: c.most_common(1)[0][0] for a, c in seen.items()
+            if len(c) == 1 and c.most_common(1)[0][0] != a and lo_d <= c.most_common(1)[0][0] - a <= hi_d}
+
+
+def map_points(V, L, fmap, sizes, pairs):
+    """The data lines of a map as {a: b} (overlay_match's choice: the most common pairing)."""
+    pts = {a: c.most_common(1)[0][0] for a, c in pairs.items()}
+    for a, b in om.data_pointer_pairs(V, L, pairs).items():
+        pts.setdefault(a, b)
+    return pts
+
+
+# ---- table ------------------------------------------------------------------------------------
+
+def sha1(b):
+    return hashlib.sha1(b).hexdigest()
+
+
+def cmd_table(a):
+    with open(a.ntsc, "rb") as ni, open(a.pal, "rb") as pi:
+        nser, nelf, _ = disc_region(ni)
+        pser, pelf, pvm = disc_region(pi)
+        ne, pe = root_file(ni, nelf), root_file(pi, pelf)
+        lines = [
+            f"# The {pser} build's layout against {nser}'s: where each NTSC-U code / data range of the boot",
+            "# module and of every level's overlay sits in the PAL build (tools/overlay_match/region_maps.py table).",
+            "# Addresses and displacements only. `code lo hi d`: the NTSC-U functions lo..hi (end",
+            "# exclusive) are at +d; `data lo hi d`: the NTSC-U data addresses lo..hi (both mapped) are at +d;",
+            "# `entry n p`: the entry of a function the region changed; `fix a d`: the relocated field of the",
+            "# NTSC-U instruction at a, moved by d where the code generators cannot take it back alone",
+            "# (tools/overlay_match/region_view.py).",
+            f"disc {pser} {pelf} {pvm} size {len(pe)} sha1 {sha1(pe)}",
+        ]
+        # the core: the same bytes at the same addresses but the boot module's entry (core main)
+        core_diff = [x for x in range(0x100080, CORE_END, 4) if _elf_word(ne, x) != _elf_word(pe, x)]
+        lines.append("core 00100080 %08x same, but " % CORE_END + " ".join("%08x" % x for x in core_diff))
+        units = [("boot", boot_overlay(ne), boot_overlay(pe))]
+        for lv in range(19):
+            units.append((str(lv), om.Overlay(*om.level_overlay(ni, lv)), om.Overlay(*om.level_overlay(pi, lv))))
+        for name, V, L in units:
+            _starts, fmap, _exact, _amb, missing, sizes, pairs, _bad = om.map_overlays(V, L)
+            pts = map_points(V, L, fmap, sizes, pairs)
+            cr, dr = code_runs(fmap, sizes), data_runs(pts)
+            ent = changed_entries(V, L, fmap, sizes, pts, cr)
+            lines.append(f"overlay {name} code {V.code_base:08x} {V.code_end:08x} -> {L.code_base:08x} {L.code_end:08x}"
+                         f" entry {V.entry:08x} -> {L.entry:08x}")
+            lines += ["code %08x %08x %+x" % r for r in cr]
+            lines += ["data %08x %08x %+x" % r for r in dr]
+            lines += ["entry %08x %08x" % e for e in sorted(ent.items())]
+            print(f"[region_maps] {name}: {len(fmap)} functions matched, {len(missing)} not: {len(cr)} code runs, {len(dr)} data runs,"
+                  f" {len(ent)} entries of changed functions")
+    Path(a.o).parent.mkdir(parents=True, exist_ok=True)
+    Path(a.o).write_text("\n".join(lines) + "\n")
+    print(f"[region_maps] wrote {a.o}")
+    import region_view  # (the code generators' corrections: `fix` lines)
+    region_view.write_fixes(a.o, a.pal, a.ntsc)
+
+
+def _elf_word(elf, addr):
+    shoff = struct.unpack_from("<I", elf, 0x20)[0]
+    for i in range(struct.unpack_from("<H", elf, 0x30)[0]):
+        _n, typ, _f, sa, off, size = struct.unpack_from("<IIIIII", elf, shoff + i * 40)
+        if typ == 1 and sa <= addr < sa + size:
+            return struct.unpack_from("<I", elf, off + addr - sa)[0]
+    return None
+
+
+# ---- apply ------------------------------------------------------------------------------------
+
+class Region:
+    """One overlay's runs: NTSC-U -> the disc's, and back."""
+
+    def __init__(self):
+        self.code, self.data, self.entry = [], [], {}
+        self.code_base = self.code_end = 0
+
+    def code_fwd(self, n):
+        for lo, hi, d in self.code:
+            if lo <= n < hi:
+                return n + d
+        return self.entry.get(n)
+
+    def code_back(self, p):
+        for lo, hi, d in self.code:
+            if lo <= p - d < hi:
+                return p - d
+        for n, q in self.entry.items():
+            if q == p:
+                return n
+        return None
+
+    def data_fwd(self, n):
+        """The runtime's translation of an NTSC-U data address (ovl_reloc.cpp's RegionRuns::data_fwd):
+        inside a run, its displacement; between two runs of the same displacement, that one; else the
+        run below's when the address is less than 0x100 above its end (an offset into its last object);
+        None (kept) otherwise."""
+        i = bisect.bisect_right(self.data, (n, 0xFFFFFFFF, 0)) - 1
+        if i < 0:
+            return None
+        lo, hi, d = self.data[i]
+        if n <= hi:
+            return n + d
+        if i + 1 < len(self.data) and self.data[i + 1][2] == d:
+            return n + d
+        return n + d if n - hi < 0x100 else None
+
+    def data_back(self, p):
+        """Every NTSC-U address a run puts at p (a run is a range of equal displacement)."""
+        return [p - d for lo, hi, d in self.data if lo <= p - d <= hi]
+
+
+def read_table(path):
+    """(the disc line's fields, {overlay name: Region}); each Region also has .code_base (NTSC-U)."""
+    disc, units, cur = None, {}, None
+    for line in Path(path).read_text().splitlines():
+        f = line.split()
+        if not f or f[0].startswith("#"):
+            continue
+        if f[0] == "disc":
+            disc = f[1:]
+        elif f[0] == "overlay":
+            cur = units.setdefault(f[1], Region())
+            cur.code_base, cur.code_end = int(f[3], 16), int(f[4], 16)
+        elif f[0] in ("code", "data"):
+            getattr(cur, f[0]).append((int(f[1], 16), int(f[2], 16), int(f[3], 16)))
+        elif f[0] == "entry":
+            cur.entry[int(f[1], 16)] = int(f[2], 16)
+    return disc, units
+
+
+def compose(T0, V, L, label):
+    """NTSC-U Veldin -> L: the disc's Veldin V matched in L (one disc), its addresses taken back to
+    NTSC-U Veldin's through the table's level 0 runs."""
+    _starts, fmap, _exact, _amb, _missing, sizes, pairs, _bad = om.map_overlays(V, L)
+    fn, lost = {}, 0
+    for p, q in fmap.items():
+        n = T0.code_back(p)
+        if n is None:
+            lost += 1  # a PAL-only function of Veldin (no NTSC-U equivalent)
+            continue
+        fn[n] = (q, sizes[p])
+    data = {}
+    for p, q in map_points(V, L, fmap, sizes, pairs).items():
+        if p < CORE_END:
+            data[p] = q
+            continue
+        for n in T0.data_back(p):
+            data.setdefault(n, q)
+    return fn, data, lost
+
+
+def write_map(path, header, fn, data):
+    lines = [f"# {h}" for h in header]
+    lines += [f"fn {n:08x} {q:08x} {s:x}" for n, (q, s) in sorted(fn.items())]
+    lines += [f"data {n:08x} {q:08x} 0" for n, q in sorted(data.items())]
+    path.write_text("\n".join(lines) + "\n")
+
+
+def cmd_apply(a):
+    out = Path(a.o)
+    out.mkdir(parents=True, exist_ok=True)
+    disc, units = read_table(a.table)
+    elf = Path(a.elf).read_bytes()
+    with open(a.iso, "rb") as iso:
+        ser, ename, _vm = disc_region(iso)
+        if disc is None or disc[0] != ser:
+            raise SystemExit(f"[region_maps] the table is for {disc[0] if disc else '?'}, the disc is {ser}")
+        if "sha1" in disc and disc[disc.index("sha1") + 1] != sha1(elf):
+            raise SystemExit(f"[region_maps] {ename} is not the build the table was made from (sha1 differs)")
+        T0 = units["0"]
+        V = om.Overlay(*om.level_overlay(iso, 0))
+        # level 0: the table's runs themselves (fn lines at the disc's own function starts)
+        starts = V.function_starts()
+        ends = starts[1:] + [V.code_end]
+        fn = {}
+        for p, e in zip(starts, ends):
+            n = T0.code_back(p)
+            if n is not None:
+                fn[n] = (p, e - p)
+        data = {}
+        for lo, hi, d in T0.data:
+            data[lo], data[hi] = lo + d, hi + d
+        # (every address the disc's Veldin code builds, back to NTSC-U: more points inside the runs)
+        _s, idmap, _e, _a, _m, sizes, pairs, _b = om.map_overlays(V, V)
+        for p in map_points(V, V, idmap, sizes, pairs):
+            if p >= CORE_END:
+                for n in T0.data_back(p):
+                    data.setdefault(n, p)
+        write_map(out / "level0.txt", [f"level 0: NTSC-U Veldin -> {ser} Veldin (the region table's runs; tools/overlay_match/region_maps.py apply)"],
+                  fn, data)
+        print(f"[region_maps] level 0: {len(fn)} functions, {len(data)} data addresses")
+        for lv in range(1, 19):
+            L = om.Overlay(*om.level_overlay(iso, lv))
+            fn, data, lost = compose(T0, V, L, f"level {lv}")
+            write_map(out / f"level{lv}.txt", [f"level {lv}: NTSC-U Veldin -> {ser} level {lv} ({ser} Veldin matched in its level {lv}, composed with the region table's level 0)"],
+                      fn, data)
+            print(f"[region_maps] level {lv}: {len(fn)} functions ({lost} {ser}-only of Veldin's dropped), {len(data)} data addresses")
+        B = boot_overlay(elf)
+        fn, data, lost = compose(T0, V, B, "boot")
+        write_map(out / "front_reloc.txt", [f"level front: NTSC-U Veldin -> {ser} boot module ({ename}; composed with the region table's level 0)"],
+                  fn, data)
+        print(f"[region_maps] boot module: {len(fn)} functions, {len(data)} data addresses")
+    for name, R in units.items():
+        fname = "region_boot.txt" if name == "boot" else f"region_level{name}.txt"
+        (out / fname).write_text("base %08x %08x\n" % (R.code_base, R.code_end)
+                                 + "".join("code %08x %08x %+x\n" % r for r in R.code)
+                                 + "".join("data %08x %08x %+x\n" % r for r in R.data)
+                                 + "".join("entry %08x %08x\n" % e for e in sorted(R.entry.items())))
+    print(f"[region_maps] wrote {out}/")
+
+
+# ---- check ------------------------------------------------------------------------------------
+
+def read_map(path):
+    fn, data = {}, {}
+    for line in Path(path).read_text().splitlines():
+        f = line.split()
+        if len(f) >= 3 and f[0] == "fn":
+            fn[int(f[1], 16)] = int(f[2], 16)
+        elif len(f) >= 3 and f[0] == "data":
+            data[int(f[1], 16)] = int(f[2], 16)
+    return fn, data
+
+
+def xlate_data(data, keys, a):
+    """ovl_reloc.cpp's ovl_xlate_data on a map (None: kept untranslated)."""
+    if a in data:
+        return data[a]
+    i = bisect.bisect_right(keys, a)
+    if i == 0:
+        return None
+    lo = keys[i - 1]
+    d = data[lo] - lo
+    if i < len(keys) and data[keys[i]] - keys[i] == d:
+        return a + d
+    return a + d if a - lo < 0x100 else None
+
+
+def xlate_code(fn, sizes, keys, data, a):
+    if a in fn:
+        return fn[a]
+    if a in data:
+        return data[a]
+    i = bisect.bisect_right(keys, a)
+    if i and a - keys[i - 1] < sizes.get(keys[i - 1], 0):
+        return a + fn[keys[i - 1]] - keys[i - 1]
+    return None
+
+
+def port_literals():
+    out = subprocess.run(["grep", "-rhoE", r"\b(OV|OVF|OvConst<)\(?0x[0-9a-fA-F]+", str(ROOT / "src/game")],
+                         capture_output=True, text=True).stdout.split()
+    code, data = set(), set()
+    for t in out:
+        v = int(t[t.index("0x"):], 16)
+        (code if t.startswith("OVF") else data).add(v)
+    return code, data
+
+
+def cmd_check(a):
+    code_lit, data_lit = port_literals()
+    print(f"[region_maps] the ports' literals: {len(code_lit)} code (OVF), {len(data_lit)} data (OV / OvConst)")
+    ni, pi = open(a.ntsc, "rb"), open(a.pal, "rb")
+    V = om.Overlay(*om.level_overlay(ni, 0))
+    for lv in [x for x in a.levels.split(",")]:
+        # the direct map: NTSC-U Veldin matched in the PAL overlay (both discs), as overlay_match writes it
+        if lv == "front":
+            _r, pelf, _v = disc_region(pi)
+            L = boot_overlay(root_file(pi, pelf))
+        else:
+            L = om.Overlay(*om.level_overlay(pi, int(lv)))
+        _st, fmap, _e, _a, _m, sizes, pairs, _b = om.map_overlays(V, L)
+        dfn, dsz = dict(fmap), {x: sizes[x] for x in fmap}
+        ddata = map_points(V, L, fmap, sizes, pairs)
+        mine = Path(a.maps) / ("front_reloc.txt" if lv == "front" else f"level{lv}.txt")
+        mfn, mdata = read_map(mine)
+        msz = {int(l.split()[1], 16): int(l.split()[3], 16) for l in mine.read_text().splitlines() if l.startswith("fn ")}
+        dk, mk, dfk, mfk = sorted(ddata), sorted(mdata), sorted(dfn), sorted(mfn)
+        res = collections.Counter()
+        diffs = []
+        for x in sorted(data_lit | code_lit):
+            if x >= 0x1EAA00 and x in code_lit or x >= 0x1EAA00 and x not in data_lit:
+                u, v = xlate_code(dfn, dsz, dfk, ddata, x), xlate_code(mfn, msz, mfk, mdata, x)
+                kind = "code"
+            else:
+                u, v = xlate_data(ddata, dk, x), xlate_data(mdata, mk, x)
+                kind = "data"
+            if u == v:
+                res[kind + (" same" if u is not None else " both untranslated")] += 1
+                if u is None:
+                    diffs.append(f"    {kind} {x:08x}: untranslated in both (kept)")
+            else:
+                res[kind + " differ"] += 1
+                diffs.append(f"    {kind} {x:08x}: direct {u if u is None else '%08x' % u}, region {v if v is None else '%08x' % v}")
+        fn_same = sum(1 for n in dfn if mfn.get(n) == dfn[n])
+        print(f"  level {lv}: fn lines direct {len(dfn)}, region {len(mfn)}, the same {fn_same}; the ports' literals: "
+              + ", ".join(f"{k} {v}" for k, v in sorted(res.items())))
+        for d in diffs[: a.show]:
+            print(d)
+
+
+def level_literals():
+    """{level: {address}}: the level-only ports' literals (`L<n>_ADDR(0x...)`), and the boot module's
+    (`FR(0x...)`) under 'boot'."""
+    out = subprocess.run(["grep", "-rhoE", r"\b(L[0-9]+_(ADDR|CASE)\(|FR\(|LvlConst<[0-9]+, )0x[0-9a-fA-F]+", str(ROOT / "src/game")],
+                         capture_output=True, text=True).stdout.splitlines()
+    lits = collections.defaultdict(set)
+    for t in out:
+        m = re.match(r"(?:L([0-9]+)_(?:ADDR|CASE)\(|(FR)\(|LvlConst<([0-9]+), )(0x[0-9a-fA-F]+)", t)
+        lits["boot" if m.group(2) else (m.group(1) or m.group(3))].add(int(m.group(4), 16))
+    return lits
+
+
+def cmd_check_levels(a):
+    """The level-only and boot module literals translated through the table's runs (as the runtime does)
+    against the direct maps (NTSC-U level N matched in the PAL level N, both discs)."""
+    _disc, units = read_table(a.table)
+    lits = level_literals()
+    ni, pi = open(a.ntsc, "rb"), open(a.pal, "rb")
+    bad_total = 0
+    order = sorted(lits, key=lambda k: 99 if k == "boot" else int(k))
+    for name in order:
+        if a.levels and name not in a.levels.split(","):
+            continue
+        if name == "boot":
+            _r, nelf, _v = disc_region(ni)
+            _r, pelf, _v = disc_region(pi)
+            V, L = boot_overlay(root_file(ni, nelf)), boot_overlay(root_file(pi, pelf))
+        else:
+            V, L = om.Overlay(*om.level_overlay(ni, int(name))), om.Overlay(*om.level_overlay(pi, int(name)))
+        _st, fmap, _e, _am, _m, sizes, pairs, _b = om.map_overlays(V, L)
+        dfn, dsz = dict(fmap), {x: sizes[x] for x in fmap}
+        ddata = map_points(V, L, fmap, sizes, pairs)
+        dk, dfk = sorted(ddata), sorted(dfn)
+        R = units[name]
+        res, diffs = collections.Counter(), []
+        for x in sorted(lits[name]):
+            if x < CORE_END:
+                res["below the overlay (never translated)"] += 1
+                continue
+            if x >= V.code_base:
+                u, v, kind = xlate_code(dfn, dsz, dfk, ddata, x), R.code_fwd(x), "code"
+            else:
+                u, v, kind = xlate_data(ddata, dk, x), R.data_fwd(x), "data"
+            if u == v:
+                res[kind + (" same" if u is not None else " both untranslated")] += 1
+                if u is None:
+                    diffs.append(f"    {kind} {x:08x}: untranslated in both (kept)")
+            elif u is None:
+                res[kind + " direct has none"] += 1
+                diffs.append(f"    {kind} {x:08x}: direct none, region {v:08x}")
+            else:
+                res[kind + " differ"] += 1
+                bad_total += 1
+                diffs.append(f"    {kind} {x:08x}: direct {u:08x}, region {v if v is None else '%08x' % v}")
+        print(f"  {name}: {len(lits[name])} literals: " + ", ".join(f"{k} {v}" for k, v in sorted(res.items())))
+        for d in diffs[: a.show]:
+            print(d)
+    print(f"[region_maps] {bad_total} literals translated differently from the direct maps")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    t = sub.add_parser("table")
+    t.add_argument("--pal", default=str(ROOT / "assets/iso/Ratchet Clank.iso"))
+    t.add_argument("--ntsc", default=str(ROOT / "assets/iso/rac1-ntsc-u.iso"))
+    t.add_argument("-o", required=True)
+    p = sub.add_parser("apply")
+    p.add_argument("--iso", required=True)
+    p.add_argument("--elf", required=True, help="the disc's boot ELF (SCES_509.16), extracted")
+    p.add_argument("--table", required=True)
+    p.add_argument("-o", required=True)
+    c = sub.add_parser("check")
+    c.add_argument("--maps", required=True, help="apply's output")
+    c.add_argument("--pal", default=str(ROOT / "assets/iso/Ratchet Clank.iso"))
+    c.add_argument("--ntsc", default=str(ROOT / "assets/iso/rac1-ntsc-u.iso"))
+    c.add_argument("--levels", default=",".join(str(i) for i in range(19)) + ",front")
+    c.add_argument("--show", type=int, default=8)
+    k = sub.add_parser("check-levels")
+    k.add_argument("--table", required=True)
+    k.add_argument("--pal", default=str(ROOT / "assets/iso/Ratchet Clank.iso"))
+    k.add_argument("--ntsc", default=str(ROOT / "assets/iso/rac1-ntsc-u.iso"))
+    k.add_argument("--levels", default="", help="e.g. 3,5,boot (default: every level with literals)")
+    k.add_argument("--show", type=int, default=8)
+    a = ap.parse_args()
+    {"table": cmd_table, "apply": cmd_apply, "check": cmd_check, "check-levels": cmd_check_levels}[a.cmd](a)
+
+
+if __name__ == "__main__":
+    main()

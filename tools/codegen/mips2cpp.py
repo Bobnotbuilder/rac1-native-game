@@ -39,7 +39,7 @@ def off(o):
 def lit(v, wrap):
     v &= 0xFFFFFFFF
     if OVL_LO <= v < OVL_HI:
-        if wrap == 'none':  # the boot module's own addresses: no relocation (tools/codegen/gen/mkall/title_sky.json)
+        if wrap == 'none':  # no relocation
             return f'0x{v:08x}u'
         w = wrap.split('/')
         w = w[0] if len(w) == 1 or v < 0x1EAA00 else w[1]  # "OV/OVF": data / code
@@ -435,8 +435,8 @@ def load_hooks(path, lvl):
     if not path or not os.path.exists(path):
         return hooks, labels
     for line in open(path):
-        if not line.strip() or line.lstrip().startswith('#'):
-            continue
+        if not line.strip() or line.lstrip().startswith('#') or re.match(r'^L\d+\s+PAL:', line):
+            continue  # (`PAL:` points: the PAL build's code, moved onto a stand-in by mkall.py)
         m = re.match(r'^(L\d+)\s+(0x[0-9a-fA-F]+)\s*(?::\s*(.*?)|\s+(label))\s*$', line.rstrip('\n'))
         if not m:
             print('mips2cpp: bad hook line: ' + line.rstrip(), file=sys.stderr)
@@ -459,7 +459,7 @@ def main():
     ap.add_argument('--ret', default='void')
     ap.add_argument('--callees', default=None)
     ap.add_argument('--jt', action='append', default=[])
-    ap.add_argument('--const-wrap', default='L1_ADDR', help='L1_ADDR, or OV/OVF (data / code) for a port at Veldin addresses')
+    ap.add_argument('--const-wrap', default='L1_ADDR', help='L1_ADDR, OV/OVF (data / code) for a port at Veldin addresses, FR for the boot module\'s own')
     ap.add_argument('--veldin', action='store_true', help='a Veldin-address port: orig comment `0x...`, the jump tables switch on ovl_code_to_veldin')
     ap.add_argument('--ptr-args', default='')
     ap.add_argument('--local', action='append', default=[], help='start:end (hex): a routine reached by bal that shares the caller\'s registers (hand-written asm with its own register contract), appended to the listing: its jr ra returns to the bal sites')
@@ -698,7 +698,22 @@ def main():
         # a `lui` page kept across a label is re-added by an unfolded addiu/ori: the page must be raw and the sum wrapped
         import re as _re
         page = {}
+        # a branch-likely's block (`if (c) {` its delay slot, `goto` `}`) runs only when the branch is taken: the code after it
+        # sees the pages from before it (the Vendor's start 0x29a884: `bnel v1,s2` with `lui v0,0x17` in its slot, then
+        # `lw a1,0xd0(v0)` on the fall-through path read 0x1700d0 instead of the centre item's id, issue #27)
+        blocks = []
         for i, ln in enumerate(out):
+            if _re.match(r'\s*if \(.*\) \{  //', ln):
+                blocks.append(dict(page))
+                continue
+            if _re.match(r'\s*\{  //', ln):
+                blocks.append(None)
+                continue
+            if _re.match(r'\s*\}\s*$', ln) and blocks:
+                b = blocks.pop()
+                if b is not None:
+                    page = b
+                continue
             m = _re.match(r'(\s*)set32\((\w+), (?:OVF?|L1_ADDR)\(0x([0-9a-f]{4})0000u\)\);(.*lui )', ln)
             if m:
                 page[m.group(2)] = int(m.group(3), 16) << 16

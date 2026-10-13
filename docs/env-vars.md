@@ -1,13 +1,16 @@
 # Environment variables
 
-rac1-native reads a number of `RAC1_*` environment variables. This page lists all of them: 274 in
+rac1-native reads a number of `RAC1_*` environment variables. This page lists all of them: 279 in
 total, in three groups.
 
 | Group | Count | Who it is for |
 |---|---|---|
 | [Player](#player-variables) | 18 | Settings a player may want to change: files, window, audio, the ISO |
-| [Debugging](#debugging-variables) | 202 | Developers: profilers, overlays, switching a renderer or an optimisation on or off to compare |
-| [Automated testing](#automated-testing-variables) | 54 | Scripted and headless runs: frame counts, screenshots, simulated input, self-checks |
+| [Debugging](#debugging-variables) | 205 | Developers: profilers, overlays, switching a renderer or an optimisation on or off to compare |
+| [Automated testing](#automated-testing-variables) | 56 | Scripted and headless runs: frame counts, screenshots, simulated input, self-checks |
+
+The oracle (`build/tests/ovl_oracle`) reads variables of its own (`ORACLE_*`, `RAC1_ORACLE_DUMPS`): see
+[The oracle](oracle.md).
 
 ## When a variable is honoured
 
@@ -30,7 +33,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | Variable | Values and default | What it does |
 |---|---|---|
 | `RAC1_ADVANCED_FILE` | path; default $XDG_CONFIG_HOME/rac1-native/advanced_options.txt, else ~/.config/rac1-native/advanced_options.txt | Overrides the location of the text file where the Advanced (enhancement) settings are loaded from and saved to. |
-| `RAC1_AUDIO_DEVICE` | set (any value) = open the audio device in a headless run; default off in headless (a windowed run always opens it) | Lets a headless run open the real sound device (headless otherwise has no audio output), to test audio at a given frame rate. |
+| `RAC1_AUDIO_DEVICE` | set (any value) = open the audio device in a headless run; `null` = miniaudio's null device (nothing is heard); default off in headless (a windowed run always opens it) | Lets a headless run open the real sound device (headless otherwise has no audio output), to test audio at a given frame rate; `null` runs the queue, the IOP's mirror and their timing without a sound card or the speakers, also in a window. |
 | `RAC1_AUDIO_PERIODS` | integer N; default 3 | Number of periods in the audio device's buffer; with RAC1_AUDIO_PERIOD_MS it sets the output latency and can be raised if sound crackles. |
 | `RAC1_AUDIO_PERIOD_MS` | integer milliseconds; default 10 | Length of one period of the audio device's buffer; raise it together with or instead of the period count if sound crackles. |
 | `RAC1_CONTROLS_FILE` | path; default $XDG_CONFIG_HOME/rac1-native/controls.txt, else ~/.config/rac1-native/controls.txt | Overrides the location of the controls (key and pad bindings) file; in a headless run, setting it also makes control changes get saved there. |
@@ -69,6 +72,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_CAM_TRACE` | set (any value) = on; default off | Prints every camera switch to stderr. |
 | `RAC1_CARD_LOG` | set (any value) = on; default off | Prints a line whenever the memory card screens or machines change state (UI state, flags, level, slot, owned items, bolts). |
 | `RAC1_CHAIN_LOG` | set (any value) = on; default off | Every host frame prints the address range of the graphics DMA chain that is walked and whether it runs. |
+| `RAC1_DEVICE_DUMP` | file path; unset = no dump | Writes what the audio device is given, as played (raw 48 kHz stereo signed 16-bit PCM): the queue's skips, underruns and the IOP's frames played alone are in it, to look for clicks; unlike RAC1_AUDIO_DUMP (the game's IOP's output). |
 | `RAC1_EMIT_MAX_SHARE` | fraction 0 to 1; default 0.35 | The modern lighting's automatic emitters: a warm-coloured class glowing over more than this share of its surface is taken as a bright material, not a lamp. |
 | `RAC1_FADE_LOG` | set (any value) = on; default off | Prints the frames of the game's blocking loops (fades and waits) as they run. |
 | `RAC1_FPU_NEAREST` | 1 = host round-to-nearest; default off (round toward zero as the PS2) | Turns off the PS2-style float rounding so the host's normal rounding is used, only to compare behaviour. |
@@ -131,6 +135,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_MRP_EFFECTS_SKIP` | 0 = always run the effects shadow, 1 = skip it when nothing would change, 2 = run it and check that prediction; default 1 | Controls the skipping of the widescreen effects shadow pass when it would change nothing. |
 | `RAC1_MRP_FOG` | 0 = off, nonzero = on; unset = built-in default | Switches the modern pipeline's own fog for mobys on or off, to compare with the original look. |
 | `RAC1_MRP_FX` | 0 = off, anything else = on; default on | Switches the modern pipeline's handling of particle and effect drawing off to return to the original path for effects. |
+| `RAC1_MRP_FX_ATLAS_CAP` | integer layers; default 1024 (or the GL's GL_MAX_ARRAY_TEXTURE_LAYERS, if lower) | Caps the modern effects' texture atlas at this many layers (its least recently drawn layers are then reused), to exercise the reuse with a small cap. |
 | `RAC1_MRP_FX_DEBUG` | any value = on; default off | Prints debug output from the modern effects (particles, glows) drawing. |
 | `RAC1_MRP_FX_HIDE` | any value = on; default off | Does not draw the effects the modern pipeline takes over, to see what they change in the image. |
 | `RAC1_MRP_FX_INVENTORY` | any value = on; default off | Takes an inventory of the producers (draw list functions) of effects as the game runs them and reports it. |
@@ -166,6 +171,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_OWN_OVERLAY` | 0 = run every level on Veldin's overlay image; anything else or unset = each level on its own overlay | For comparison, makes every level run on the first level's overlay instead of its own. |
 | `RAC1_PACE_GAME` | 0 = off; default on | When the frame cap is set, also paces the game to 60 Hz times the speed factor. Setting 0 stops the game loop being held to that rate; for timing comparisons. |
 | `RAC1_PACING` | 0 = the older pacing; default the current frame pacer | Switches the host frame pacer back to the older legacy mode, to compare. |
+| `RAC1_PAD_FALLBACK` | `force`, `0`; default: on for controllers with no mapping | On Linux, a controller with no mapping and the Xbox driver's layout gets the Xbox layout ([Input](input.md#how-the-host-builds-the-packet)). `force` gives it even to a mapped controller of that layout (to test the fallback with a known pad); `0` turns the fallback off. |
 | `RAC1_PART_TRACE` | any value = on; default off | Every 30 frames prints the live particles counted by type. |
 | `RAC1_PICKUP_LOG` | integer period in frames; unset = off | Every given number of frames prints the live item pickups and crates within 15 units of the hero (class, state, item, amount, timer, velocity). |
 | `RAC1_PIPELINE` | 0 = off, any other integer = on; unset = the saved setting | Forces the host's pipelining setting on or off, for comparison. |
@@ -300,6 +306,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_POKE8` | frame:address=byte pairs separated by commas, numbers decimal or 0x hex, e.g. 100:0x14bec0=1; unset = none | Writes the given bytes to EE RAM at the given frames, to set game state in scripted runs. |
 | `RAC1_RAMDUMP` | frame,filename | At the given frame writes the whole 32 MB of EE RAM plus the scratchpad to the file, for offline comparison. |
 | `RAC1_RAMHASH` | file path; unset = off | After each game frame appends per-page hashes of EE RAM and scratchpad to the file, so two runs can be compared. |
+| `RAC1_REALTIME` | 1 = on; default off | A headless run steps the game as a window does: 60 game frames a second of the wall clock, several in one host frame when the host is slower, the stalls not caught up; with RAC1_FPS_CAP (the host frames' rate), RAC1_PACE_GAME=0 (a cap above 60, as VSync at 75 Hz), RAC1_HOST_DELAY_MS and RAC1_AUDIO_DEVICE=null it measures the game's speed and the sound's queue as a player's machine would. Prints `[pace]` (game steps a second) at the end. |
 | `RAC1_SEQ_TRACE` | integer n; default 0 (off) | During a simulated-input script, every n frames prints the hero state, position, game mode, level and bolts. |
 | `RAC1_SEQ_WATCH` | integer moby class; default off | During a simulated-input script, traces every moby of that class each frame (state, flags, position, first pvar words), plus the hero-freeze word and the active camera. |
 | `RAC1_SHOTS` | comma-separated list of frame numbers, e.g. 100,300; default none | Saves a screenshot shot_<frame>.ppm in the current directory when each listed game frame is shown, and prints a line with the game state at that frame. |
@@ -310,6 +317,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_TITLE_HOST` | 0 or 1; unset = the title scene is drawn through the normal chain (modern or faithful) | 1 draws the title screen's scene with the older host renderers instead; 0 forces the normal chain. |
 | `RAC1_TITLE_WAIT` | integer frames; default 60 | With a RAC1_SIM_INPUT title: script, how many frames after the title appears before Start is pressed. |
 | `RAC1_UNLOCK_PLANETS` | comma-separated level numbers, e.g. 2,3,4; unset = none | At the first gameplay frame, makes those planets reachable from the ship by calling the game's own unlock routine, so the galactic map shows them. |
+| `RAC1_UPDATE_FAKE` | x.y.z (a release) or dev:N (N new commits on main); unset = off | Offers a made-up update to the update notice instead of asking GitHub (no network), so the main menu's panel can be seen and tried: with `--debug-tools`, or headless with RAC1_ADVANCED=1 and RAC1_BOOT=1 (a headless run never checks for real). Skip Version applies to it as to a real one (`update_skip` in advanced_options.txt). |
 | `RAC1_VENDOR_OPEN` | button bitmask (decimal or 0x hex); default 0x10 (triangle) | With the RAC1_SIM_INPUT vendor script, the button press used to open the vendor screens (for example 0x20 for circle). |
 | `RAC1_VU_SELFCHECK` | any value = on; default off | Runs each fast VU1 port and the exact port side by side and reports on stderr when their results differ; a progress line every 5000 programs. |
 | `RAC1_WORLD_MRP_CHECK` | any value = on; default off | Verification mode for the modern world renderer: it compares the triangles it builds against the CPU reference and also disables the GPU fast paths. |

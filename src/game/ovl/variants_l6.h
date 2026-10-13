@@ -19,8 +19,13 @@ constexpr int BLARG = 6;
 // orig: (host) the current translation target is Blarg's Nebula G34 overlay
 inline bool on_blarg() { return on_level(BLARG); }
 
-// A level-6 address of the port's own (level-only data / code, not a Veldin equivalent): never translated.
-#define L6_ADDR(a) (a)
+// A level-6 address of the port's own (level-only data / code, not a Veldin equivalent): no Veldin
+// translation; on another region's disc, the region table's.
+#define L6_ADDR(a) LVL_ADDR(6, a)
+// the same address as a `case` label: its switch compares lvl_key(pointer)
+#define L6_CASE(a) (a)
+// a `lui` half kept apart from its low half (ovl_reloc.h lvl_page): never translated
+#define L6_PAGE(a) LVL_PAGE(a)
 
 }  // namespace rac1
 

@@ -13,7 +13,11 @@ import os
 import struct
 import sys
 
-ELF_DEFAULT = (os.environ.get('RAC1_ASSETS') or os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'assets')) + '/dumps/SCUS_971.99'
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'overlay_match'))
+import region_view  # noqa: E402
+
+# the disc's own boot ELF (the VU programs and their packets are below the boot module: the same bytes in every region's)
+ELF_DEFAULT = region_view.boot_elf_path(os.environ.get('RAC1_ASSETS') or os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'assets'))
 
 
 class Elf:

@@ -79,6 +79,22 @@ code reading these fields.
   then a `gamecontrollerdb.txt` next to `controls.txt` (by default in `~/.config/rac1-native/`), then
   the `SDL_GAMECONTROLLERCONFIG` environment variable (`load_controller_db`). A controller missing
   from the database can be added in either of the last two places.
+- **Controllers missing from the database.** On Linux, a controller with no mapping that has the
+  layout of the kernel's Xbox driver (`xpad`: 11 buttons, or 12 with a Share button, 6 axes and a
+  D-pad) is given the Xbox layout (A, B, X, Y, the bumpers, Back, Start, Guide, the sticks and their
+  clicks, the triggers, the D-pad). Many Xbox-compatible controllers are such. Any other controller
+  with no mapping is not used. In both cases the log names it, with its GUID:
+
+  ```
+  [controls] joystick 0: <name> (GUID 0300...): no mapping, not used (add its mapping: docs/input.md)
+  ```
+
+  To add its mapping, write one line in SDL's format (`<GUID>,<name>,a:b0,b:b1,...,platform:Linux,`)
+  into `~/.config/rac1-native/gamecontrollerdb.txt`. Tools such as SDL's `controllermap`, or Steam's
+  controller settings (which set `SDL_GAMECONTROLLERCONFIG`), can make one. Please also send it to
+  [SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB), or in a bug report here.
+  For testing, `RAC1_PAD_FALLBACK=force` (with `--debug-tools`) gives the Xbox layout even to a mapped
+  controller of that layout, and `RAC1_PAD_FALLBACK=0` turns the fallback off.
 - **Keyboard and mouse.** Bound like any other input. Stick directions can be bound to keys (full
   deflection) or to mouse movement.
 - **Mouse look.** When the right stick is bound to the mouse and mouse look is on, a left click in the
