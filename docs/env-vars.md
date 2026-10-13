@@ -132,6 +132,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_MRP_EFFECTS_SKIP` | 0 = always run the effects shadow, 1 = skip it when nothing would change, 2 = run it and check that prediction; default 1 | Controls the skipping of the widescreen effects shadow pass when it would change nothing. |
 | `RAC1_MRP_FOG` | 0 = off, nonzero = on; unset = built-in default | Switches the modern pipeline's own fog for mobys on or off, to compare with the original look. |
 | `RAC1_MRP_FX` | 0 = off, anything else = on; default on | Switches the modern pipeline's handling of particle and effect drawing off to return to the original path for effects. |
+| `RAC1_MRP_FX_ATLAS_CAP` | integer layers; default 1024 (or the GL's GL_MAX_ARRAY_TEXTURE_LAYERS, if lower) | Caps the modern effects' texture atlas at this many layers (its least recently drawn layers are then reused), to exercise the reuse with a small cap. |
 | `RAC1_MRP_FX_DEBUG` | any value = on; default off | Prints debug output from the modern effects (particles, glows) drawing. |
 | `RAC1_MRP_FX_HIDE` | any value = on; default off | Does not draw the effects the modern pipeline takes over, to see what they change in the image. |
 | `RAC1_MRP_FX_INVENTORY` | any value = on; default off | Takes an inventory of the producers (draw list functions) of effects as the game runs them and reports it. |

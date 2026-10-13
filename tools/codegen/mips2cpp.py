@@ -698,7 +698,22 @@ def main():
         # a `lui` page kept across a label is re-added by an unfolded addiu/ori: the page must be raw and the sum wrapped
         import re as _re
         page = {}
+        # a branch-likely's block (`if (c) {` its delay slot, `goto` `}`) runs only when the branch is taken: the code after it
+        # sees the pages from before it (the Vendor's start 0x29a884: `bnel v1,s2` with `lui v0,0x17` in its slot, then
+        # `lw a1,0xd0(v0)` on the fall-through path read 0x1700d0 instead of the centre item's id, issue #27)
+        blocks = []
         for i, ln in enumerate(out):
+            if _re.match(r'\s*if \(.*\) \{  //', ln):
+                blocks.append(dict(page))
+                continue
+            if _re.match(r'\s*\{  //', ln):
+                blocks.append(None)
+                continue
+            if _re.match(r'\s*\}\s*$', ln) and blocks:
+                b = blocks.pop()
+                if b is not None:
+                    page = b
+                continue
             m = _re.match(r'(\s*)set32\((\w+), (?:OVF?|L1_ADDR)\(0x([0-9a-f]{4})0000u\)\);(.*lui )', ln)
             if m:
                 page[m.group(2)] = int(m.group(3), 16) << 16
