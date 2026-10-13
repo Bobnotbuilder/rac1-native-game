@@ -24,7 +24,8 @@
 //   nice -10 game threads; default on in a window), RAC1_AUDIO_QUEUE=0354 (the earlier queue policy, for comparison),
 //   RAC1_AUDIO_LOG=1 (the queue's summary every 10 s), RAC1_AUDIO_PERIOD_MS / RAC1_AUDIO_PERIODS (the device's buffer),
 //   RAC1_FRAME_PROF_LONG=ms (with RAC1_FRAME_PROF: the host frames longer than that, stage by stage; default 30), a headless
-//   run with RAC1_FPS_CAP=n paced at n (testing the audio device at 60 fps)
+//   run with RAC1_FPS_CAP=n paced at n (testing the audio device at 60 fps), RAC1_REALTIME=1 (a headless run stepped on the
+//   wall clock as a window; with RAC1_AUDIO_DEVICE=null, the null sound device; RAC1_DEVICE_DUMP=file what the device plays)
 // ADR 0013: RAC1_IOP_MIRROR=0 (the game's IOP's output played, not
 //   the host's mirror of the IOP), RAC1_IOP_VERIFY=1 (the mirror never alone, each of its vsyncs compared with the game's
 //   IOP's mix: counted at exit), RAC1_LOAD_PROF=1 (each load's steps timed: "[load]" lines)
@@ -146,6 +147,7 @@ bool audio_out_start();  // audio_out.cpp
 void audio_out_push(const int16_t* pcm, int frames);
 void audio_out_set_alone(bool ok);
 uint64_t audio_out_alone_total();
+void audio_out_step(bool in_step);
 namespace rac1 {
 void gs_texture_cache_clear();  // runtime/gs/gs_renderer.cpp (its header clashes with gs_emu.h)
 }
@@ -2053,7 +2055,20 @@ int main(int argc, char** argv) {
     int display_settle = 0;  // (frames after a change before the window's size is reported back: the window manager answers late)
     bool unlock_done = false;  // RAC1_UNLOCK_PLANETS done
     int hero_at_done = 0;  // RAC1_HERO_AT: the entries placed (several, '/'-separated, in order)
+    // (testing, RAC1_REALTIME) the game's speed over the run, 60 = real time
+    const auto run_t0 = std::chrono::steady_clock::now();
+    uint64_t run_host_frames = 0;
+    bool pace_reported = false;
+    auto pace_report = [&] {
+        if (std::getenv("RAC1_REALTIME") == nullptr || pace_reported) return;
+        pace_reported = true;
+        const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - run_t0).count();
+        std::printf("[pace] %llu game steps in %llu host frames, %.2f s: %.2f game steps a second, %.2f host frames a second\n",
+                    static_cast<unsigned long long>(frame), static_cast<unsigned long long>(run_host_frames), secs, static_cast<double>(frame) / secs,
+                    static_cast<double>(run_host_frames) / secs);
+    };
     while (running && !glfwWindowShouldClose(window)) {
+        ++run_host_frames;
         glfwPollEvents();
         if (!headless) {  // Options > Graphics: the window's settings changed there applied now; the window as it is reported
             const bool is_fs = glfwGetWindowMonitor(window) != nullptr;
@@ -2103,8 +2118,11 @@ int main(int argc, char** argv) {
         if (host_delay_ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(host_delay_ms));  // (testing: a slow host frame)
         bool iop_alone = true;  // (the IOP's mirror may play alone while the game's thread stalls; not while the host holds the game)
 #ifdef RAC1_DEVTOOLS
-        if (!headless) {
-            dt::dev_menu_poll(window);
+        // (testing) RAC1_REALTIME=1: a headless run steps the game as a window does (60 game frames a second of the wall
+        // clock, the stalls not caught up), with RAC1_FPS_CAP its host frames' rate and RAC1_AUDIO_DEVICE=null the sound's queue
+        static const bool realtime_test = headless && std::getenv("RAC1_REALTIME") != nullptr && std::atoi(std::getenv("RAC1_REALTIME")) != 0;
+        if (!headless || realtime_test) {
+            if (!headless) dt::dev_menu_poll(window);
             const dt::DevSettings& ds = dt::dev_settings();
             const bool paused = ds.paused || (ds.open && ds.pause_when_open);
             iop_alone = !paused && ds.speed == 1.0f;
@@ -2149,6 +2167,7 @@ int main(int argc, char** argv) {
             }
 #endif
             const auto t0 = std::chrono::steady_clock::now();
+            audio_out_step(true);  // (the IOP's mirror plays alone only while the game's thread is stuck inside a step: a stall)
             render_view_projection_undo();  // (the game's own projection back before its update: its state is a 4:3 run's)
             {  // the MRP skips what only the GS / VU1 path needs: asked
                // before the update, for a frame the MRP will draw (not the title, the level exit, a movie, the debug diffs)
@@ -2224,6 +2243,7 @@ int main(int argc, char** argv) {
                 if (ramhash != nullptr) ram_hash_frame(ramhash, game_frame);
                 ++game_frame;
             }
+            audio_out_step(false);
             const double step_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
             update_ms += step_ms;
             g_last_steps_ms = std::max(g_last_steps_ms, step_ms);
@@ -2976,6 +2996,7 @@ int main(int argc, char** argv) {
         if (title_view) mrp_world_drop_frame();  // (a pending scene's capture done before the bytes go back: none when drawn)
         mrp_title_view_swap_out();
         if (max_frames != 0 && frame >= max_frames) {
+            pace_report();
             sample_prof_stop();
             mrp_scene_report();
             mrp_moby_report();
@@ -3042,6 +3063,7 @@ int main(int argc, char** argv) {
             }
         }
     }
+    pace_report();
     sample_prof_stop();
     fprof.report();
     if (fprof.on && !pacer.legacy)

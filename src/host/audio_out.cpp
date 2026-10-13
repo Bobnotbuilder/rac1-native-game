@@ -33,7 +33,8 @@
 // (ADR 0013) The queue's producer is the IOP's mirror on a thread of its own (the "IOP thread"), not the game's
 // thread. The game's IOP (runtime/iop/snd989_iop.h) records what it is sent and each vsync; the IOP thread replays them on
 // the mirror, a second 989snd, and queues its output: sample for sample the game's IOP's while the game keeps up. When the
-// game's thread stalls (a load, a long frame: more than 20 ms since its last vsync) and the queue runs low, the IOP thread
+// game's thread stalls (a load, a long frame: inside a game step 20 ms after its last vsync, or no vsync for longer than the
+// host's usual gaps) and the queue runs low, the IOP thread
 // renders the mirror alone, a game frame's worth at a time, until the game's vsyncs come back: the music and the sounds
 // already playing go on, as on the PS2, whose IOP is a processor of its own. The game's IOP (what the game reads back) does
 // not move: only the mirror's time runs ahead. Not while the host holds the game (the debug menu's pause or its slow
@@ -112,6 +113,9 @@ std::atomic<int> g_target_now{kStartTarget};
 std::atomic<uint64_t> g_rate_n{0};
 std::atomic<uint64_t> g_device_tid{0};
 std::atomic<uint64_t> g_alone_frames{0}, g_alone_runs{0};  // (the IOP's mirror played alone; since the last summary)
+// the longest recent gap between the game's bursts of vsyncs (the IOP thread's measure, see iop_loop): the queue's target is not
+// lowered under it (with a quarter more) plus the device's period (at 30 frames a second, or VSync at 75 Hz, a 33 ms target ran dry at each gap)
+std::atomic<double> g_burst_gap_ms{0.0};
 std::atomic<uint64_t> g_alone_total{0};                    // (the whole run's)  // (the device's thread, seen by its first callback)
 
 inline int16_t at(uint64_t i, int c) { return g_ring[(i & (kCap - 1)) * 2 + static_cast<uint64_t>(c)]; }
@@ -134,7 +138,15 @@ void atomic_add(std::atomic<double>& a, double v) {
     }
 }
 
-void pull(ma_device*, void* out, const void*, ma_uint32 frames_u) {
+// (testing) RAC1_DEVICE_DUMP=file: what the device is given, as played (48 kHz stereo s16): the queue's skips, underruns and
+// the IOP's frames alone in it, to look for clicks
+FILE* g_device_dump = std::getenv("RAC1_DEVICE_DUMP") != nullptr ? std::fopen(std::getenv("RAC1_DEVICE_DUMP"), "wb") : nullptr;
+void pull_queue(ma_device* d, void* out, const void* in, ma_uint32 frames_u);
+void pull(ma_device* d, void* out, const void* in, ma_uint32 frames_u) {
+    pull_queue(d, out, in, frames_u);
+    if (g_device_dump != nullptr) std::fwrite(out, 4, frames_u, g_device_dump);
+}
+void pull_queue(ma_device*, void* out, const void*, ma_uint32 frames_u) {
     int16_t* o = static_cast<int16_t*>(out);
     const int frames = static_cast<int>(frames_u);
     Reader& rd = g_rd;
@@ -158,8 +170,10 @@ void pull(ma_device*, void* out, const void*, ma_uint32 frames_u) {
     }
 
     // the target lowered after 20 s without running dry
-    if (!g_simple && rd.target > kMinTarget && t - rd.last_dry_ms > 20000.0) {
-        rd.target = std::max(kMinTarget, rd.target - kFrame / 2);
+    const int floor_target = std::max(kMinTarget, static_cast<int>(g_burst_gap_ms.load(std::memory_order_relaxed) * 1.25 * 48.0) +
+                                                      static_cast<int>(g_device.playback.internalPeriodSizeInFrames));
+    if (!g_simple && rd.target - kFrame / 2 >= floor_target && t - rd.last_dry_ms > 20000.0) {
+        rd.target = rd.target - kFrame / 2;
         rd.last_dry_ms = t;
         g_target_now.store(rd.target, std::memory_order_relaxed);
     }
@@ -301,7 +315,16 @@ std::atomic<bool> g_alone_ok{true};
 // (testing) RAC1_IOP_VERIFY: the mirror never alone, so that each of its vsyncs can be compared with the game's IOP's mix
 const bool g_iop_verify = std::getenv("RAC1_IOP_VERIFY") != nullptr;
 std::atomic<double> g_last_vsync_ms{0.0};  // (the game's last vsync recorded, as the IOP thread saw it)
-constexpr double kAloneGapMs = 20.0;         // (the game late: more than a frame's period since its last vsync)
+// The game's thread stalled: inside one game step (a game frame, or a blocking loop's frame) for more than kAloneGapMs since
+// its last vsync (a load, a long frame of the game's code), or no vsync for longer than the host's usual gap between its
+// bursts of vsyncs allows (a long draw or swap: a shader compiled, a texture upload). Not the gaps of a host that runs below
+// 60 frames a second at its pace (the 30 FPS cap: two game frames every 33 ms; VSync at 75 Hz: a host frame of 27 ms every
+// fifth; a heavy scene): those vsyncs come, the game is not late, and the queue absorbs them. Played alone then (on any gap
+// over 20 ms), the mirror's frames were taken off the game's owed frames (orig_main) and the game ran slower than real time
+// (issues #4, #8, #22).
+constexpr double kAloneGapMs = 20.0, kAloneMaxGapMs = 100.0;
+std::atomic<double> g_step_t0_ms{0.0};  // (the game step the game's thread is in: its start, 0 between steps)
+double g_gap_max_ms = 0.0;  // (the IOP thread's: the longest recent gap between the game's vsyncs, decaying)
 int g_alone_fill = 2 * kFrame;              // (the fill under which a stalled game's gap is filled: the device's period + half a frame)
 void ring_push(const int16_t* pcm, int frames);
 
@@ -312,12 +335,16 @@ void iop_loop() {
     double run_t0 = 0.0;  // the game's last vsync before it
     while (g_iop_run.load(std::memory_order_relaxed)) {
         bool did = false;
+        const double last_before = g_last_vsync_ms.load(std::memory_order_relaxed);
         while (rac1::snd989_mirror_next(buf)) {
             ring_push(buf, kFrame);
             g_last_vsync_ms.store(now_ms(), std::memory_order_relaxed);
             did = true;
         }
         if (did) {
+            if (run == 0 && last_before != 0.0)  // (the host's own rhythm, the stalls left out; ~2.3 s half-life at 60 bursts a second)
+                g_gap_max_ms = std::max(std::min(now_ms() - last_before, kAloneMaxGapMs), g_gap_max_ms * 0.995);
+            g_burst_gap_ms.store(g_gap_max_ms, std::memory_order_relaxed);
             if (run != 0) {
                 g_alone_runs.fetch_add(1, std::memory_order_relaxed);
                 static int logged = 0;
@@ -330,7 +357,10 @@ void iop_loop() {
         }
         const double t = now_ms(), last = g_last_vsync_ms.load(std::memory_order_relaxed);
         const int64_t fill = static_cast<int64_t>(g_w.load(std::memory_order_relaxed) - g_r.load(std::memory_order_acquire));
-        if (g_alone_ok.load(std::memory_order_relaxed) && !g_iop_verify && last != 0.0 && t - last > kAloneGapMs && fill < g_alone_fill) {
+        const double step_t0 = g_step_t0_ms.load(std::memory_order_relaxed);
+        const double gap_limit = std::clamp(g_gap_max_ms * 1.25 + 4.0, kAloneGapMs, kAloneMaxGapMs);
+        const bool stalled = (step_t0 != 0.0 && t - step_t0 > kAloneGapMs && t - last > kAloneGapMs) || t - last > gap_limit;
+        if (g_alone_ok.load(std::memory_order_relaxed) && !g_iop_verify && last != 0.0 && stalled && fill < g_alone_fill) {
             if (run++ == 0) run_t0 = last;
             rac1::snd989_mirror_alone(buf);
             ring_push(buf, kFrame);
@@ -348,7 +378,12 @@ void iop_loop() {
 bool audio_out_start() {
     ma_context_config cc = ma_context_config_init();
     cc.threadPriority = ma_thread_priority_realtime;  // (granted where the system allows it, else the default)
-    if (ma_context_init(nullptr, 0, &cc, &g_context) != MA_SUCCESS) {
+    // (testing) RAC1_AUDIO_DEVICE=null: miniaudio's null backend (a timer pulls the queue at 48 kHz, nothing is heard): a
+    // headless run measures the queue, the IOP thread and the game's pacing as a player's would, without a sound device
+    const char* dev = std::getenv("RAC1_AUDIO_DEVICE");
+    const ma_backend null_backend[] = {ma_backend_null};
+    const bool null_dev = dev != nullptr && std::strcmp(dev, "null") == 0;
+    if (ma_context_init(null_dev ? null_backend : nullptr, null_dev ? 1 : 0, &cc, &g_context) != MA_SUCCESS) {
         std::fprintf(stderr, "rac1-native: no audio context\n");
         return false;
     }
@@ -400,6 +435,9 @@ void audio_out_push(const int16_t* pcm, int frames) {
 
 // orig: (host) the host lets the IOP run alone while the game's thread stalls (not while it holds the game: a pause, a slow speed)
 void audio_out_set_alone(bool ok) { g_alone_ok.store(ok, std::memory_order_relaxed); }
+
+// orig: (host) the game's thread enters / leaves a game step (a game frame, or a blocking loop's frame up to its vsync)
+void audio_out_step(bool in_step) { g_step_t0_ms.store(in_step ? now_ms() : 0.0, std::memory_order_relaxed); }
 
 // orig: (host) the game frames the IOP's mirror played alone so far (the host does not run them again as owed game frames)
 uint64_t audio_out_alone_total() { return g_alone_total.load(std::memory_order_relaxed); }

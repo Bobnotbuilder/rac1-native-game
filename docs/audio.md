@@ -62,10 +62,16 @@ The port therefore runs **two copies** of the driver
   and every vsync; the mirror replays them in order, and what it renders is what you hear. While the
   game keeps up, the mirror produces the same samples as the game's IOP (`RAC1_IOP_VERIFY=1` compares
   them every vsync).
-- When the game's thread has not reached a vsync for 20 ms and the queue is running low, the mirror
-  renders **alone** (`snd989_mirror_alone`), so the music and the sounds already playing go on. When
-  the game resumes, the mirror is ahead by the stall's length, as a PS2's IOP would be after a long EE
-  frame.
+- When the game's thread stalls and the queue is running low, the mirror renders **alone**
+  (`snd989_mirror_alone`), so the music and the sounds already playing go on. When the game resumes,
+  the mirror is ahead by the stall's length, as a PS2's IOP would be after a long EE frame, and the
+  host does not run those game frames again. A stall is the game's thread stuck inside one game frame
+  for more than 20 ms after its last vsync (a load), or no vsync for longer than the host's usual gap
+  between its frames (a long draw). A host that simply runs below 60 frames a second (the 30 FPS cap,
+  VSync at 75 Hz, a heavy scene) is not stalled: it runs two or more game frames per host frame and the
+  queue absorbs the gaps (its latency is not lowered below the longest recent gap). Before, any gap
+  over 20 ms counted as a stall, and the game ran slower than real time at those rates (issues #4, #8,
+  #22).
 
 `RAC1_IOP_MIRROR=0` turns the mirror off and plays the game's IOP directly.
 
