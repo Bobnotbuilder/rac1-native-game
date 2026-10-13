@@ -151,6 +151,17 @@ add_subdirectory(src/game)
 option(RAC1_DEVTOOLS "Compile src/_devtools/ (the debug menu)" ON)
 add_subdirectory(src/_devtools)
 
+# ---- tests/oracle/ : the oracle, the ports proved against the original code (developers only: docs/oracle.md) ----
+# Off by default: ./setup.sh never builds it. It needs the generated sources (the NTSC-U disc's) and, for most of its
+# batches, RAM dumps recorded by the developer (assets/dumps/oracle/, never committed).
+option(RAC1_ORACLE "Build the oracle (tests/oracle: build/tests/ovl_oracle, docs/oracle.md)" OFF)
+if(RAC1_ORACLE)
+    if(RAC1_NO_GENERATED)
+        message(FATAL_ERROR "RAC1_ORACLE needs the generated sources (RAC1_NO_GENERATED is ON)")
+    endif()
+    add_subdirectory(tests/oracle)
+endif()
+
 # ---- src/setup/ : setup & asset extraction ----
 add_library(rac1_setup STATIC
     src/setup/kick_trace.cpp

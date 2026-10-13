@@ -40,6 +40,9 @@ tools/
   setup.py         the guided setup (run through setup.sh)
   overlay_match/   generates the per-level address maps from the player's disc
   codegen/         the code generators and their inputs (see "The generated code" below)
+  oracle/          headless runs that record the oracle's RAM dumps (see The oracle)
+tests/
+  oracle/          the oracle: each port checked against the original code (see The oracle)
 cmake/             dependencies downloaded at configure time
 assets/generated/src/
                    the generated code, written by the setup from the player's disc (not in the repository)
@@ -117,6 +120,9 @@ The rules a port follows are in [Overview](overview.md#the-porting-rules). In pr
   `world_light_vu0.cpp`...) are the VU code the game uploads, translated instruction by instruction,
   in an exact form and a faster `_fast` form. They are registered by the hash of the code they
   replace and run when the game starts that code. Most of them are generated files.
+
+The oracle (`tests/oracle/`, built with `-DRAC1_ORACLE=ON`) runs the original code in the R5900
+interpreter beside each port and compares them; see [The oracle](oracle.md).
 
 `src/game/render/` and `src/game/enhance/` are host code that sits beside the port: the renderer
 reads the game's state and draws it; the options pages are built from the game's own menu widgets
