@@ -2173,7 +2173,12 @@ int g_emitters_level = -2;
 bool emissive_rgba(uint32_t c) {
     const float r = static_cast<float>(c & 0xff) / 255.0f, g = static_cast<float>((c >> 8) & 0xff) / 255.0f, b = static_cast<float>((c >> 16) & 0xff) / 255.0f;
     const float mx = std::max({r, g, b}), mn = std::min({r, g, b});
-    return mx >= 0.8f && mx > 0.0f && (mx - mn) / mx >= 0.55f && ((c >> 24) & 0xff) >= 0x40;
+    if (!(mx >= 0.8f && mx > 0.0f && (mx - mn) / mx >= 0.55f && ((c >> 24) & 0xff) >= 0x40)) return false;
+    // Warm diffuse palettes (ochre rock, orange wood, rust, dirt: R dominant, low B, moderate G) often have V in 0.80..0.90;
+    // require genuinely bright emission on warm texels so terrain highlights and wooden beams are not mistaken for bulbs.
+    const bool warm = r >= g && g >= b && b < 0.35f;
+    if (warm && mx < 0.92f && (0.299f * r + 0.587f * g + 0.114f * b) < 0.72f) return false;
+    return true;
 }
 
 // orig: (host) a colour's hue, degrees (0 red, 120 green, 240 blue)
@@ -2268,8 +2273,8 @@ void build_emitters() {
         std::vector<Emitter>& out = model[&tc];
         // a class glowing over much of its surface in a warm colour is a bright material - Eudora's orange trees and woodwork,
         // Rilgar's red and yellow paint -, not a lamp (a lamp's bulb, a panel's strip: a small part of its object). A cool one (cyan, blue:
-        // screens, glass, energy - Veldin's house panels) stays a light. Our choice; a level's lights file can turn a class off ("noauto").
-        static const double max_share = std::getenv("RAC1_EMIT_MAX_SHARE") != nullptr ? std::atof(std::getenv("RAC1_EMIT_MAX_SHARE")) : 0.35;  // (testing)
+        // screens, glass, energy - Veldin's house panels) stays a light unless nearly the whole large mesh is painted that colour.
+        static const double max_share = std::getenv("RAC1_EMIT_MAX_SHARE") != nullptr ? std::atof(std::getenv("RAC1_EMIT_MAX_SHARE")) : 0.15;  // (testing)
         const double share = total_area > 0.0 ? lit_area / total_area : 1.0;
         double mc[3] = {0, 0, 0}, mw = 0;
         for (const auto& [key, cell] : cells) {
@@ -2278,7 +2283,7 @@ void build_emitters() {
         }
         const float hue = mw > 0.0 ? hue_of(mc[0] / mw, mc[1] / mw, mc[2] / mw) : 0.0f;  // (degrees, of the glowing part's mean colour)
         const bool cool = hue >= 165.0f && hue <= 260.0f;
-        const bool material = share > max_share && !cool;
+        const bool material = (!cool && (share > max_share || lit_area > 220.0)) || (cool && share > 0.85 && total_area > 500.0);
         if (std::getenv("RAC1_LIGHTS_TRACE") != nullptr && lit_area > 0.0)
             std::printf("[lights] tie class %d: glowing %.1f of %.1f units^2 (%.0f %%), hue %.0f%s\n", tc.o_class, lit_area, total_area, 100.0 * share, hue,
                         material ? ": a material, not a lamp" : "");
@@ -2291,7 +2296,7 @@ void build_emitters() {
         if (order.size() > 12) order.resize(12);
         for (const Cell* cp : order) {
             const Cell& cell = *cp;
-            if (cell.w < 0.02) continue;  // (a speck)
+            if (cell.w < 0.05) continue;  // (a speck)
             Emitter e;
             for (int l = 0; l < 3; ++l) {
                 e.pos[l] = static_cast<float>(cell.p[l] / cell.w);
@@ -2355,7 +2360,7 @@ void build_emitters() {
         consts[0] = one_u;  // (0x290 x: the 1 / w numerator: STQ as sent)
         std::map<std::tuple<int, int, int>, Cell> cells;
         // per tfrag texture: its whole area, its glowing area and colour, its cells - a texture glowing over much of its
-        // surface in a warm colour is a material (Rilgar's, Eudora's), as for the ties' classes
+        // surface in a warm colour is a material (Rilgar's, Eudora's, Orxon's ground), as for the ties' classes
         struct TexAcc {
             double total = 0.0, lit = 0.0, c[3] = {0, 0, 0};
             std::map<std::tuple<int, int, int>, Cell> cells;
@@ -2429,11 +2434,11 @@ void build_emitters() {
                 const double len = std::sqrt(cx * cx + cy * cy + cz * cz);
                 TexAcc& ta = tex_acc[ti];
                 if (std::isfinite(len) && len * 0.5 <= 400.0) ta.total += 0.5 * len;
-                static const int tf_min_hits = std::getenv("RAC1_TF_HITS") != nullptr ? std::atoi(std::getenv("RAC1_TF_HITS")) : 2;  // (testing)
+                static const int tf_min_hits = std::getenv("RAC1_TF_HITS") != nullptr ? std::atoi(std::getenv("RAC1_TF_HITS")) : 3;  // (testing)
                 if (hits < tf_min_hits) continue;
                 ++dbg[5];
                 const double area = 0.5 * len * hits / 7.0;
-                if (!(area > 0.0) || area > 400.0) continue;  // (a degenerate or a runaway triangle)
+                if (!(area > 0.0) || area > 64.0) continue;  // (a degenerate or large terrain triangle is ground/wall, not a lamp strip)
                 ta.lit += area;
                 ta.c[0] += cr / hits * area;
                 ta.c[1] += cg / hits * area;
@@ -2441,7 +2446,7 @@ void build_emitters() {
                 // (the light a little off its surface, on the upper side: in the surface's plane it lights nothing of it)
                 const double sg = cz < 0.0 ? -1.0 : 1.0;
                 double ctr[3];
-                for (int l = 0; l < 3; ++l) ctr[l] = (q[0][l] + q[1][l] + q[2][l]) / 3.0 + 1.5 * sg * (l == 0 ? cx : l == 1 ? cy : cz) / len;
+                for (int l = 0; l < 3; ++l) ctr[l] = (q[0][l] + q[1][l] + q[2][l]) / 3.0 + 1.2 * sg * (l == 0 ? cx : l == 1 ? cy : cz) / len;
                 Cell& cell = ta.cells[{static_cast<int>(std::floor(ctr[0] / 4.0)), static_cast<int>(std::floor(ctr[1] / 4.0)), static_cast<int>(std::floor(ctr[2] / 4.0))}];
                 cell.w += area;
                 for (int l = 0; l < 3; ++l) cell.p[l] += ctr[l] * area;
@@ -2450,11 +2455,12 @@ void build_emitters() {
                 cell.c[2] += cb / hits * area;
             }
         }
-        for (auto& [ti, ta] : tex_acc) {  // (the textures not a warm material: their cells)
+        for (auto& [ti, ta] : tex_acc) {  // (the textures not a warm material or solid terrain surface: their cells)
             if (!(ta.lit > 0.0)) continue;
             const double share = ta.total > 0.0 ? ta.lit / ta.total : 1.0;
             const float hue = hue_of(ta.c[0] / ta.lit, ta.c[1] / ta.lit, ta.c[2] / ta.lit);
-            const bool material = share > 0.35 && !(hue >= 165.0f && hue <= 260.0f);
+            const bool cool = hue >= 165.0f && hue <= 260.0f;
+            const bool material = (!cool && (share > 0.12 || ta.lit > 70.0 || ta.total > 350.0)) || (cool && (share > 0.75 || ta.lit > 500.0));
             if (std::getenv("RAC1_LIGHTS_TRACE") != nullptr)
                 std::printf("[lights] tfrag texture %d: glowing %.1f of %.1f units^2 (%.0f %%), hue %.0f%s\n", ti, ta.lit, ta.total, 100.0 * share, hue, material ? ": a material" : "");
             if (material) continue;
@@ -2470,7 +2476,7 @@ void build_emitters() {
         if (std::getenv("RAC1_LIGHTS_TRACE") != nullptr) std::printf("[lights] tfrags: entries %zu run %zu tris %zu textured %zu some %zu emissive %zu cells %zu\n", dbg[0], dbg[1], dbg[2], dbg[3], dbg[4], dbg[5], cells.size());
         static const float gain = std::getenv("RAC1_AUTO_LIGHTS_GAIN") != nullptr ? static_cast<float>(std::atof(std::getenv("RAC1_AUTO_LIGHTS_GAIN"))) : 1.0f;  // (testing)
         for (const auto& [key, cell] : cells) {
-            if (cell.w < 0.05) continue;  // (a speck)
+            if (cell.w < 0.10) continue;  // (a speck)
             Emitter w;
             for (int l = 0; l < 3; ++l) w.pos[l] = static_cast<float>(cell.p[l] / cell.w);
             const float area = static_cast<float>(cell.w);
@@ -2483,12 +2489,8 @@ void build_emitters() {
                             cell.c[2] / cell.w);
         }
     }
-    // the lights of a few units around merged into one (a lamp's dozen, a strip's row): fewer lights, so the nearest the frame lights
-    // seldom change (each change a light coming or going)
+    // Merge only truly adjacent emitters of the same fixture (cap cell_size at 4.5 units so separate lamps are never averaged into mid-air)
     const size_t before_merge = g_emitters.size();
-    // the cell grown (x1.5, up to 24 units) while more than kDense (the shaders' 96, less a few for the game's) lights fall within the frame's reach (60 units) of one:
-    // a level dense with glowing things (Rilgar's, Blarg's) never has more near the camera than the shaders light - no light switched
-    // on or off as the camera moves
     constexpr int kDense = 88;
     const std::vector<Emitter> all = g_emitters;
     float cell_size = 3.0f;
@@ -2517,7 +2519,7 @@ void build_emitters() {
                 e.pos[l] = static_cast<float>(a.p[l] / a.w);
                 e.col[l] = static_cast<float>(a.c[l] * sc);
             }
-            e.r = std::min(a.r + 0.5f * cell_size, 6.0f + 0.5f * cell_size);
+            e.r = std::min(a.r + 0.35f * cell_size, 7.5f);
             g_emitters.push_back(e);
         }
         dense = 0;
@@ -2529,8 +2531,8 @@ void build_emitters() {
             }
             dense = std::max(dense, n);
         }
-        if (dense <= kDense || cell_size >= 24.0f) break;
-        cell_size = std::min(cell_size * 1.5f, 24.0f);
+        if (dense <= kDense || cell_size >= 4.5f) break;
+        cell_size = 4.5f;
     }
     if (std::getenv("RAC1_LIGHTS_TRACE") != nullptr) std::printf("[lights] merged in cells of %.1f units: at most %d lights within 60 units of one\n", cell_size, dense);
     std::printf("[lights] level %d: %zu automatic emitters, %zu before merging (%zu from %zu tie classes, %zu from the tfrags; %.0f ms)\n", L.id, g_emitters.size(), before_merge, tie_emitters, classes,
@@ -2894,11 +2896,16 @@ int mrp_world_emitters_near(const float cam[3], float reach, int max, float* pos
     static std::mutex build_m;  // (the scene's worker - the casters' slots - and the shadow pass both ask)
     std::lock_guard<std::mutex> lg(build_m);
     if (g_emitters_level != g_level.id) build_emitters();
-    std::vector<std::pair<float, size_t>> near;
+    static std::vector<std::pair<float, size_t>> near;
+    near.clear();
     for (size_t i = 0; i < g_emitters.size(); ++i) {
         const Emitter& e = g_emitters[i];
-        const float d = std::sqrt((e.pos[0] - cam[0]) * (e.pos[0] - cam[0]) + (e.pos[1] - cam[1]) * (e.pos[1] - cam[1]) + (e.pos[2] - cam[2]) * (e.pos[2] - cam[2])) - e.r;
-        if (d < reach) near.push_back({d, i});
+        const float dx = e.pos[0] - cam[0], dy = e.pos[1] - cam[1], dz = e.pos[2] - cam[2];
+        const float d2 = dx * dx + dy * dy + dz * dz;
+        const float lim = reach + e.r;
+        if (d2 >= lim * lim) continue;
+        const float d = std::sqrt(d2) - e.r;
+        near.push_back({d, i});
     }
     std::sort(near.begin(), near.end());
     const int n = std::min(max, static_cast<int>(near.size()));
