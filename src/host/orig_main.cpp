@@ -1581,7 +1581,7 @@ int main(int argc, char** argv) {
                              "  ./setup.sh --iso <path-to-your-iso>\n"
                              "and start the game from the repository's root.\n\n",
                      have_disc ? "the game's data is missing (assets/)."
-                               : "your disc image was not found (assets/iso/rac1-ntsc-u.iso, or $RAC1_ISO).");
+                               : "your disc image was not found (assets/iso/rac1-ntsc-u.iso or rac1-pal.iso, or $RAC1_ISO).");
         return 1;
     }
     const bool headless = std::getenv("RAC1_HEADLESS") != nullptr;
@@ -1825,6 +1825,10 @@ int main(int argc, char** argv) {
     // contents, the level's header and its files (0x204428) before it runs the overlay.
     sw(0x0015ed84, static_cast<uint32_t>(level));
     sw(0x0015ed80, 0);
+    // the disc's region 0x15ee90 (1: PAL), which the overlay's main (0x23d598, not ported) sets from the
+    // disc's SYSTEM.CNF (the Options' Video page, the save's settings size and folder): set on another region's disc
+    // only. Its video mode stays 0: the PAL game's own 60 Hz mode (Daino's decision).
+    if (disc_other_region()) sw(0x0015ee90, 1);
     // The language 0x15ed88: the overlay's main (0x23d598, not ported) sets it from the console's
     // language (0x12d240; 1 English → 0, 2 French → 2, 3 Spanish → 4, 4 German → 3, 5 Italian
     // → 5, others 0) before the level's load copies the texts of that language (0x241940). The
@@ -1886,7 +1890,7 @@ int main(int argc, char** argv) {
                 }
                 return true;
             })) {
-            std::fprintf(stderr, "rac1-native: cannot read the level from the ISO (assets/iso/rac1-ntsc-u.iso or $RAC1_ISO)\n");
+            std::fprintf(stderr, "rac1-native: cannot read the level from the ISO (%s)\n", disc_path().c_str());
             return 1;
         }
         std::printf("[orig] sound bank %08x\n", lwu(0x0015ed5c));

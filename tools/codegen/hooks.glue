@@ -101,3 +101,17 @@ L8 0x002355c4: if (advanced_rac3_wrench_out()) goto L_2355bc;  // enhancement (L
 L8 0x00239508: if (advanced_rac3_wrench_out()) goto L_239514;  // enhancement (M)
 L11 0x00251f04: if (advanced_rac3_wrench_out()) goto L_251efc;  // enhancement (L)
 L11 0x00255b00: if (advanced_rac3_wrench_out()) goto L_255b0c;  // enhancement (M)
+
+# ---- Points I / J in the PAL build (SCES-50916) of hero_horizontal_velocity, for the stand-ins generated from the PAL disc
+# (tools/codegen/ovlist.py: the PAL build changed this function, its NTSC-U code is not on that disc). `L<n> PAL:0xADDR` is an
+# address of the PAL build's code and `L_PAL_<addr>` a label there; tools/codegen/mkall.py moves both to the stand-in's
+# addresses. Each point is the instruction that corresponds to the NTSC-U point above (the code around it, from the
+# point to its goto target, is the same in both builds; the PAL build adds its hero sound 1 call before point I).
+L5 PAL:0x00242124: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_PAL_2421b8; }  // enhancement (I)
+L5 PAL:0x00242524: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_PAL_24253c; }  // enhancement (J)
+L6 PAL:0x0022b308: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_PAL_22b39c; }  // enhancement (I)
+L6 PAL:0x0022b708: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_PAL_22b720; }  // enhancement (J)
+L8 PAL:0x00225d1c: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_PAL_225db0; }  // enhancement (I)
+L8 PAL:0x0022611c: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_PAL_226134; }  // enhancement (J)
+L11 PAL:0x002443ac: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_PAL_244440; }  // enhancement (I)
+L11 PAL:0x002447ac: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_PAL_2447c4; }  // enhancement (J)

@@ -12,6 +12,7 @@
 #include <game/ovl/moby_pass.h>
 #include <game/ovl/ovl.h>
 #include <game/ovl/ovl_common.h>
+#include <game/ovl/ovl_reloc.h>
 #include <game/port_stubs.h>
 #include <runtime/ee/ee_timer.h>
 #include <runtime/kernel/disc.h>
@@ -25,7 +26,7 @@ constexpr uint32_t TOC = 0x00137b80;
 // The texture base of the frame's uploads back to the texture base, the HUD's counter 0.
 // orig: front:0x001e9128
 void boot_tex_base() {
-    sw(0x0015ef20, 0);
+    sw(FR(0x0015ef20), 0);
     sw(0x0015ee74, lwu(0x0015ee8c));
 }
 
@@ -37,7 +38,7 @@ void boot_clut_order() {
         uint32_t k = i & 0xe7;
         if ((i & 8) != 0) k |= 0x10;
         if ((i & 0x10) != 0) k |= 8;
-        sw(0x0018e740 + k * 4, (i >> 1) << 24);
+        sw(FR(0x0018e740) + k * 4, (i >> 1) << 24);
     }
 }
 
@@ -52,12 +53,16 @@ void boot_module_start() {
     TODO_PORT(0x001204b8, "libgraph: sceGsResetPath")();
     TODO_PORT(0x00123008, "front: the IOP's reboot and modules (sceSifRebootIop, sceSifLoadModule, sceCdInit ...)")();
     // the disc's region: sector 0x121 (0x12f208), its byte 0x33 'N' (NTSC); the host's disc is
-    // the user's NTSC-U ISO
+    // the user's ISO of either region, NTSC-U or PAL
     {
         uint8_t sec[2048] = {};
         const uint32_t pal = disc_read(0x121, 1, sec) && sec[0x33] != 'N' ? 1u : 0u;
         sw(0x0015ee90, pal);
         sw(0x0015ed80, pal);
+        // host choice: the PAL disc runs in the PAL game's own 60 Hz mode (its Options' Video page offers
+        // 50 Hz or 60 Hz; 60 Hz is the NTSC timing and gameplay data). A PAL run defaults to 60 Hz (Daino's decision);
+        // the 50 Hz mode (its frame-rate constants, the host's clock, the PAL movie rows) is not supported yet.
+        if (pal != 0) sw(0x0015ed80, 0);
     }
     TODO_PORT(0x00209030, "front: the memory card's start (the overlays' 0x24b410)")();
     TODO_PORT(0x00121878, "libgraph: sceGsResetGraph")(0, 1, lw(0x0015ed80) == 0 ? 2 : 3, 0);
@@ -78,7 +83,7 @@ void boot_module_start() {
     debug_printf_stub();
     TODO_PORT(0x00217048, "front: the overlays' 0x266ed0")();
     TODO_PORT(0x00122e68, "libgraph: the vsync callback set")(0x0012f1c8u);
-    sw(0x00160f0c, 0x00160000u);
+    sw(FR(0x00160f0c), FR(0x00160000u));
     memory_layout();
     TODO_PORT(0x0020ac58, "front: the overlays' 0x24cf10")();
     screen_setup();
@@ -86,10 +91,10 @@ void boot_module_start() {
     sub_002a07f8();
     sound_system_init();
     {  // an 8 x 8 white texture at block 0x3ffb
-        mem_fill32(0x001941c0, 0x80808080u, 0x100);
+        mem_fill32(FR(0x001941c0), 0x80808080u, 0x100);
         const uint32_t lp = ee_stack_alloc(0x60);
         gs_set_def_load_image(lp, 0x3ffb, 1, 0, 0, 0, 8, 8);
-        gs_exec_load_image(lp, 0x001941c0);  // (after FlushCache)
+        gs_exec_load_image(lp, FR(0x001941c0));  // (after FlushCache)
         gs_sync_path(0, 0);
         ee_stack_free(0x60);
     }
@@ -135,7 +140,7 @@ int32_t boot_card_check() {
 // TEXFLUSH.
 // orig: front:0x002012b8
 void boot_picture(uint32_t src) {
-    constexpr uint32_t CUR = 0x00160f00;  // the frame's packet cursor
+    const uint32_t CUR = FR(0x00160f00u);  // the frame's packet cursor
     int32_t rows = lw(0x0015ed80) != 0 ? 0x1c0 : 0x1a0;
     int32_t dbp = static_cast<int32_t>(lwu(0x0015ee84)) >> 8;
     uint32_t data = src;

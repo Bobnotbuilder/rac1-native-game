@@ -143,7 +143,8 @@ write). The generators read only:
 - the disc image: each level's overlay, read from the disc by `tools/overlay_match/`
   (`tools/codegen/ovlist.py`), with `tools/codegen/r5900dis.py` disassembling it;
 - the boot executable, `assets/dumps/SCUS_971.99`, and the overlay address maps,
-  `assets/generated/overlay_map/`, both made from the disc by the setup;
+  `assets/generated/overlay_map/`, both made from the disc by the setup (from the PAL disc, through the
+  region table: see [The region layer](#the-region-layer));
 - their committed inputs in `tools/codegen/`, which hold no game data: `gen/mkall/` (each run: the
   level, the entry functions with their names and signatures, the generator's options, and call-site
   glue), `gen/asm2cpp/` (the routines and the review's patches), `asm2fn_specs/`, the `*.glue` files
@@ -235,14 +236,59 @@ only in one level is registered under that level's own address (for example
 **The default.** Every level runs on its own overlay. `RAC1_OWN_OVERLAY=0` (with `--debug-tools`)
 runs every level on Veldin's overlay image instead, for comparison.
 
+## The region layer
+
+The ports carry the North American build's addresses (`SCUS-97199`). The European PAL build
+(`SCES-50916`) is the same code relinked: most of it moved by a few bytes, a few functions changed.
+The **region table**, `data/regions/SCES-50916.txt`, records where the PAL build put each piece of the
+North American build: per overlay (the boot module and levels 0 to 18), `code` and `data` runs (an
+address range and its shift), the `entry` of each function the PAL build changed, and a few lines for the
+code generators (`fix`, `start`, `nostart`, `pair`, below). It holds addresses, shifts and the PAL
+executable's checksum, never the game's bytes. `tools/overlay_match/region_maps.py table` writes it from
+both discs, on a developer's machine.
+
+**At setup** (`tools/setup.py`, on the PAL disc): `region_maps.py apply` makes the game's maps from the
+PAL disc and the table: `level<n>.txt` and `front_reloc.txt` (North American Veldin to the disc's
+overlays) and `region_level<n>.txt` / `region_boot.txt` (the table's runs, for the runtime).
+
+**The code generators** read the PAL overlays through `tools/overlay_match/region_view.py`: each code run
+is moved back to its North American address, and the fields the linker relocated (`jal` targets, a `lui`
+half and the offsets that complete it, `$gp` offsets, jump tables) are taken back through the table. The
+rebuilt code is word for word the North American code; the table's `fix` lines correct the few fields
+the analysis cannot take back alone (a `lui` half built in another function, an address two runs claim),
+`start` / `nostart` lines align the function starts, and `pair` lines pair the few functions the PAL
+build rewrote (`region_view.py check` compares the rebuilt code with the North American disc's). The
+generators' own maps go to `overlay_map/codegen/`. A function the PAL build changed has no North American
+code on the PAL disc: it is translated from the PAL code instead, placed at the North American entry, and
+marked `STAND-IN` in the generated file.
+
+The generated level-only code is made region-proof by `tools/codegen/reloc_level.py` (run by the
+generators on every file that names a level's own addresses): a jump table's `switch` compares
+`lvl_key(pointer)` (the pointer back to the North American address), and a `lui` half kept apart from its
+low half becomes `L<n>_PAGE` with its uses folded into the full address. On the North American disc the
+code it writes computes the same values.
+
+**At run time** (`src/game/ovl/ovl_reloc.h`): `disc_other_region()` reads the disc's `SYSTEM.CNF`; on
+the PAL disc the game loads `SCES_509.16`, translates Veldin's addresses too, and translates:
+
+| Form | Use |
+|---|---|
+| `L<n>_ADDR(0x...)` / `LvlConst<n, 0x...>` | an address of level n's own overlay |
+| `L<n>_CASE(0x...)` with `switch (lvl_key(fn))` | a `case` label of a dispatch switch |
+| `L<n>_PAGE(0x...)` | a `lui` half, never translated |
+| `FR(0x...)` / `FrConst<0x...>` | an address of the boot module (the title) |
+
+On the North American disc all of these are the identity. A function the PAL build changed is found
+through its `entry` line, and its North American port runs in its place.
+
 ## Runtime files
 
 The game runs from the repository's root: every path is relative to the working directory.
 
 | Path | What | Read by |
 |---|---|---|
-| `assets/iso/rac1-ntsc-u.iso` (or `$RAC1_ISO`) | the player's disc image | `runtime/kernel/disc.cpp` |
-| `assets/dumps/SCUS_971.99` | the game's executable, extracted from the disc | `runtime/kernel/ee_memory.cpp`, `src/game/boot/front_image.cpp` |
+| `assets/iso/rac1-ntsc-u.iso` or `rac1-pal.iso` (or `$RAC1_ISO`) | the player's disc image | `runtime/kernel/disc.cpp` |
+| `assets/dumps/SCUS_971.99` (`SCES_509.16` from the PAL disc) | the game's executable, extracted from the disc | `runtime/kernel/ee_memory.cpp`, `src/game/boot/front_image.cpp` |
 | `assets/extracted/level_wads/<n>_<name>/level.wad` | each level's data | `src/host/orig_main.cpp`, `runtime/level/level_loader.cpp` |
 | `assets/generated/overlay_map/` | the per-level address maps | `src/game/ovl/ovl_reloc.cpp` |
 | `assets/generated/mrp/moby/`, `assets/generated/mrp/world/` | the MRP's assets | `mrp_moby_renderer.cpp`, `mrp_world_renderer.cpp` |

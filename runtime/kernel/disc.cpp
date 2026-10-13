@@ -20,17 +20,18 @@ std::FILE* g_iso = nullptr;
 std::string disc_path() {
     const char* env = std::getenv("RAC1_ISO");
     if (env != nullptr) return env;
-    // the setup's link to the player's image; where links cannot be made (Windows without the
-    // privilege), the image's path written in a text file beside it instead
-    const std::string link = "assets/iso/rac1-ntsc-u.iso";
+    // the setup's link to the player's image, one name per region (the PAL disc's when it is the one
+    // there); where links cannot be made (Windows without the privilege), the image's path written in a
+    // text file beside it instead
+    const std::string link = "assets/iso/rac1-ntsc-u.iso", pal_link = "assets/iso/rac1-pal.iso";
     std::error_code ec;
-    if (!std::filesystem::exists(link, ec)) {
-        std::ifstream f(disc_path_file());
-        std::string p;
-        if (f && std::getline(f, p)) {
-            while (!p.empty() && (p.back() == '\r' || p.back() == '\n')) p.pop_back();
-            if (!p.empty()) return p;
-        }
+    if (std::filesystem::exists(link, ec)) return link;
+    if (std::filesystem::exists(pal_link, ec)) return pal_link;
+    std::ifstream f(disc_path_file());
+    std::string p;
+    if (f && std::getline(f, p)) {
+        while (!p.empty() && (p.back() == '\r' || p.back() == '\n')) p.pop_back();
+        if (!p.empty()) return p;
     }
     return link;
 }

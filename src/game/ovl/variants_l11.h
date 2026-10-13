@@ -18,8 +18,13 @@ constexpr int POKITARU = 11;
 // orig: (host) the current translation target is Pokitaru's overlay
 inline bool on_pokitaru() { return on_level(POKITARU); }
 
-// A level-11 address of the port's own (level-only data / code, not a Veldin equivalent): never translated.
-#define L11_ADDR(a) (a)
+// A level-11 address of the port's own (level-only data / code, not a Veldin equivalent): no Veldin
+// translation; on another region's disc, the region table's.
+#define L11_ADDR(a) LVL_ADDR(11, a)
+// the same address as a `case` label: its switch compares lvl_key(pointer)
+#define L11_CASE(a) (a)
+// a `lui` half kept apart from its low half (ovl_reloc.h lvl_page): never translated
+#define L11_PAGE(a) LVL_PAGE(a)
 
 }  // namespace rac1
 

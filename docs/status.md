@@ -120,4 +120,9 @@ nothing, so an object whose class is not ported stands still or does not appear.
   through the GS replica, and the mobys' flattened shadow meshes are not drawn yet (see
   [Rendering](rendering.md#limits)).
 - **Platforms.** Linux x86-64; Windows x86-64 is experimental (see [Platforms](platforms.md)). Vulkan / Direct3D renderers and macOS may come later.
-- **Regions.** Only the North American disc (`SCUS-97199`) is supported.
+- **Regions.** The North American disc (`SCUS-97199`) is the reference. The European PAL disc
+  (`SCES-50916`) can now be used on its own, through its region table: the setup, the generated code
+  and the game run from it, in the PAL game's 60 Hz mode. This is new and awaits playtesting. Still to
+  do for PAL: the functions the PAL build changed run as the North American port, or, for ten
+  generated ones, as stand-ins translated from the PAL code that are not yet proved; the 50 Hz mode; the
+  levels after Umbris have not been tried. See [Setup](setup.md#the-european-pal-disc).

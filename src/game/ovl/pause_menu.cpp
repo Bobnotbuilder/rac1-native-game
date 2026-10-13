@@ -48,7 +48,7 @@ void moby_anim_last(uint32_t m, uint32_t set) {
 // change of focus; the ported ones, others reported once (0 returned)
 int32_t menu_widget_call(uint32_t fn, uint32_t w, int32_t a1) {
     if (ovl_reloc_level() == OVL_FRONT) {  // (the boot module's own widget functions, its main menu's Options)
-        switch (fn) {
+        switch (region_to_ntsc(OVL_FRONT, fn)) {  // (the NTSC-U boot module's addresses)
             case 0x0021a1b0: return title_options_list_focus_in(w);
             case 0x00219d80: return title_label_update(w);
             case 0x0021a308: return title_nop_focus(w);

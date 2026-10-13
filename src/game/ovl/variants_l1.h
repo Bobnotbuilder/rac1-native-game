@@ -20,9 +20,13 @@ constexpr int NOVALIS = 1;
 // orig: (host) the current translation target is Novalis's overlay
 inline bool on_novalis() { return on_level(NOVALIS); }
 
-// A Novalis address of the port's own (not a Veldin equivalent: level-only data / code): never
-// translated.
-#define L1_ADDR(a) (a)
+// A Novalis address of the port's own (not a Veldin equivalent: level-only data / code): the same
+// on every level's overlay (no Veldin translation); on another region's disc, the region table's.
+#define L1_ADDR(a) LVL_ADDR(1, a)
+// the same address as a `case` label: its switch compares lvl_key(pointer)
+#define L1_CASE(a) (a)
+// a `lui` half kept apart from its low half (ovl_reloc.h lvl_page): never translated
+#define L1_PAGE(a) LVL_PAGE(a)
 
 }  // namespace rac1
 

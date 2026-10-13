@@ -8,11 +8,11 @@ namespace rac1 {
 // orig: (host) see blarg_hooks.h
 bool blarg_camera_type_call(uint32_t fn, uint32_t cam, uint32_t other, int32_t* ret) {
     *ret = 0;
-    switch (fn) {
-    case L6_ADDR(0x00316368): *ret = static_cast<int32_t>(blg_cam_type18_accept_u(cam, other, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f).v0); return true;
-    case L6_ADDR(0x003163d0): blg_cam_type18_init_l6(cam); return true;
-    case L6_ADDR(0x003163d8): blg_cam_type18_update_l6(cam); return true;
-    case L6_ADDR(0x003163e0): blg_cam_type18_exit_l6(cam); return true;
+    switch (lvl_key(fn)) {
+    case L6_CASE(0x00316368): *ret = static_cast<int32_t>(blg_cam_type18_accept_u(cam, other, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f).v0); return true;
+    case L6_CASE(0x003163d0): blg_cam_type18_init_l6(cam); return true;
+    case L6_CASE(0x003163d8): blg_cam_type18_update_l6(cam); return true;
+    case L6_CASE(0x003163e0): blg_cam_type18_exit_l6(cam); return true;
     default: return false;
     }
 }

@@ -19,8 +19,13 @@ constexpr int RILGAR = 5;
 // orig: (host) the current translation target is Rilgar's overlay
 inline bool on_rilgar() { return on_level(RILGAR); }
 
-// A Rilgar address of the port's own (level-only data / code, not a Veldin equivalent): never translated.
-#define L5_ADDR(a) (a)
+// A Rilgar address of the port's own (level-only data / code, not a Veldin equivalent): no Veldin
+// translation; on another region's disc, the region table's.
+#define L5_ADDR(a) LVL_ADDR(5, a)
+// the same address as a `case` label: its switch compares lvl_key(pointer)
+#define L5_CASE(a) (a)
+// a `lui` half kept apart from its low half (ovl_reloc.h lvl_page): never translated
+#define L5_PAGE(a) LVL_PAGE(a)
 
 }  // namespace rac1
 

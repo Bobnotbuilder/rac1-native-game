@@ -21,6 +21,7 @@ Output (gitignored, generated from your ELF dump and ISO; setup.sh):
 Usage (repo root):
   tools/overlay_match/front_match.py [--elf assets/dumps/SCUS_971.99] [--iso assets/iso/rac1-ntsc-u.iso]
                                      [--out assets/generated/overlay_map]
+(On another region's disc the setup makes these maps with tools/overlay_match/region_maps.py apply.)
 """
 import argparse
 import struct
@@ -71,10 +72,13 @@ def boot_entry(elf):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--elf", default=str(ROOT / "assets/dumps/SCUS_971.99"))
-    ap.add_argument("--iso", default=str(ROOT / "assets/iso/rac1-ntsc-u.iso"))
+    ap.add_argument("--elf", help="the disc's boot ELF (default: the one the setup extracted from the disc)")
+    ap.add_argument("--iso", help="the disc image (default: $RAC1_ISO, else the setup's link)")
     ap.add_argument("--out", default=str(ROOT / "assets/generated/overlay_map"))
     a = ap.parse_args()
+    import region_view  # noqa: E402  (it imports this module)
+    a.iso = a.iso or region_view.disc_path(str(ROOT / "assets"))
+    a.elf = a.elf or region_view.boot_elf_path(str(ROOT / "assets"))
     elf = open(a.elf, "rb").read()
     entry = boot_entry(elf)
     F = om.Overlay(boot_module(elf), entry)
