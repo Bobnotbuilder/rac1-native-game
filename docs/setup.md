@@ -246,6 +246,11 @@ The Windows build is made with **clang** (or GCC) from **MSYS2**, not with Visua
    repository's folder, where it finds `assets\`: `build\rac1-native.exe` double-clicked on its own
    would not find them. From a terminal in that folder, `build\rac1-native.exe` works too.)
 
+   `play.cmd` first checks that the setup is up to date (`tools/setup.py --check`, which changes
+   nothing): after a new version is downloaded over this one, or when a setup did not finish, a
+   window offers to run the setup again (**Run the setup**) or to start the game as it is (**Play
+   anyway**).
+
 What differs from Linux:
 
 - **The disc image.** Windows only lets programs make links with Developer Mode on (or as an
