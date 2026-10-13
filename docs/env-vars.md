@@ -1,13 +1,13 @@
 # Environment variables
 
-rac1-native reads a number of `RAC1_*` environment variables. This page lists all of them: 275 in
+rac1-native reads a number of `RAC1_*` environment variables. This page lists all of them: 277 in
 total, in three groups.
 
 | Group | Count | Who it is for |
 |---|---|---|
 | [Player](#player-variables) | 18 | Settings a player may want to change: files, window, audio, the ISO |
-| [Debugging](#debugging-variables) | 202 | Developers: profilers, overlays, switching a renderer or an optimisation on or off to compare |
-| [Automated testing](#automated-testing-variables) | 55 | Scripted and headless runs: frame counts, screenshots, simulated input, self-checks |
+| [Debugging](#debugging-variables) | 203 | Developers: profilers, overlays, switching a renderer or an optimisation on or off to compare |
+| [Automated testing](#automated-testing-variables) | 56 | Scripted and headless runs: frame counts, screenshots, simulated input, self-checks |
 
 ## When a variable is honoured
 
@@ -30,7 +30,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | Variable | Values and default | What it does |
 |---|---|---|
 | `RAC1_ADVANCED_FILE` | path; default $XDG_CONFIG_HOME/rac1-native/advanced_options.txt, else ~/.config/rac1-native/advanced_options.txt | Overrides the location of the text file where the Advanced (enhancement) settings are loaded from and saved to. |
-| `RAC1_AUDIO_DEVICE` | set (any value) = open the audio device in a headless run; default off in headless (a windowed run always opens it) | Lets a headless run open the real sound device (headless otherwise has no audio output), to test audio at a given frame rate. |
+| `RAC1_AUDIO_DEVICE` | set (any value) = open the audio device in a headless run; `null` = miniaudio's null device (nothing is heard); default off in headless (a windowed run always opens it) | Lets a headless run open the real sound device (headless otherwise has no audio output), to test audio at a given frame rate; `null` runs the queue, the IOP's mirror and their timing without a sound card or the speakers, also in a window. |
 | `RAC1_AUDIO_PERIODS` | integer N; default 3 | Number of periods in the audio device's buffer; with RAC1_AUDIO_PERIOD_MS it sets the output latency and can be raised if sound crackles. |
 | `RAC1_AUDIO_PERIOD_MS` | integer milliseconds; default 10 | Length of one period of the audio device's buffer; raise it together with or instead of the period count if sound crackles. |
 | `RAC1_CONTROLS_FILE` | path; default $XDG_CONFIG_HOME/rac1-native/controls.txt, else ~/.config/rac1-native/controls.txt | Overrides the location of the controls (key and pad bindings) file; in a headless run, setting it also makes control changes get saved there. |
@@ -69,6 +69,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_CAM_TRACE` | set (any value) = on; default off | Prints every camera switch to stderr. |
 | `RAC1_CARD_LOG` | set (any value) = on; default off | Prints a line whenever the memory card screens or machines change state (UI state, flags, level, slot, owned items, bolts). |
 | `RAC1_CHAIN_LOG` | set (any value) = on; default off | Every host frame prints the address range of the graphics DMA chain that is walked and whether it runs. |
+| `RAC1_DEVICE_DUMP` | file path; unset = no dump | Writes what the audio device is given, as played (raw 48 kHz stereo signed 16-bit PCM): the queue's skips, underruns and the IOP's frames played alone are in it, to look for clicks; unlike RAC1_AUDIO_DUMP (the game's IOP's output). |
 | `RAC1_EMIT_MAX_SHARE` | fraction 0 to 1; default 0.35 | The modern lighting's automatic emitters: a warm-coloured class glowing over more than this share of its surface is taken as a bright material, not a lamp. |
 | `RAC1_FADE_LOG` | set (any value) = on; default off | Prints the frames of the game's blocking loops (fades and waits) as they run. |
 | `RAC1_FPU_NEAREST` | 1 = host round-to-nearest; default off (round toward zero as the PS2) | Turns off the PS2-style float rounding so the host's normal rounding is used, only to compare behaviour. |
@@ -301,6 +302,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_POKE8` | frame:address=byte pairs separated by commas, numbers decimal or 0x hex, e.g. 100:0x14bec0=1; unset = none | Writes the given bytes to EE RAM at the given frames, to set game state in scripted runs. |
 | `RAC1_RAMDUMP` | frame,filename | At the given frame writes the whole 32 MB of EE RAM plus the scratchpad to the file, for offline comparison. |
 | `RAC1_RAMHASH` | file path; unset = off | After each game frame appends per-page hashes of EE RAM and scratchpad to the file, so two runs can be compared. |
+| `RAC1_REALTIME` | 1 = on; default off | A headless run steps the game as a window does: 60 game frames a second of the wall clock, several in one host frame when the host is slower, the stalls not caught up; with RAC1_FPS_CAP (the host frames' rate), RAC1_PACE_GAME=0 (a cap above 60, as VSync at 75 Hz), RAC1_HOST_DELAY_MS and RAC1_AUDIO_DEVICE=null it measures the game's speed and the sound's queue as a player's machine would. Prints `[pace]` (game steps a second) at the end. |
 | `RAC1_SEQ_TRACE` | integer n; default 0 (off) | During a simulated-input script, every n frames prints the hero state, position, game mode, level and bolts. |
 | `RAC1_SEQ_WATCH` | integer moby class; default off | During a simulated-input script, traces every moby of that class each frame (state, flags, position, first pvar words), plus the hero-freeze word and the active camera. |
 | `RAC1_SHOTS` | comma-separated list of frame numbers, e.g. 100,300; default none | Saves a screenshot shot_<frame>.ppm in the current directory when each listed game frame is shown, and prints a line with the game state at that frame. |
