@@ -151,6 +151,8 @@ For contributors, and for reverse-engineering and decompilation people:
 
 - [Overview](docs/overview.md): the approach; port, emulation and decompilation; what "faithful"
   means; how a port is proved.
+- [The oracle](docs/oracle.md): the proof of the ports against the original code; building and
+  running it, adding a batch. Every change to ported game code ships with a batch.
 - [Decisions](docs/decisions.md): the project's architectural decisions.
 - [Architecture](docs/architecture.md): the source tree, the layers, the `// orig:` annotations, the
   per-level overlays.

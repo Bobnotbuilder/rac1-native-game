@@ -128,7 +128,8 @@ numbers. Nothing compared a port with the original.
 
 **Consequence.** A port either matches the original on recorded states or it is not done. RAM
 snapshots became important project inputs; they are the user's own data and are never committed.
-See [Overview](overview.md#the-oracle).
+See [Overview](overview.md#the-oracle) and [The oracle](oracle.md): every change to ported game code
+ships with an oracle batch and passes it before it is merged.
 
 ## 7. Mobys drawn through their ported VU1 pass
 

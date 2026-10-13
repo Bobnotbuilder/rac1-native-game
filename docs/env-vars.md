@@ -9,6 +9,9 @@ total, in three groups.
 | [Debugging](#debugging-variables) | 203 | Developers: profilers, overlays, switching a renderer or an optimisation on or off to compare |
 | [Automated testing](#automated-testing-variables) | 56 | Scripted and headless runs: frame counts, screenshots, simulated input, self-checks |
 
+The oracle (`build/tests/ovl_oracle`) reads variables of its own (`ORACLE_*`, `RAC1_ORACLE_DUMPS`): see
+[The oracle](oracle.md).
+
 ## When a variable is honoured
 
 - **Headless runs** (`RAC1_HEADLESS=1`): every variable is honoured. A headless run reads no controls file and
