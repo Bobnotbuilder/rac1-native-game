@@ -12,6 +12,7 @@
 #include <game/enhance/advanced.h>
 #include <game/enhance/controls.h>
 #include <game/enhance/graphics.h>
+#include <game/enhance/update_notice.h>
 
 #include <game/ovl/ovl_common.h>
 #include <game/ovl/ovl_reloc.h>
@@ -38,6 +39,8 @@ constexpr uint32_t QS_PAUSE = SETTINGS + 0;    // the world paused while the qui
 constexpr uint32_t CONTROLS = SETTINGS + 1;    // 1: the modern controls (L2 aims with the strafe, R2 fires)
 constexpr uint32_t MOVEMENT = SETTINGS + 2;    // 1: R&C 3's on-foot movement
 constexpr uint32_t FADES = SETTINGS + 3;       // 1: the original's screen fades shown (0: run in one host frame)
+constexpr uint32_t UPDATE_OFF = SETTINGS + 4;  // 1: no update check at start (update_notice.h)
+constexpr uint32_t UPDATE_DEV = SETTINGS + 5;  // 1: the update check's development channel (main), 0 the releases
 constexpr uint32_t ENTRIES = ADV + 0x680;      // the Options list's entries, ours added (0x100 before ten rows overflowed into HELP)
 constexpr uint32_t HELP = ADV + 0x180;         // the Options help label's texts, ours added
 constexpr uint32_t PICTURES = ADV + 0x600;     // the Options picture's images (sector, count), ours added (0x1c0 before two more rows did not fit)
@@ -50,7 +53,7 @@ constexpr uint32_t STRINGS = ADV + 0x800;      // our texts, per language
 // Our menu pictures: a picture table entry (sector, count) whose sector is PICTURE_SECTOR + n is
 // made here instead of read from the disc (sectors that high are past the end of the disc)
 constexpr uint32_t PICTURE_SECTOR = 0xadf00000u;
-enum : uint32_t { PIC_PLACEHOLDER, PIC_GRAPHICS, PIC_ORIGINAL, PIC_MODERN, PIC_CONTROLS, PIC_EXPERIMENTAL, PIC_COUNT };  // (graphics.cpp: 2 / 3 / 5)
+enum : uint32_t { PIC_PLACEHOLDER, PIC_GRAPHICS, PIC_ORIGINAL, PIC_MODERN, PIC_CONTROLS, PIC_EXPERIMENTAL, PIC_UPDATE, PIC_COUNT };  // (graphics.cpp: 2 / 3 / 5; update_notice.cpp: 6)
 
 // The game's data the page is made from (Veldin's addresses, relocated)
 constexpr OvConst<0x001b4950u> OPTIONS_PAGE{};
@@ -60,39 +63,52 @@ constexpr OvConst<0x001b4a30u> OPTIONS_PICTURE{};  // its image is the list's se
 constexpr OvConst<0x001b5a60u> CAMERA_PAGE{};
 constexpr OvConst<0x001b5ae8u> CAMERA_TITLE{};
 constexpr OvConst<0x001b5ba0u> CAMERA_SETTINGS{};
+constexpr OvConst<0x001b6678u> TALL_PAGE{};  // a page (state 0x1a) whose slot 3 box is tall enough for our rows (graphics.cpp)
 constexpr OvConst<0x001b8888u> MAIN_OPTIONS_PAGE{};  // the main menu's Options (the boot module's)
 
 // Our text ids, after the game's (0x4e00..0x5300 in the level text tables)
 constexpr int32_t TEXT_FIRST = 0x7f00;
-enum : int32_t { T_ADVANCED, T_HELP, T_QUICK_SELECT, T_NORMAL, T_PAUSE, T_CONTROLS, T_CLASSIC, T_MODERN, T_MOVEMENT, T_ORIGINAL, T_RAC3, T_FADES, T_FAST, T_FADES_ORIGINAL, T_COUNT };
+enum : int32_t { T_ADVANCED, T_HELP, T_QUICK_SELECT, T_NORMAL, T_PAUSE, T_CONTROLS, T_CLASSIC, T_MODERN, T_MOVEMENT, T_ORIGINAL, T_RAC3, T_FADES, T_FAST, T_FADES_ORIGINAL,
+                 T_UPDATE_CHECK, T_ON, T_OFF, T_UPDATE_CHANNEL, T_STABLE, T_DEVELOPMENT, T_COUNT };
 // per language (0x15ed88: 0 English, 2 French, 3 German, 4 Spanish, 5 Italian; French in English
 // for now, the font's accented letters not looked at yet)
 constexpr const char* TEXTS[6][T_COUNT] = {
-    {"Advanced", "Extra settings of the PC version", "Quick Select", "Normal", "Pause", "Aiming", "Original", "Modern", "Movement", "Original", "RAC 3", "Fades", "Fast", "Original"},
-    {"Advanced", "Extra settings of the PC version", "Quick Select", "Normal", "Pause", "Aiming", "Original", "Modern", "Movement", "Original", "RAC 3", "Fades", "Fast", "Original"},
-    {"Advanced", "Extra settings of the PC version", "Quick Select", "Normal", "Pause", "Aiming", "Original", "Modern", "Movement", "Original", "RAC 3", "Fades", "Fast", "Original"},
-    {"Erweitert", "Extra-Einstellungen der PC-Version", "Schnellwahl", "Normal", "Pause", "Zielen", "Original", "Modern", "Bewegung", "Original", "RAC 3", "Blenden", "Schnell", "Original"},
-    {"Avanzado", "Ajustes extra de la version PC", "Seleccion rapida", "Normal", "Pausa", "Apuntado", "Original", "Moderno", "Movimiento", "Original", "RAC 3", "Fundidos", "Rapidos", "Originales"},
-    {"Avanzate", "Impostazioni extra della versione PC", "Scelta rapida", "Normale", "Pausa", "Mira", "Originale", "Moderna", "Movimento", "Originale", "RAC 3", "Dissolvenze", "Rapide", "Originali"},
+    {"Advanced", "Extra settings of the PC version", "Quick Select", "Normal", "Pause", "Aiming", "Original", "Modern", "Movement", "Original", "RAC 3", "Fades", "Fast", "Original",
+     "Update Check", "On", "Off", "Update Channel", "Stable", "Development"},
+    {"Advanced", "Extra settings of the PC version", "Quick Select", "Normal", "Pause", "Aiming", "Original", "Modern", "Movement", "Original", "RAC 3", "Fades", "Fast", "Original",
+     "Update Check", "On", "Off", "Update Channel", "Stable", "Development"},
+    {"Advanced", "Extra settings of the PC version", "Quick Select", "Normal", "Pause", "Aiming", "Original", "Modern", "Movement", "Original", "RAC 3", "Fades", "Fast", "Original",
+     "Update Check", "On", "Off", "Update Channel", "Stable", "Development"},
+    {"Erweitert", "Extra-Einstellungen der PC-Version", "Schnellwahl", "Normal", "Pause", "Zielen", "Original", "Modern", "Bewegung", "Original", "RAC 3", "Blenden", "Schnell", "Original",
+     "Update-Suche", "An", "Aus", "Update-Kanal", "Stabil", "Entwicklung"},
+    {"Avanzado", "Ajustes extra de la version PC", "Seleccion rapida", "Normal", "Pausa", "Apuntado", "Original", "Moderno", "Movimiento", "Original", "RAC 3", "Fundidos", "Rapidos", "Originales",
+     "Buscar versiones", "Si", "No", "Canal", "Estable", "Desarrollo"},
+    {"Avanzate", "Impostazioni extra della versione PC", "Scelta rapida", "Normale", "Pausa", "Mira", "Originale", "Moderna", "Movimento", "Originale", "RAC 3", "Dissolvenze", "Rapide", "Originali",
+     "Cerca aggiornamenti", "Si", "No", "Canale", "Stabile", "Sviluppo"},
 };
-constexpr uint32_t STRING_SIZE = 0x40;
+constexpr uint32_t STRING_SIZE = 0x30;  // (0x40 before the update rows: 6 languages x T_COUNT texts end before the Graphics block, 0xf2000)
+static_assert(0x800 + 6 * T_COUNT * STRING_SIZE <= 0x2000, "the Advanced page's texts end where the Graphics page's block begins");
 
 // The page's rows: the name in the settings file, the id in the saves' files (never reused),
 // the byte, the name's text, the values' texts (the byte's value is the index; value 0 is the
 // default: the original's behaviour, or for a console compromise removed ("faithful
-// to the game's code, not to the PS2's limits") the port's - Fades: 0 fast, 1 the original's)
+// to the game's code, not to the PS2's limits") the port's - Fades: 0 fast, 1 the original's),
+// and whether the row is kept with the saves (the update check's rows belong to the machine: preferences only)
 struct Row {
     const char* key;
     uint16_t id;
     uint32_t byte;
     int32_t name;
     int32_t values[4];
+    bool in_saves = true;
 };
 constexpr Row SETTINGS_ROWS[] = {
     {"quick_select_pause", 1, QS_PAUSE, T_QUICK_SELECT, {T_NORMAL, T_PAUSE, -1, -1}},
     {"controls", 2, CONTROLS, T_CONTROLS, {T_CLASSIC, T_MODERN, -1, -1}},
     {"movement", 3, MOVEMENT, T_MOVEMENT, {T_ORIGINAL, T_RAC3, -1, -1}},
     {"fades", 4, FADES, T_FADES, {T_FAST, T_FADES_ORIGINAL, -1, -1}},
+    {"update_check_off", 5, UPDATE_OFF, T_UPDATE_CHECK, {T_ON, T_OFF, -1, -1}, false},
+    {"update_channel", 6, UPDATE_DEV, T_UPDATE_CHANNEL, {T_STABLE, T_DEVELOPMENT, -1, -1}, false},
 };
 constexpr uint32_t ROW_COUNT = sizeof(SETTINGS_ROWS) / sizeof(Row);
 
@@ -134,17 +150,33 @@ std::filesystem::path prefs_path() {
     return "advanced_options.txt";
 }
 
-// orig: (none) — enhancement: the settings from a preferences file; false when none
-bool prefs_read(const std::filesystem::path& path) {
+std::string g_update_skip;  // the update "Skip Version" chose (update_notice.h): a release's tag, or main's commit
+
+// orig: (none) — enhancement: a preferences file's "name value" lines, each given to `line`; false when none
+template <typename F>
+bool prefs_lines(const std::filesystem::path& path, F line) {
     FILE* f = platform::open_file(path, "r");
     if (f == nullptr) return false;
-    char name[64];
-    unsigned value = 0;
-    while (std::fscanf(f, "%63s %u", name, &value) == 2)
-        for (const Row& r : SETTINGS_ROWS)
-            if (std::strcmp(name, r.key) == 0 && value < row_values(r)) sb(r.byte, value);
+    char buf[256], name[64], value[128];
+    while (std::fgets(buf, sizeof buf, f) != nullptr)
+        if (std::sscanf(buf, "%63s %127s", name, value) == 2) line(name, value);
     std::fclose(f);
     return true;
+}
+
+// orig: (none) — enhancement: the settings from a preferences file; false when none
+bool prefs_read(const std::filesystem::path& path) {
+    return prefs_lines(path, [](const char* name, const char* value) {
+        if (std::strcmp(name, "update_skip") == 0) {
+            g_update_skip = value;
+            return;
+        }
+        char* end = nullptr;
+        const unsigned long v = std::strtoul(value, &end, 10);
+        if (end == value || *end != 0) return;
+        for (const Row& r : SETTINGS_ROWS)
+            if (std::strcmp(name, r.key) == 0 && v < row_values(r)) sb(r.byte, static_cast<uint32_t>(v));
+    });
 }
 
 // orig: (none) — enhancement: the settings as they are now, noted as saved
@@ -170,6 +202,7 @@ void settings_save() {
     if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path(), ec);
     if (FILE* f = platform::open_file(path, "w")) {
         for (const Row& r : SETTINGS_ROWS) std::fprintf(f, "%s %u\n", r.key, lbu(r.byte));
+        if (!g_update_skip.empty()) std::fprintf(f, "update_skip %s\n", g_update_skip.c_str());
         std::fclose(f);
     }
     settings_mark_saved();
@@ -204,13 +237,15 @@ std::vector<uint8_t> save_file_make() {
         d.push_back(static_cast<uint8_t>(v >> 8));
     };
     u16(SAVE_VERSION);
-    u16(ROW_COUNT);
+    u16(0);  // (the count, below)
+    uint32_t count = 0;
     for (const Row& r : SETTINGS_ROWS) {
+        if (!r.in_saves) continue;
         u16(r.id);
         u16(1);
         d.push_back(lbu(r.byte));
+        ++count;
     }
-    uint32_t count = ROW_COUNT;
     graphics_save_items(d, count);  // (the Graphics page's picture settings and the mode, ids 32..)
     d[6] = static_cast<uint8_t>(count);
     d[7] = static_cast<uint8_t>(count >> 8);
@@ -228,7 +263,7 @@ bool save_file_apply(const std::vector<uint8_t>& d) {
         at += 4;
         if (at + size > d.size()) break;
         for (const Row& r : SETTINGS_ROWS)
-            if (r.id == id && size >= 1 && d[at] < row_values(r)) sb(r.byte, d[at]);
+            if (r.in_saves && r.id == id && size >= 1 && d[at] < row_values(r)) sb(r.byte, d[at]);
         graphics_save_item(id, d.data() + at, size);
         at += size;
     }
@@ -275,6 +310,9 @@ void advanced_menu_install() {
     const uint32_t graphics_page = graphics_page_install(front ? static_cast<uint32_t>(MAIN_OPTIONS_PAGE) : static_cast<uint32_t>(OPTIONS_PAGE));
     const uint32_t controls = controls_page_install(front ? static_cast<uint32_t>(MAIN_OPTIONS_PAGE) : static_cast<uint32_t>(OPTIONS_PAGE));
     sw(PAGE + 0x40, ROWS_WIDGET);
+    // the rows' box: Camera's holds 4 or 5 rows, ours are 6 (the update check's two): the taller box of page
+    // 0x1b6678 (its slot 3), as the Graphics page's
+    sw(PAGE + 0xc, lwu(TALL_PAGE + 0xc));
     for (uint32_t i = 0; i < 14; ++i) {
         const uint32_t slot = PAGE + 0x44 + i * 4;
         if (lwu(slot) == CAMERA_TITLE) sw(slot, TITLE);
@@ -346,6 +384,7 @@ void advanced_menu_install() {
 uint32_t advanced_text(int32_t id) {
     if (const uint32_t s = graphics_text(id)) return s;
     if (const uint32_t s = controls_text(id)) return s;
+    if (const uint32_t s = update_notice_text(id)) return s;
     if (id < TEXT_FIRST || id >= TEXT_FIRST + T_COUNT) return 0;
     uint32_t lang = lwu(0x0015ed88);
     if (lang >= 6) lang = 0;
@@ -382,13 +421,14 @@ void picture_placeholder(uint32_t buf, uint32_t which) {
         for (int x = 0; x < VW; ++x)
             if (x < 3 || y < 3 || x >= VW - 3 || y >= VH - 3) px[y * W + x] = FRAME;
     // the letters (5 x 7, rows from the top, bit 4 the left column), 7 texels a dot: "PC+" (the
-    // Advanced page), "GFX" (Graphics), "PS2" / "PC+" (the new game's Original / Modern modes)
+    // Advanced page), "GFX" (Graphics), "PS2" / "PC+" (the new game's Original / Modern modes), "NEW" (the update notice)
     static constexpr uint8_t P[7] = {0x1e, 0x11, 0x11, 0x1e, 0x10, 0x10, 0x10}, C[7] = {0x0e, 0x11, 0x10, 0x10, 0x10, 0x11, 0x0e},
                              PLUS[7] = {0x00, 0x04, 0x04, 0x1f, 0x04, 0x04, 0x00}, G[7] = {0x0e, 0x11, 0x10, 0x17, 0x11, 0x11, 0x0f},
                              F[7] = {0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x10}, X[7] = {0x11, 0x11, 0x0a, 0x04, 0x0a, 0x11, 0x11},
                              S_[7] = {0x0f, 0x10, 0x10, 0x0e, 0x01, 0x01, 0x1e}, TWO[7] = {0x0e, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1f},
-                             A[7] = {0x0e, 0x11, 0x11, 0x1f, 0x11, 0x11, 0x11}, E[7] = {0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x1f}, D[7] = {0x1e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1e};
-    const uint8_t* const WORDS[PIC_COUNT][3] = {{P, C, PLUS}, {G, F, X}, {P, S_, TWO}, {P, C, PLUS}, {P, A, D}, {E, X, P}};
+                             A[7] = {0x0e, 0x11, 0x11, 0x1f, 0x11, 0x11, 0x11}, E[7] = {0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x1f}, D[7] = {0x1e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1e},
+                             N[7] = {0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11}, W_[7] = {0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0a};
+    const uint8_t* const WORDS[PIC_COUNT][3] = {{P, C, PLUS}, {G, F, X}, {P, S_, TWO}, {P, C, PLUS}, {P, A, D}, {E, X, P}, {N, E, W_}};
     const uint8_t* const* GLYPHS = WORDS[which < PIC_COUNT ? which : 0];
     constexpr int S = 7, GW = 5 * S, GAP = S, TW = 3 * GW + 2 * GAP;
     constexpr int X0 = (VW - TW) / 2, Y0 = (VH - 7 * S) / 2;
@@ -1151,6 +1191,41 @@ void advanced_setting_changed(uint32_t byte) {
     // RAC 3 off turns it off
     if (byte == CONTROLS && lbu(CONTROLS) != 0) sb(MOVEMENT, 1);
     if (byte == MOVEMENT && lbu(MOVEMENT) == 0) sb(CONTROLS, 0);
+    // the update check's rows are read at the next start: saved now (the others are at the next gameplay frame,
+    // advanced_frame; these are also changed at the main menu, which may be left by quitting)
+    if ((byte == UPDATE_OFF || byte == UPDATE_DEV) && !g_advanced_disabled) settings_save();
+}
+
+// orig: (none) — enhancement (advanced.h)
+AdvancedUpdatePrefs advanced_update_prefs() {
+    AdvancedUpdatePrefs p;
+    if (g_advanced_disabled) {
+        p.check = false;
+        return p;
+    }
+    if (g_loaded) {
+        p.check = lbu(UPDATE_OFF) == 0;
+        p.development = lbu(UPDATE_DEV) != 0;
+        p.skipped = g_update_skip;
+        return p;
+    }
+    // (at start, before the game's memory holds the settings: the file read for these alone)
+    std::string skip;
+    prefs_lines(prefs_path(), [&p, &skip](const char* name, const char* value) {
+        if (std::strcmp(name, "update_check_off") == 0) p.check = std::strcmp(value, "0") == 0;
+        else if (std::strcmp(name, "update_channel") == 0) p.development = std::strcmp(value, "1") == 0;
+        else if (std::strcmp(name, "update_skip") == 0) skip = value;
+    });
+    p.skipped = skip;
+    return p;
+}
+
+// orig: (none) — enhancement (advanced.h)
+void advanced_update_skip(const std::string& id) {
+    if (g_advanced_disabled) return;
+    settings_load();
+    g_update_skip = id;
+    settings_save();
 }
 
 // orig: (none) — enhancement (advanced.h)

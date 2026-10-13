@@ -126,13 +126,17 @@ The full guide, with requirements and troubleshooting: [Setup](docs/setup.md).
 On Windows, run `setup.cmd` instead (double-click it, or drop your disc image on it): see
 [Setup](docs/setup.md#on-windows-experimental). Windows support is experimental.
 
+At start the game checks, in the background, whether a newer version is out, and says so at the main menu
+(it downloads nothing). That is one anonymous request to GitHub's API, no telemetry; Options > Advanced >
+Update Check turns it off. See [The update check](docs/settings.md#the-update-check).
+
 ## Documentation
 
 For players:
 
 - [Setup](docs/setup.md): requirements, step by step, troubleshooting.
 - [Settings](docs/settings.md): the Graphics, Controls and Advanced pages, the Original, Modern and Experimental modes,
-  where settings are kept, the debug tools.
+  the update check, where settings are kept, the debug tools.
 - [Input](docs/input.md): controllers, keyboard and mouse, rebinding.
 - [Saves](docs/saves.md): where your saves are. Saving and loading work, but the save files may still change: they have not been checked by hand yet.
 - [Platforms](docs/platforms.md): Windows (experimental) and macOS later.

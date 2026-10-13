@@ -27,6 +27,7 @@
 
 #include <game/enhance/advanced.h>
 #include <game/enhance/controls.h>
+#include <game/enhance/update_notice.h>
 #include <game/ovl/ovl.h>
 #include <game/ovl/ovl_common.h>
 #include <game/ovl/ovl_reloc.h>
@@ -592,7 +593,7 @@ uint32_t graphics_text(int32_t id) {
 
 // orig: (none) — enhancement (graphics.h)
 void graphics_menu_back(uint32_t cur, uint32_t to, uint32_t mobys) {
-    if (cur == 0 || to == 0 || (cur != PAGE && cur != POP_PAGE && cur != advanced_page() && cur != controls_page())) return;
+    if (cur == 0 || to == 0 || (cur != PAGE && cur != POP_PAGE && cur != advanced_page() && cur != controls_page() && cur != update_notice_page())) return;
     // `to`'s boxes as the game leaves them: a page entered forward ends on its animations' last frame; a root page
     // (no parent: the menu's first page) is opened by its animations played back to their first frame
     const bool root = lwu(to + 0x38) == 0;

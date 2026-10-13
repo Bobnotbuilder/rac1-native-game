@@ -134,6 +134,7 @@
 #include "sample_prof.h"
 #include "sim_autopilot.h"
 #include "sim_script.h"
+#include "update_check.h"
 #include <_devtools/item_give_quiet.h>  // (header only: also without the dev tools)
 #ifdef RAC1_DEVTOOLS
 #include <_devtools/dev_menu.h>
@@ -1649,6 +1650,10 @@ int main(int argc, char** argv) {
     // a headless run ignores the player's Advanced settings (~/.config/rac1-native/advanced_options.txt, save<N>.pc): tests are
     // deterministic, the enhancements off; RAC1_ADVANCED=1 keeps them (testing an enhancement)
     if (headless && std::getenv("RAC1_ADVANCED") == nullptr) rac1::g_advanced_disabled = true;
+    std::printf("[orig] rac1-native %s\n", rac1::update_check::version_text().c_str());
+    // the update check (Options > Advanced > Update Check): one anonymous request to GitHub in the background, never
+    // in a headless run; what it finds is shown at the main menu (the update notice)
+    rac1::update_check::start(headless);
     if (const char* ck = std::getenv("RAC1_CLOCK")) g_host_clock_fixed = static_cast<std::time_t>(std::strtoll(ck, nullptr, 0));
     const uint64_t max_frames = std::getenv("RAC1_FRAMES") ? std::strtoull(std::getenv("RAC1_FRAMES"), nullptr, 10) : (headless ? 300 : 0);
 
@@ -2077,6 +2082,7 @@ int main(int argc, char** argv) {
             }
         }
         rac1::graphics_frame();
+        rac1::update_check::poll();  // (the update check's answer, when it has come: to the main menu's notice)
         if (!headless) {
             bool cursor_free = false;  // (the debug menu has the cursor while it is open)
 #ifdef RAC1_DEVTOOLS

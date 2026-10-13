@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
-project(rac1-native LANGUAGES C CXX)
+# the release's version (semantic): bumped at each release, with its tag vX.Y.Z (the in-game update check compares
+# it with the latest release's: docs/settings.md)
+project(rac1-native VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -170,6 +172,7 @@ set(RAC1_HOST_SOURCES
     src/host/host_language.cpp
     src/host/sim_script.cpp
     src/host/sim_autopilot.cpp
+    src/host/update_check.cpp
 )
 if(WIN32)
     list(APPEND RAC1_HOST_SOURCES src/host/host_priority_win32.cpp src/platform/win32/rac1-native.rc)
@@ -183,6 +186,20 @@ else()
     add_executable(rac1-native ${RAC1_HOST_SOURCES})
 endif()
 target_link_libraries(rac1-native PRIVATE rac1_runtime rac1_game rac1_setup miniaudio_headers)
+# the installed version (the release's, and the git commit and branch of a clone), remade at each build:
+# rac1_version.h, rewritten only when it changes (cmake/version.cmake). With it, the Python the build was configured
+# with: the update check's helper (tools/update_check.py) is run with it when the environment names none (on Windows,
+# the setup's own Python is not in PATH when the game is started by hand)
+find_package(Git QUIET)
+find_package(Python3 COMPONENTS Interpreter QUIET)
+set(RAC1_VERSION_H "${CMAKE_BINARY_DIR}/version/rac1_version.h")
+add_custom_target(rac1_version
+    COMMAND "${CMAKE_COMMAND}" "-DVERSION=${PROJECT_VERSION}" "-DSRC=${CMAKE_SOURCE_DIR}" "-DGIT=${GIT_EXECUTABLE}"
+            "-DPYTHON=${Python3_EXECUTABLE}" "-DOUT=${RAC1_VERSION_H}" -P "${CMAKE_SOURCE_DIR}/cmake/version.cmake"
+    BYPRODUCTS "${RAC1_VERSION_H}"
+    VERBATIM)
+add_dependencies(rac1-native rac1_version)
+target_include_directories(rac1-native PRIVATE "${CMAKE_BINARY_DIR}/version")
 if(RAC1_DEVTOOLS)
     target_link_libraries(rac1-native PRIVATE rac1_devtools)
     target_compile_definitions(rac1-native PRIVATE RAC1_DEVTOOLS=1)

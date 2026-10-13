@@ -5,6 +5,7 @@
 // the frame capture, the planet map / ship screens).
 #include <game/enhance/advanced.h>
 #include <game/enhance/graphics.h>
+#include <game/enhance/update_notice.h>
 #include <game/boot/title_menu.h>
 #include <game/ovl/memory_card.h>
 #include <game/ovl/ovl_reloc.h>
@@ -554,7 +555,10 @@ int32_t menu_button_update(uint32_t w) {
         };
         switch (static_cast<uint32_t>(action) < 0xcu ? action : -1) {
             case 2: moby_sound_start(2, 0x11, lwu(w + 0x14)); break;
-            case 3: page_go(); break;
+            case 3:
+                update_notice_choice(w);  // enhancement: the update notice's Skip Version
+                page_go();
+                break;
             case 4:
             case 5: {
                 if (action == 4) graphics_new_game_choice(w);  // enhancement: the new game popup's mode

@@ -11,6 +11,7 @@
 #define RAC1_GAME_ENHANCE_ADVANCED_H
 
 #include <cstdint>
+#include <string>
 
 namespace rac1 {
 
@@ -47,6 +48,19 @@ void advanced_setting_changed(uint32_t byte);
 // orig: (none) — enhancement: the settings widget (0x27ef00) `w`, its selected row `e`: left / right
 // on our pages' rows (Advanced, Graphics) step the value back / forward; true when it did
 bool advanced_settings_dpad(uint32_t w, uint32_t e);
+// orig: (none) — enhancement: the update check's preferences (Options > Advanced: Update Check, Update
+// Channel; "Skip Version" of the update notice, update_notice.h): read from the preferences file
+// when the game's memory does not hold the settings yet (at start). Check off while every
+// enhancement is off (headless runs).
+struct AdvancedUpdatePrefs {
+    bool check = true;         // Update Check = On
+    bool development = false;  // Update Channel = Development (main), else Stable (the releases)
+    std::string skipped;       // the release's tag / main's commit "Skip Version" chose
+};
+AdvancedUpdatePrefs advanced_update_prefs();
+// orig: (none) — enhancement: "Skip Version": `id` kept in the preferences
+void advanced_update_skip(const std::string& id);
+
 // orig: (none) — enhancement: the Advanced page (built by advanced_menu_install) and its title's text
 // id (the main menu's Options list)
 uint32_t advanced_page();

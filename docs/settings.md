@@ -1,7 +1,7 @@
 # Settings
 
 The port's own settings: three pages added to the game's Options (Graphics, Controls, Advanced), the
-Original, Modern or Experimental choice at New Game, where settings are kept, and the debug tools.
+Original, Modern or Experimental choice at New Game, the update check, where settings are kept, and the debug tools.
 
 ## Removed compromises and enhancements
 
@@ -72,8 +72,12 @@ The controller and keyboard bindings, mouse look, look inversion and mouse sensi
 | Aiming | Original, Modern |
 | Movement | Original, RAC 3 |
 | Fades | Fast, Original |
+| Update Check | On, Off |
+| Update Channel | Stable, Development |
 
-See [Advanced options](advanced.md) for what each one does and how it is built.
+See [Advanced options](advanced.md) for what each one does and how it is built, and
+[The update check](#the-update-check) for the last two. Those two belong to the machine: they are kept
+in the preferences only, not with the saves.
 
 ## Original, Modern or Experimental mode
 
@@ -91,12 +95,47 @@ New Game opens a choice between three modes before the game starts
 Experimental is Modern plus the [modern lighting](lighting.md), which is experimental. No mode changes
 the window settings or Fades. The mode chosen is kept with the save.
 
+## The update check
+
+At start, the game asks GitHub whether there is something newer than the installed build. When there
+is, a panel at the main menu says so: the new version (or, on the development channel, how many new
+commits there are on `main`), the release notes in short, and how to update (`git pull`, then
+`./setup.sh`; on Windows `setup.cmd`; for a downloaded copy, the new release downloaded, then the
+setup). **OK** closes it (it comes back at the next start); **Skip Version** closes it for good
+for that version. The game itself downloads and installs nothing.
+
+- **What is sent:** one anonymous HTTPS request to the GitHub API (`api.github.com`), for this
+  repository only: `GET /repos/daino-selvatico/rac1-native-game/releases/latest` (Stable), or the
+  comparison of the installed commit with `main` (Development). Nothing else: no identifier, no
+  telemetry, nothing about the player or the machine (GitHub sees the request's IP address, as for any
+  web request). The answer is kept for 6 hours in `update_check.txt` (in the settings' folder below):
+  a start within them asks nothing.
+- **When:** once at start, in the background (`tools/update_check.py`, Python's standard library, run by
+  `src/host/update_check.cpp`): start-up never waits for it. No network, an error or GitHub's rate
+  limit: nothing is shown. Never in a headless run. The panel is shown at most once a run, at the main
+  menu's first page only, never during play.
+- **Turning it off:** Options > Advanced > Update Check = Off (in `advanced_options.txt`:
+  `update_check_off 1`). It takes effect at the next start.
+- **The channel:** Options > Advanced > Update Channel. **Stable** (the default) compares the installed
+  version (`project(rac1-native VERSION ...)` in `CMakeLists.txt`) with the latest release's tag.
+  **Development** compares the installed commit with `main`, and only applies to a build from a git
+  clone on the `main` branch (another branch, or a downloaded copy, is checked on Stable).
+- **The installed version** is printed at start (`[orig] rac1-native 0.1.0 (v0.1.0-10-g7dee3d1, main)`):
+  the release's version and, for a git clone, `git describe` and the branch, recorded by the build
+  (`cmake/version.cmake`).
+- **Skip Version** is kept in `advanced_options.txt` (`update_skip <tag or commit>`); remove the
+  line to see the notice again.
+
+To try the panel without a new release: `RAC1_UPDATE_FAKE=0.9.0` (or `dev:12`) with `--debug-tools`
+(see [Environment variables](env-vars.md)).
+
 ## Where settings are kept
 
 | What | Where |
 |---|---|
 | Graphics page | `~/.config/rac1-native/graphics_options.txt` |
-| Advanced page | `~/.config/rac1-native/advanced_options.txt` |
+| Advanced page (and the update check's Skip Version) | `~/.config/rac1-native/advanced_options.txt` |
+| The update check's last answer | `~/.config/rac1-native/update_check.txt` |
 | Controls | `~/.config/rac1-native/controls.txt` (see [Input](input.md#the-bindings-file-controlstxt)) |
 | The picture settings, the Advanced settings and the mode, per save | `save<N>.pc` next to each save (see [Saves](saves.md#the-pc-settings-next-to-each-save)) |
 | The game's own options | the game's own settings file on the memory card, as on the PS2 |
