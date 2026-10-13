@@ -97,6 +97,11 @@ the window settings or Fades. The mode chosen is kept with the save.
 
 ## The update check
 
+> **Work in progress.** The update check is new: it has been tried only in automated runs and on one
+> machine, so its panel's texts, the moment it appears and the channels may still change. Updating
+> stays manual for now; updating from the panel itself is planned for a later version
+> ([issue #13](https://github.com/daino-selvatico/rac1-native-game/issues/13)).
+
 At start, the game asks GitHub whether there is something newer than the installed build. When there
 is, a panel at the main menu says so: the new version (or, on the development channel, how many new
 commits there are on `main`), the release notes in short, and how to update (`git pull`, then

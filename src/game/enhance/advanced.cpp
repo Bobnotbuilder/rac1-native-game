@@ -1191,9 +1191,10 @@ void advanced_setting_changed(uint32_t byte) {
     // RAC 3 off turns it off
     if (byte == CONTROLS && lbu(CONTROLS) != 0) sb(MOVEMENT, 1);
     if (byte == MOVEMENT && lbu(MOVEMENT) == 0) sb(CONTROLS, 0);
-    // the update check's rows are read at the next start: saved now (the others are at the next gameplay frame,
-    // advanced_frame; these are also changed at the main menu, which may be left by quitting)
-    if ((byte == UPDATE_OFF || byte == UPDATE_DEV) && !g_advanced_disabled) settings_save();
+    // saved now: a row changed at the title's main menu would otherwise wait for the next gameplay frame
+    // (advanced_frame), and be lost by quitting from the menu (the preferences are loaded by then: the page's
+    // install reads them)
+    if (!g_advanced_disabled && g_loaded) settings_save();
 }
 
 // orig: (none) — enhancement (advanced.h)
