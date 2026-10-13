@@ -1,9 +1,9 @@
 # rac1-native
 
-> **Current state:** apart from a few small bugs and glitches, the game is playable without major
-> problems up to **Umbris** (included). The planets after it all load and some may already be largely
-> playable (Batalia, for example, is ported but not played through yet), but they are only partly ported: expect missing
-> effects or sections that can't be finished. Everything after Umbris is work in progress.
+> **Current state (0.2.0):** apart from a few small bugs and glitches, the game is playable up to
+> **Umbris**, and now also **Batalia**, **Gaspar** and **Orxon**. The planets after them all load, but
+> they are only partly ported: expect missing effects or sections that can't be finished. Everything
+> after Orxon is work in progress.
 > See [Status](docs/status.md).
 
 A native PC port of **Ratchet & Clank** (PlayStation 2, 2002), for Linux, and experimentally for Windows.
@@ -22,7 +22,8 @@ changing how the game behaves.
 
 **Milestone 1 is reached: the game is playable up to Umbris.** Veldin, Novalis, Aridia, Kerwan,
 Eudora, Rilgar, Blarg / Nebula G34 and Umbris, the eight planets, have been played through, apart from a few small bugs
-and glitches. Batalia and the planets after it are only partly ported or not yet, so they are not playable end to
+and glitches. Since 0.2.0, Batalia, Gaspar and Orxon are ported too and have been played through.
+Pokitaru and the planets after it are only partly ported or not yet, so they are not playable end to
 end yet. The port as a whole is still in progress. See [Status](docs/status.md) (which also maps the names
 the code uses for the levels to the names in the game), the [Roadmap](docs/roadmap.md) and the
 [History](docs/history.md).
@@ -123,8 +124,8 @@ game's code from it, builds the game and generates the game's data. Run it again
 ```
 
 The full guide, with requirements and troubleshooting: [Setup](docs/setup.md).
-On Windows, run `setup.cmd` instead (double-click it, or drop your disc image on it): see
-[Setup](docs/setup.md#on-windows-experimental). Windows support is experimental.
+On Windows, run `setup.cmd` instead (double-click it, or drop your disc image on it), then play with
+`play.cmd`: see [Setup](docs/setup.md#on-windows-experimental). Windows support is experimental.
 
 At start the game checks, in the background, whether a newer version is out, and says so at the main menu
 (it downloads nothing; this is new and still a work in progress). That is one anonymous request to GitHub's API, no telemetry; Options > Advanced >

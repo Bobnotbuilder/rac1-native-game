@@ -7,12 +7,13 @@ rem Usage: setup.cmd [--iso <path-to-your-iso>] [--force [steps]] [-j N]  (setup
 rem Double-clicking it works too (it asks for the disc image), and so does dropping the disc image on it.
 setlocal
 set "DIR=%~dp0"
-set "ARGS=%*"
 set "WAIT="
+set "DROPPED="
 rem (double-clicked, or a disc image dropped on it: the window stays open at the end)
+rem (the arguments are never copied into a variable: a path with & or ) in it would end the command there)
 if "%~1"=="" set "WAIT=1"
 if not "%~1"=="" if exist "%~1" (
-    set "ARGS=--iso %*"
+    set "DROPPED=1"
     set "WAIT=1"
 )
 
@@ -25,7 +26,11 @@ if errorlevel 1 (
     goto done
 )
 set "PATH=%DIR%.toolchain\msys64\clang64\bin;%PATH%"
-"%DIR%.toolchain\msys64\clang64\bin\python.exe" "%DIR%tools\setup.py" %ARGS%
+if defined DROPPED (
+    "%DIR%.toolchain\msys64\clang64\bin\python.exe" "%DIR%tools\setup.py" --iso "%~1"
+) else (
+    "%DIR%.toolchain\msys64\clang64\bin\python.exe" "%DIR%tools\setup.py" %*
+)
 set "RESULT=%errorlevel%"
 goto done
 
@@ -37,7 +42,11 @@ if errorlevel 1 (
     echo     pacman -S --needed mingw-w64-clang-x86_64-python
     goto done
 )
-python "%DIR%tools\setup.py" %ARGS%
+if defined DROPPED (
+    python "%DIR%tools\setup.py" --iso "%~1"
+) else (
+    python "%DIR%tools\setup.py" %*
+)
 set "RESULT=%errorlevel%"
 
 :done

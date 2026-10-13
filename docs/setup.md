@@ -229,7 +229,8 @@ The Windows build is made with **clang** (or GCC) from **MSYS2**, not with Visua
 (see [Platforms](platforms.md)).
 
 1. Get the repository (with git, or as a zip) and **double-click `setup.cmd`** in its folder (or drop
-   your disc image on it, or run `setup.cmd --iso C:\Users\you\Games\ratchet.iso`).
+   your disc image on it, or run `setup.cmd --iso "C:\Users\you\Games\ratchet.iso"`; the quotes are
+   needed when the path has spaces or characters such as `&`).
 
    Nothing needs to be installed first. The first time, the setup downloads the tools that build the
    game (about 1 GB, a few minutes): a private copy of [MSYS2](https://www.msys2.org) in the
@@ -241,7 +242,9 @@ The Windows build is made with **clang** (or GCC) from **MSYS2**, not with Visua
    With your own MSYS2, the setup can also run from its **CLANG64** shell (`./setup.sh`, or
    `setup.cmd`): it then uses that shell's tools and tells you which packages to install.
 
-2. **Play**: double-click `build\rac1-native.exe`.
+2. **Play**: double-click **`play.cmd`** in the repository's folder. (The game must start from the
+   repository's folder, where it finds `assets\`: `build\rac1-native.exe` double-clicked on its own
+   would not find them. From a terminal in that folder, `build\rac1-native.exe` works too.)
 
 What differs from Linux:
 
