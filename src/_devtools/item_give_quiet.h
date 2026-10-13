@@ -5,7 +5,7 @@
 // acquisition message (table 0x1b0340) through the HUD message 0x263d40 (text 0x179118, frames 0x15f640). A first
 // acquisition message is only in the text table of the level the game gives that item on (e.g. the
 // Hydrodisplacer's on Nebula G34, the Swingshot's on Kerwan), so an item given anywhere else shows the game's own
-// "Paradox: This message does not exist" (0x1796a8): the original does the same. The tools take that message back: the
+// the placeholder message for a missing text (0x1796a8): the original does the same. The tools take that message back: the
 // HUD message is left as it was when the level's table lacks the item's text. The item, its ammo and its slots are the
 // game's own give.
 

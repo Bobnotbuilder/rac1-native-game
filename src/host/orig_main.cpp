@@ -2559,7 +2559,7 @@ int main(int argc, char** argv) {
                     char* e = nullptr;
                     const long id = std::strtol(q, &e, 0);
                     if (e == q) break;
-                    devtools::item_give_quiet(static_cast<int32_t>(id), 0);  // (no "Paradox" for another level's item)
+                    devtools::item_give_quiet(static_cast<int32_t>(id), 0);  // (no placeholder message for another level's item)
                     q = *e == ',' ? e + 1 : e;
                 }
             }
