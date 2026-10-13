@@ -216,6 +216,10 @@ still runs those ranges, with the ported particle program on its VU1, but instea
 primitives it keeps them aside. `src/game/render/mrp_fx.cpp` takes them back to world space and draws
 them in the shared projection and depth buffer, from a texture atlas, in the GS's primitive order,
 breaking batches only on a blend or depth change. Effects that need it use dual-source blending.
+The atlas holds at most 1024 layers (fewer if the GPU allows fewer array layers); when it is full, the
+layer least recently drawn with is reused. Some effects get new texture pixels every frame (Aridia's
+sand sea), so an atlas that only grew reached the GPU's limit after about half a minute there, and every
+effect then lost its texture ([issue #19](https://github.com/daino-selvatico/rac1-native-game/issues/19)).
 
 ## Level of detail
 

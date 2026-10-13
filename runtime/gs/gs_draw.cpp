@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -563,6 +564,26 @@ void draw(const Gs& gs, int win_w, int win_h, float FB_W, float FB_H, const Dept
             verts = {mk(p.v[0]), mk(p.v[1])};
         }
         if (verts.empty()) continue;
+        // a 2D sprite / triangle that covers none of the GS's sample points draws nothing on the GS: it samples each pixel at its
+        // integer coordinates (pixel x covered when x0 <= x < x1, the "top-left" rule), GL at the pixel's centre (x + 0.5), so a
+        // primitive whose part inside the scissor is within [511.5, 512) - the oxygen indicator's frame parked off the frame at x = 512,
+        // less the HUD's half-pixel offset (issue #5) - lit the window's last column on every frame. Such a primitive is not drawn, as on
+        // the GS.
+        if (!p.vu && !p.wide && !crop_3d && (p.type == 6 || p.type == 3)) {
+            float bx0 = p.v[0].x, bx1 = bx0, by0 = p.v[0].y, by1 = by0;
+            for (size_t i = 1; i < (p.type == 6 ? 2u : 3u); ++i) {
+                bx0 = std::min(bx0, p.v[i].x);
+                bx1 = std::max(bx1, p.v[i].x);
+                by0 = std::min(by0, p.v[i].y);
+                by1 = std::max(by1, p.v[i].y);
+            }
+            // (inside the scissor: what lies past it is not drawn either)
+            bx0 = std::max(bx0, static_cast<float>(field(st.scissor, 0, 11)));
+            bx1 = std::min(bx1, static_cast<float>(field(st.scissor, 16, 11) + 1));
+            by0 = std::max(by0, static_cast<float>(field(st.scissor, 32, 11)));
+            by1 = std::min(by1, static_cast<float>(field(st.scissor, 48, 11) + 1));
+            if (std::ceil(bx0) >= bx1 || std::ceil(by0) >= by1) continue;
+        }
         // the 2D over the frame's whole width or height (a fade, a darkening in strips): its
         // vertices at the frame's edges moved to the window's
         bool to_left = false, to_right = false, full_span = false, edge_fill = false;
