@@ -28,6 +28,7 @@
 #include <game/ovl/ship_draw_cbs.h>
 #include <game/ovl/veldin_extras.h>
 #include <game/ovl/empty_class_updates.h>
+#include <game/ovl/weapon_classes_tr.h>
 #include <game/port_stubs.h>
 
 #include <vector>
@@ -100,6 +101,7 @@ static std::vector<MobyFnEntry>& moby_fns() {
         ship_draw_cbs_register();
         empty_class_updates_register();
         veldin_extras_register();
+        weapon_classes_register();
     }
     return table;
 }
