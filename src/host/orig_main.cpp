@@ -65,6 +65,8 @@
 
 #include <platform/platform.h>
 
+#include "host_language.h"
+
 #include <game/enhance/advanced.h>
 #include <game/enhance/controls.h>
 #include <game/enhance/graphics.h>
@@ -1878,7 +1880,10 @@ int main(int argc, char** argv) {
     // The language 0x15ed88: the overlay's main (0x23d598, not ported) sets it from the console's
     // language (0x12d240; 1 English → 0, 2 French → 2, 3 Spanish → 4, 4 German → 3, 5 Italian
     // → 5, others 0) before the level's load copies the texts of that language (0x241940). The
-    // host has no console settings: English (0), or the debug menu's saved choice.
+    // host stands in for the console's settings (host_language.h): the language the player last
+    // chose in the game, else the system's; English in a headless run. Then the debug menu's saved
+    // choice, then RAC1_LANGUAGE.
+    sw(0x0015ed88, rac1::host_language::console_language(!headless));
 #ifdef RAC1_DEVTOOLS
     if (!headless || std::getenv("RAC1_DEVMENU_SHOT") != nullptr) rac1::devtools::dev_language_boot();
 #endif
@@ -2172,6 +2177,7 @@ int main(int argc, char** argv) {
             // the game's frame on the EE thread's coroutine (ADR 0012): a vsync wait inside a blocking loop (the screen fade
             // 0x1f9838) suspends it, this host frame shows that frame and the next one resumes it (the lambda not called again)
             if (!ee_thread_suspended()) g_mode_at_update = boot_active() ? -100 : lw(OV(0x0015f5c4));
+            rac1::host_language::note(lwu(0x0015ed88));  // (a language chosen in the game: kept as the console's)
             ee_thread_run([&] {
                 if (exiting) {  // the level exit's loops (the loading screen, the load), then the new level
                     static uint64_t flight_frames = 0, flight_first = 0;  // (the frames the loading screen's flight was drawn)
