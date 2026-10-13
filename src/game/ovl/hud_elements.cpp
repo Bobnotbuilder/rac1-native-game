@@ -5,6 +5,7 @@
 // shown / to show, +0x7c the time it stays up, +0x80 its animation counters.
 #include <game/lib/libc.h>
 #include <game/ovl/hud_o2.h>
+#include <game/ovl/hud_slot7_tr.h>
 #include <game/ovl/ovl_reloc.h>
 #include <game/math/vecmath.h>
 #include <game/ovl/ovl.h>
@@ -481,6 +482,8 @@ void hud_element_fns_register() {
     ovl_register_moby_fn(0x0023cdb8, hud_ammo_update);
     ovl_register_moby_fn(0x0023a7a8, hud_ammo_draw_fn);
     ovl_register_moby_fn(0x0023a640, hud_mode2_draw_fn);
+    ovl_register_moby_fn(0x00235dc0, hud_slot7_start_tr);  // (slot 7, the Metal Detector's: its draw is each level's own)
+    ovl_register_moby_fn(0x0023a218, hud_slot7_update_tr);
     hud_o2_fns_register();
 }
 

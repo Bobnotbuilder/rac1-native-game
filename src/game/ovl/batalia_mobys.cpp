@@ -3,6 +3,7 @@
 // moby +0x74) reaches them only while the played level's overlay is level 8's.
 #include <game/ovl/batalia_hooks.h>
 #include <game/ovl/batalia_mobys.h>
+#include <game/ovl/batalia_part2.h>
 
 #include <game/ovl/ovl_reloc.h>
 
@@ -88,6 +89,7 @@ void batalia_moby_fns_register() {
     ovl_register_level_moby_fn(BATALIA, L8_ADDR(0x002d4000), bat_hook_2d4000_m);
     ovl_register_level_moby_fn(BATALIA, L8_ADDR(0x002d4050), bat_hook_2d4050_m);
     ovl_register_level_moby_fn(BATALIA, L8_ADDR(0x002d8180), bat_hook_2d8180_m);
+    batalia_part2_register();  // (the classes' draw-list callbacks)
 }
 
 }  // namespace rac1

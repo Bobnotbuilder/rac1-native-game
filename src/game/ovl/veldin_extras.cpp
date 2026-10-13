@@ -4,6 +4,7 @@
 #include <game/ovl/ovl.h>
 #include <game/ovl/ovl_common.h>
 #include <game/ovl/particle_types_tr.h>
+#include <game/ovl/particle_types2_tr.h>
 #include <game/ovl/shared_classes_tr.h>
 
 namespace rac1 {
@@ -24,6 +25,11 @@ void veldin_extras_register() {
     ovl_register_moby_fn(0x00271c88, particle_30_update);  // (particle type 0x30)
     ovl_register_moby_fn(0x00271df8, particle_32_update);  // (particle type 0x32)
     ovl_register_moby_fn(0x00271ec8, particle_33_update);  // (particle type 0x33)
+    ovl_register_moby_fn(0x00268d48, particle_00_update);  // (particle type 0: met on Batalia)
+    ovl_register_moby_fn(0x00268fe8, particle_01_update);  // (particle type 1: met on Batalia)
+    ovl_register_moby_fn(0x00275860, particle_4d_update);  // (particle type 0x4d: met on Batalia)
+    ovl_register_moby_fn(0x002710a0, particle_2b_update);  // (particle type 0x2b: met on Batalia)
+    ovl_register_moby_fn(0x00275510, particle_4a_update);  // (particle type 0x4a, the Sandmouse's: met on Batalia)
     ovl_register_moby_fn(0x00273448, particle_3d_update);  // (particle type 0x3d)
     ovl_register_moby_fn(0x00273ee0, particle_41_update);  // (particle type 0x41)
     ovl_register_moby_fn(0x00272bc0, particle_3a_update);  // (particle type 0x3a)
