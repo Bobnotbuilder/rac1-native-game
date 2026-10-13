@@ -37,20 +37,24 @@ inline uint32_t f2u(float f) { uint32_t u; std::memcpy(&u, &f, 4); return u; }
 // has no Inf / NaN, game data uses 0x7f800000 as "very large"), denormals read as signed zero.
 inline double fpu_in(float f) {
     const uint32_t u = f2u(f);
-    const uint32_t e = u & 0x7f800000u;
-    if (e == 0x7f800000u) {
-        const double v = std::ldexp(1.0 + static_cast<double>(u & 0x7fffffu) / 8388608.0, 128);
-        return (u >> 31) != 0 ? -v : v;
+    const uint32_t m = u & 0x7fffffffu;
+    if (__builtin_expect(m >= 0x7f800000u || (m - 1u < 0x007fffffu), 0)) {
+        if (m >= 0x7f800000u) {
+            const double v = std::ldexp(1.0 + static_cast<double>(u & 0x7fffffu) / 8388608.0, 128);
+            return (u >> 31) != 0 ? -v : v;
+        }
+        return (u >> 31) != 0 ? -0.0 : 0.0;
     }
-    if (e == 0) return (u >> 31) != 0 ? -0.0 : 0.0;
     return static_cast<double>(f);
 }
 // orig: (helper) an EE FPU result: beyond the range clamps to +-FLT_MAX, denormals flush.
 inline float fpu_out(double r) {
-    if (std::fabs(r) > static_cast<double>(FLT_MAX)) return std::signbit(r) ? -FLT_MAX : FLT_MAX;
+    if (__builtin_expect(std::fabs(r) > static_cast<double>(FLT_MAX), 0)) return std::signbit(r) ? -FLT_MAX : FLT_MAX;
     const float f = static_cast<float>(r);
-    if (std::isinf(f)) return std::signbit(f) ? -FLT_MAX : FLT_MAX;
-    if (f != 0.0f && std::fabs(f) < FLT_MIN) return std::signbit(f) ? -0.0f : 0.0f;
+    const uint32_t u = f2u(f), m = u & 0x7fffffffu;
+    if (__builtin_expect(m >= 0x7f800000u || (m - 1u < 0x007fffffu), 0)) {
+        return u2f((u & 0x80000000u) | (m >= 0x7f800000u ? 0x7f7fffffu : 0u));
+    }
     return f;
 }
 // orig: (helper) EE FPU DIV.S (rounded to nearest) — x/0 gives +-FLT_MAX; results clamp to +-FLT_MAX, denormals flush.
@@ -72,19 +76,19 @@ inline int32_t ee_rem(int32_t a, int32_t b) { return b == 0 ? a : (b == -1 ? 0 :
 inline float vuc(float f) {
     uint32_t u;
     std::memcpy(&u, &f, 4);
-    const uint32_t e = u & 0x7f800000u;
-    if (e == 0) u &= 0x80000000u;
-    else if (e == 0x7f800000u) u = (u & 0x80000000u) | 0x7f7fffffu;
-    std::memcpy(&f, &u, 4);
+    const uint32_t m = u & 0x7fffffffu;
+    if (__builtin_expect(m >= 0x7f800000u || (m - 1u < 0x007fffffu), 0)) {
+        u = (u & 0x80000000u) | (m >= 0x7f800000u ? 0x7f7fffffu : 0u);
+        std::memcpy(&f, &u, 4);
+    }
     return f;
 }
 // Views of EE RAM as the math library's vector / matrix types.
 inline Vec4& V(uint32_t a) { return *static_cast<Vec4*>(ee_ram_ptr(a)); }
 inline Mat4& M(uint32_t a) { return *static_cast<Mat4*>(ee_ram_ptr(a)); }
 inline void lq_sq(uint32_t dst, uint32_t src) {  // 128-bit aligned copy
-    const uint64_t lo = ld(src & ~15u), hi = ld((src & ~15u) + 8);
-    sd(dst & ~15u, lo);
-    sd((dst & ~15u) + 8, hi);
+    struct Qw { uint64_t lo, hi; };
+    ee_write<Qw>(dst & ~15u, ee_read<Qw>(src & ~15u));
 }
 // orig: (helper) scratchpad DMA, normal mode, done synchronously: toSPR (ch9, 0x1000d400) copies
 // qwc quadwords from RAM madr to the scratchpad at sadr (wrapping in 16 KB); fromSPR (ch8) back.

@@ -23,10 +23,9 @@ struct Vu0 {
 
 // (inline: the macro-mode helpers reach it for every operand)
 namespace detail {
-extern Vu0* g_global;  // set by global_init() on the first use
-Vu0& global_init();
+extern Vu0 g_instance;
 }  // namespace detail
-inline Vu0& global() { return detail::g_global != nullptr ? *detail::g_global : detail::global_init(); }
+inline Vu0& global() { return detail::g_instance; }
 // VIF0 DMA in source chain mode from `tadr` (tte: the tags carry VIF codes): MPG into the micro
 // memory; NOP / STCYCL / FLUSH* without effect here.
 void vif0_send_chain(uint32_t tadr, bool tte);
