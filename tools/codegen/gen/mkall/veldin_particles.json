@@ -11,7 +11,8 @@
   "271ec8:particle_33_update:void:a0",
   "273448:particle_3d_update:void:a0",
   "273ee0:particle_41_update:void:a0",
-  "272bc0:particle_3a_update:void:a0"
+  "272bc0:particle_3a_update:void:a0",
+  "271d20:particle_31_update:void:a0"
  ],
  "glue_files": [],
  "files": [

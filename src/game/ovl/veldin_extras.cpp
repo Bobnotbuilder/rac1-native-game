@@ -35,6 +35,7 @@ void veldin_extras_register() {
     ovl_register_moby_fn(0x00273448, particle_3d_update);  // (particle type 0x3d)
     ovl_register_moby_fn(0x00273ee0, particle_41_update);  // (particle type 0x41)
     ovl_register_moby_fn(0x00272bc0, particle_3a_update);  // (particle type 0x3a)
+    ovl_register_moby_fn(0x00271d20, particle_31_update);  // (particle type 0x31: the bullets of Kerwan's helicopter, L3:0x260210)
     ovl_register_moby_fn(0x002b4198, class167_update_tr);  // (class 167, the Thruster-Pack's jets)
     ovl_register_moby_fn(0x002b3628, class167_draw_tr);    // (its draw-list callback)
     ovl_register_moby_fn(0x002e03a0, helmet_update_tr);    // (class 1290, the Pilot's Helmet pickup: Gaspar)
