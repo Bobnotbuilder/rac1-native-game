@@ -2117,6 +2117,7 @@ int main(int argc, char** argv) {
         static const int host_delay_ms = std::getenv("RAC1_HOST_DELAY_MS") != nullptr ? std::atoi(std::getenv("RAC1_HOST_DELAY_MS")) : 0;
         if (host_delay_ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(host_delay_ms));  // (testing: a slow host frame)
         bool iop_alone = true;  // (the IOP's mirror may play alone while the game's thread stalls; not while the host holds the game)
+        bool host_paused = false;  // (the debug menu holds the game: its frames still drawn, the menu over them)
 #ifdef RAC1_DEVTOOLS
         // (testing) RAC1_REALTIME=1: a headless run steps the game as a window does (60 game frames a second of the wall
         // clock, the stalls not caught up), with RAC1_FPS_CAP its host frames' rate and RAC1_AUDIO_DEVICE=null the sound's queue
@@ -2126,6 +2127,7 @@ int main(int argc, char** argv) {
             const dt::DevSettings& ds = dt::dev_settings();
             const bool paused = ds.paused || (ds.open && ds.pause_when_open);
             iop_alone = !paused && ds.speed == 1.0f;
+            host_paused = paused;
             if (paused) {
                 game_time = 0.0;
                 steps = ds.step_once ? 1 : 0;
@@ -2286,6 +2288,17 @@ int main(int argc, char** argv) {
                             lwu(OV(0x0015f3f8)), lw(OV(0x0015f5c4)));
             was_suspended = ee_thread_suspended();
             if (ee_thread_suspended()) break;  // (a blocking loop's frame: shown before the game goes on, ADR 0012)
+        }
+        // a host frame that ran no game frame (it came sooner than 1/60 s: a jitter in the host's timing, a faster display)
+        // shows nothing new: not prepared nor drawn again (the picture on the screen stays), the host waits for the next game
+        // frame instead. A frame prepared twice without the game's update between went wrong: the projection's widening
+        // (undone before each update, render_view_projection_undo) applied twice - the title's scene drawn in a wrong view,
+        // its menu's frames gone, for that one frame (a flicker, on Windows above all)
+        if (steps == 0 && !host_paused && !headless) {
+            const double wait_s = std::max(0.0, 0.5 - game_time) / 60.0;  // (the next game frame is due when game_time reaches 0.5)
+            std::this_thread::sleep_for(std::chrono::duration<double>(std::max(wait_s, 0.001)));
+            fprof.end_frame();
+            continue;
         }
 
         LevelLoader::legacy_level_ensure();  // (a legacy renderer chosen since the level's load: its copy of the level now)

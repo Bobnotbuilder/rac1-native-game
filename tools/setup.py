@@ -18,7 +18,8 @@ that make its output (or the disc) changed since it last ran, or when it is forc
 The record of what was generated with what is assets/setup-state.json. docs/setup.md is the guide.
 
 `tools/setup.py --code-inputs` (for CMake) prints the fingerprint of the generated code's sources, then
-those sources, one per line.
+those sources, one per line. `tools/setup.py --check` (for play.cmd) changes nothing: it prints what a setup would
+redo now, and exits with 10 when that is something (0 when the game is up to date).
 """
 
 import argparse
@@ -334,9 +335,8 @@ KNOWN_DISCS = {
 }
 
 
-def find_iso(arg):
-    if arg:
-        return Path(arg).expanduser().resolve()
+def known_iso():
+    """The disc image the game already uses (RAC1_ISO, the link in assets/iso/, or its path there), or None."""
     if os.environ.get("RAC1_ISO"):
         return Path(os.environ["RAC1_ISO"]).expanduser().resolve()
     for p in GAME_ISOS.values():
@@ -346,6 +346,15 @@ def find_iso(arg):
         lines = GAME_ISO_PATH_FILE.read_text(encoding="utf-8").splitlines()
         if lines and Path(lines[0].strip()).is_file():
             return Path(lines[0].strip())
+    return None
+
+
+def find_iso(arg):
+    if arg:
+        return Path(arg).expanduser().resolve()
+    iso = known_iso()
+    if iso is not None:
+        return iso
     if not sys.stdin.isatty():
         fail(f"No disc image given. Run {SETUP_CMD} --iso <path-to-your-iso>")
     print("  Where is your Ratchet & Clank disc image (NTSC-U SCUS-97199, or PAL SCES-50916)?")
@@ -528,20 +537,31 @@ def code_current():
     return bool(m) and m.group(1) == code_sources_fingerprint()
 
 
+def code_step_fingerprint(name, patterns, disc, state):
+    fingerprint = f"{disc}:{sources_fingerprint(patterns)}"
+    if name == "code":  # (made from the two steps before it, too)
+        fingerprint += ":" + hashlib.sha256((state.get("elf", "") + state.get("overlay", "")).encode()).hexdigest()
+    return fingerprint
+
+
+def code_step_present(name, iso):
+    if name == "elf":
+        return boot_elf(iso).is_file()
+    if name == "overlay":
+        other = region_table(iso) is not None
+        return ((OVERLAY_MAPS / "front_reloc.txt").is_file()
+                and all((OVERLAY_MAPS / f"level{lv}.txt").is_file() for lv in range(1, 19))
+                and (not other or all((OVERLAY_MAPS / f"codegen/level{lv}.txt").is_file() for lv in range(1, 19))))
+    return code_current()
+
+
 def prepare_code(iso, forced, jobs):
     """The steps before the build, each redone only when the disc or its sources changed (or forced)."""
     state = load_state()
     disc = disc_fingerprint(iso)
     for name, what, patterns in CODE_STEPS:
-        fingerprint = f"{disc}:{sources_fingerprint(patterns)}"
-        if name == "code":  # (made from the two steps before it, too)
-            fingerprint += ":" + hashlib.sha256((state.get("elf", "") + state.get("overlay", "")).encode()).hexdigest()
-        other = region_table(iso) is not None
-        present = {"elf": boot_elf(iso).is_file(), "overlay": (OVERLAY_MAPS / "front_reloc.txt").is_file()
-                   and all((OVERLAY_MAPS / f"level{lv}.txt").is_file() for lv in range(1, 19))
-                   and (not other or all((OVERLAY_MAPS / f"codegen/level{lv}.txt").is_file() for lv in range(1, 19))),
-                   "code": code_current()}[name]
-        if name not in forced and state.get(name) == fingerprint and present:
+        fingerprint = code_step_fingerprint(name, patterns, disc, state)
+        if name not in forced and state.get(name) == fingerprint and code_step_present(name, iso):
             ok(f"{what[0].upper() + what[1:]}: up to date")
             continue
         print(f"  {what[0].upper() + what[1:]}...", flush=True)
@@ -648,8 +668,10 @@ def build(jobs):
 
 def sources_fingerprint(patterns):
     h = hashlib.sha256()
+    # (the path always with /: the same fingerprint on every system, and from every Windows shell, MSYS2's Python
+    # writing paths with / when MSYSTEM is set and with \ when it is not)
     for p in sources_files(patterns):
-        h.update(str(p.relative_to(ROOT)).encode() + b"\0" + p.read_bytes() + b"\0")
+        h.update(p.relative_to(ROOT).as_posix().encode() + b"\0" + p.read_bytes() + b"\0")
     return h.hexdigest()
 
 
@@ -679,6 +701,48 @@ def generate(iso, forced):
             fail(f"Generating {what} failed (see the messages above). Run {SETUP_CMD} again to retry.")
         state[name] = fingerprint
         save_state(state)
+
+
+# What the build compiles (CMake's inputs): a file newer than the program means a new version (a git pull, a
+# download over the old one) that was not built yet.
+BUILD_INPUTS = ["CMakeLists.txt", "cmake", "src", "runtime", "third_party", "assets/generated/src"]
+
+
+def newest_mtime(paths):
+    newest = 0.0
+    stack = [ROOT / p for p in paths]
+    while stack:
+        p = stack.pop()
+        try:
+            if p.is_dir():
+                stack.extend(p.iterdir())
+            else:
+                newest = max(newest, p.stat().st_mtime)
+        except OSError:
+            pass
+    return newest
+
+
+def setup_due():
+    """What a setup would redo now, without doing it ([] when the game is up to date): for play.cmd and
+    ./setup.sh --check. Each step is judged as the setup itself judges it."""
+    if not EXE.exists():
+        return ["the game is not built yet"]
+    iso = known_iso()
+    if iso is None or not iso.is_file():
+        return ["the disc image is not set up"]
+    due = []
+    state = load_state()
+    disc = disc_fingerprint(iso)
+    for name, what, patterns in CODE_STEPS:
+        if state.get(name) != code_step_fingerprint(name, patterns, disc, state) or not code_step_present(name, iso):
+            due.append(what)
+    if newest_mtime(BUILD_INPUTS) > EXE.stat().st_mtime:
+        due.append("the game's program (its sources are newer)")
+    for name, what, patterns in STEPS:
+        if state.get(name) != f"{disc}:{sources_fingerprint(patterns)}":
+            due.append(what)
+    return due
 
 
 def game_env():
@@ -729,6 +793,10 @@ def main():
     if sys.argv[1:] == ["--code-inputs"]:
         print_code_inputs()
         return
+    if sys.argv[1:] == ["--check"]:  # exit status 10 when a setup is due (what it would redo, one per line)
+        due = setup_due()
+        print("\n".join(due) if due else "up to date")
+        sys.exit(10 if due else 0)
     ap = argparse.ArgumentParser(description="Sets up rac1-native: checks the system and your disc image, generates "
                                              "the game's code from it, builds the game and generates the game's data.")
     ap.add_argument("--iso", help="your disc image (Ratchet & Clank: NTSC-U SCUS-97199, or PAL SCES-50916)")

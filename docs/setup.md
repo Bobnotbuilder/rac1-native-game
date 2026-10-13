@@ -246,6 +246,11 @@ The Windows build is made with **clang** (or GCC) from **MSYS2**, not with Visua
    repository's folder, where it finds `assets\`: `build\rac1-native.exe` double-clicked on its own
    would not find them. From a terminal in that folder, `build\rac1-native.exe` works too.)
 
+   `play.cmd` first checks that the setup is up to date (`tools/setup.py --check`, which changes
+   nothing): after a new version is downloaded over this one, or when a setup did not finish, a
+   window offers to run the setup again (**Run the setup**) or to start the game as it is (**Play
+   anyway**).
+
 What differs from Linux:
 
 - **The disc image.** Windows only lets programs make links with Developer Mode on (or as an
@@ -257,6 +262,9 @@ What differs from Linux:
 - **The DLLs.** Built without FFmpeg, the program needs only Windows' own DLLs (the C++ runtime is
   linked in). Built with FFmpeg (the movies), it uses MSYS2's DLLs: the build copies them into
   `build\`, beside the program.
+- **The GPU.** On a laptop with two (an integrated one and an NVIDIA or AMD one), the program asks
+  the drivers for the dedicated one (`src/host/gpu_preference_win32.cpp`). A choice made in Windows'
+  Settings (System > Display > Graphics) or in the driver's control panel still wins.
 
 ## Troubleshooting
 
