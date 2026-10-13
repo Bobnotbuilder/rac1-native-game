@@ -145,6 +145,11 @@ not supported yet.
   art (for example Veldin's swaying plant, Kerwan's shrubs and textures, Eudora's tree), the collision
   of four levels.
 - The save folder is the PAL game's (`BESCES-50916RATCHET`).
+- The intro movie, the copyright screen and the title's attract movies are the North American ones
+  (the Sony Computer Entertainment America logo). The game picks them by the video mode, not by the
+  disc: the PAL disc carries both versions, and in its 60 Hz mode the PAL game plays the 60 Hz ones. A
+  European PS2 starts the game at 50 Hz, so there the intro is the European one until the player
+  switches to 60 Hz. Nothing of these movies is in the repository: they are read from your disc.
 
 **Known gaps.** A few functions are different code in the PAL build:
 
