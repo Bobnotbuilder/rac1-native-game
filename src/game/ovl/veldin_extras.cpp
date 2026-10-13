@@ -1,8 +1,10 @@
 // Veldin's engine functions first reached unported on Rilgar (see veldin_extras.h).
 #include <game/ovl/veldin_extras.h>
 
+#include <game/ovl/helmet_tr.h>
 #include <game/ovl/ovl.h>
 #include <game/ovl/ovl_common.h>
+#include <game/ovl/particle_28_tr.h>
 #include <game/ovl/particle_types_tr.h>
 #include <game/ovl/particle_types2_tr.h>
 #include <game/ovl/shared_classes_tr.h>
@@ -35,6 +37,8 @@ void veldin_extras_register() {
     ovl_register_moby_fn(0x00272bc0, particle_3a_update);  // (particle type 0x3a)
     ovl_register_moby_fn(0x002b4198, class167_update_tr);  // (class 167, the Thruster-Pack's jets)
     ovl_register_moby_fn(0x002b3628, class167_draw_tr);    // (its draw-list callback)
+    ovl_register_moby_fn(0x002e03a0, helmet_update_tr);    // (class 1290, the Pilot's Helmet pickup: Gaspar)
+    ovl_register_moby_fn(0x0026ff10, particle_28_update);  // (particle type 0x28: Orxon)
 }
 
 }  // namespace rac1

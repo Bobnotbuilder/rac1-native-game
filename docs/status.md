@@ -64,8 +64,8 @@ nothing, so an object whose class is not ported stands still or does not appear.
 | 6 | Nebula G34 (Blarg's station; see [names](#level-names)) | Complete, including the boss fight. | |
 | 7 | Umbris | Complete, including the Snagglebeast. | |
 | 8 | Batalia | Ported: its own classes and their draw callbacks (the turret's sights and radars, the Trespasser puzzle, the Sandmouse), the rain, the Metal Detector's HUD element. Its exits (the Commando to Orxon, the deserter to Gaspar, the ship) reached in automated runs. Waiting for a playtest. | The turret challenge has not been won in an automated run. A few of its classes are never placed on the level, so the original could not be compared with them. |
-| 9 | Gaspar | First part ported: 40 class update functions. | Draw callbacks not ported. |
-| 10 | Orxon | First part ported: 62 classes, 8 draw callbacks. | The O2 mask and the Pilot's Helmet not ported. |
+| 9 | Gaspar | Its own classes ported, with their draw callbacks (the lava's animated texture, the background ships' glows, the Visibomb's static) and the Pilot's Helmet pickup. Ready for playtest; not played through by hand yet. | |
+| 10 | Orxon | Its own classes ported, with their draw callbacks: Clank's section, and Ratchet's part once he has the O2 mask. Ready for playtest; not played through by hand yet. | |
 | 11 | Pokitaru | First part ported. | Weapons and gadgets bought there not ported. |
 | 12 | Hoven | Loads and runs. | Nothing of its own ported. |
 | 13 | Gemlik Base (code: Oltanis Orbit) | Loads and runs. | Nothing of its own ported. |
