@@ -65,6 +65,7 @@ constexpr OvConst<0x001b4b68u> OPTIONS_HELP{};
 constexpr OvConst<0x001b5a60u> CAMERA_PAGE{};
 constexpr OvConst<0x001b5ae8u> CAMERA_TITLE{};
 constexpr OvConst<0x001b5ba0u> CAMERA_SETTINGS{};
+constexpr OvConst<0x001b6678u> TALL_PAGE{};
 constexpr OvConst<0x001b86c8u> ROOT_PAGE{};
 constexpr OvConst<0x001b8798u> ROOT_NEW_GAME{};  // the main menu's New Game button (a one-entry list): an entry to copy
 
@@ -289,6 +290,7 @@ void update_menu_main_install() {
     sw(U_PAGE + 0x40, U_ROWS_WIDGET);
     slot_replace(U_PAGE, CAMERA_TITLE, U_TITLE);
     slot_replace(U_PAGE, CAMERA_SETTINGS, U_ROWS_WIDGET);
+    sw(U_PAGE + 0xc, lwu(TALL_PAGE + 0xc));
     sw(U_PAGE + 4, lwu(OPTIONS_PAGE + 4));
     sw(U_PAGE + 0x44 + 4, U_HELP_WIDGET);
     sw(U_PAGE + 5 * 4, 0x13);

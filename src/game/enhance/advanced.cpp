@@ -63,7 +63,6 @@ constexpr OvConst<0x001b4a30u> OPTIONS_PICTURE{};  // its image is the list's se
 constexpr OvConst<0x001b5a60u> CAMERA_PAGE{};
 constexpr OvConst<0x001b5ae8u> CAMERA_TITLE{};
 constexpr OvConst<0x001b5ba0u> CAMERA_SETTINGS{};
-constexpr OvConst<0x001b6678u> TALL_PAGE{};  // a page (state 0x1a) whose slot 3 box is tall enough for our rows (graphics.cpp)
 constexpr OvConst<0x001b8888u> MAIN_OPTIONS_PAGE{};  // the main menu's Options (the boot module's)
 
 // Our text ids, after the game's (0x4e00..0x5300 in the level text tables)
@@ -311,9 +310,6 @@ void advanced_menu_install() {
     const uint32_t graphics_page = graphics_page_install(front ? static_cast<uint32_t>(MAIN_OPTIONS_PAGE) : static_cast<uint32_t>(OPTIONS_PAGE));
     const uint32_t controls = controls_page_install(front ? static_cast<uint32_t>(MAIN_OPTIONS_PAGE) : static_cast<uint32_t>(OPTIONS_PAGE));
     sw(PAGE + 0x40, ROWS_WIDGET);
-    // the rows' box: Camera's holds 4 or 5 rows, ours are 6 (the update check's two): the taller box of page
-    // 0x1b6678 (its slot 3), as the Graphics page's
-    sw(PAGE + 0xc, lwu(TALL_PAGE + 0xc));
     for (uint32_t i = 0; i < 14; ++i) {
         const uint32_t slot = PAGE + 0x44 + i * 4;
         if (lwu(slot) == CAMERA_TITLE) sw(slot, TITLE);
