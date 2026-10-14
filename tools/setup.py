@@ -31,6 +31,9 @@ import shutil
 import struct
 import subprocess
 import sys
+import time
+import urllib.request
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -76,7 +79,6 @@ CODE_STEPS = [
 # The data steps of `rac1-native --setup --step <name>`, in order, with the sources that make each
 # one's output: a change to any of them (after a git pull) makes the step run again.
 STEPS = [
-    ("wads", "the levels' data", ["src/setup/iso_extract.*"]),
     ("moby", "the moby models and textures",
      ["src/setup/mrp_export.*", "src/setup/kick_trace.*", "src/formats/**/*", "src/game/ovl/moby_vu1*",
       "tools/codegen/gen_moby_vu_fast.py", *VU_CODEGEN, "runtime/vu/**/*"]),
@@ -689,6 +691,16 @@ def save_state(state):
 
 def generate(iso, forced):
     state = load_state()
+    old_wads = ASSETS_DIR / "extracted/level_wads"
+    if old_wads.is_dir() and not old_wads.is_symlink():
+        shutil.rmtree(old_wads, ignore_errors=True)
+        try:
+            old_wads.parent.rmdir()
+        except OSError:
+            pass
+    if "wads" in state:
+        state.pop("wads", None)
+        save_state(state)
     disc = disc_fingerprint(iso)
     for name, what, patterns in STEPS:
         fingerprint = f"{disc}:{sources_fingerprint(patterns)}"
@@ -751,6 +763,304 @@ def game_env():
     return dict(os.environ, RAC1_PYTHON=sys.executable) if WINDOWS else None
 
 
+# --- 6. Updating (--update, GitHub issue #13) ---------------------------------------------------
+
+REPO = "daino-selvatico/rac1-native-game"
+GITHUB_API = f"https://api.github.com/repos/{REPO}"
+GITHUB_ZIP = f"https://github.com/{REPO}/archive/refs"
+UPDATE_VERSION_FILE = ASSETS_DIR / "update-version.txt"
+
+
+def config_dir():
+    """The player's settings folder (platform.h config_dir)."""
+    if WINDOWS:
+        base = os.environ.get("APPDATA") or (os.path.join(os.environ["USERPROFILE"], "AppData", "Roaming")
+                                             if os.environ.get("USERPROFILE") else "")
+        return Path(base) / "rac1-native" if base else Path(".")
+    base = os.environ.get("XDG_CONFIG_HOME") or (os.path.join(os.environ["HOME"], ".config")
+                                                 if os.environ.get("HOME") else "")
+    return Path(base) / "rac1-native" if base else Path(".")
+
+
+def configured_channel(override):
+    """The update channel: --channel when given, else Options > Advanced > Update Channel (stable by default)."""
+    if override:
+        return override
+    adv = Path(os.environ.get("RAC1_ADVANCED_FILE") or (config_dir() / "advanced_options.txt"))
+    try:
+        for line in adv.read_text(encoding="utf-8", errors="replace").splitlines():
+            parts = line.split()
+            if len(parts) == 2 and parts[0] == "update_channel":
+                return "development" if parts[1] == "1" else "stable"
+    except OSError:
+        pass
+    return "stable"
+
+
+def github_get_json(path):
+    req = urllib.request.Request(GITHUB_API + path, headers={"Accept": "application/vnd.github+json",
+                                                             "User-Agent": "rac1-native-setup-update",
+                                                             "X-GitHub-Api-Version": "2022-11-28"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.load(r)
+
+
+def latest_release_tag():
+    """The latest release's tag from GitHub (or from fetched git tags when offline / rate-limited)."""
+    try:
+        tag = str(github_get_json("/releases/latest").get("tag_name") or "").strip()
+        if tag:
+            return tag
+    except Exception:
+        pass
+    if (ROOT / ".git").exists() and shutil.which("git"):
+        subprocess.run(["git", "fetch", "--tags", "origin"], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        out = subprocess.run(["git", "tag", "-l", "v*"], cwd=ROOT, capture_output=True, text=True).stdout.splitlines()
+        tags = []
+        for t in out:
+            m = re.match(r"^v(\d+)\.(\d+)\.(\d+)$", t.strip())
+            if m:
+                tags.append(((int(m.group(1)), int(m.group(2)), int(m.group(3))), t.strip()))
+        if tags:
+            return max(tags)[1]
+    fail("Could not reach GitHub to find the latest release. Your current build was not changed.")
+
+
+def wait_for_exe():
+    """On Windows, waits briefly for the game to finish exiting before touching rac1-native.exe."""
+    if not WINDOWS or not EXE.exists():
+        return
+    for _ in range(50):
+        try:
+            with open(EXE, "ab"):
+                return
+        except OSError:
+            time.sleep(0.1)
+
+
+def update_git(channel):
+    """Updates a git clone (`git fetch`, then checks out the release tag or fast-forwards main).
+    Returns a restore callback on success, or None if nothing was changed."""
+    if not shutil.which("git"):
+        fail("This is a git clone (.git), but 'git' is not installed. Your current build was not changed.")
+    dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,
+                           capture_output=True, text=True).stdout.strip()
+    if dirty:
+        fail("Your source files have local changes (git status). They are never overwritten: commit or stash them first.")
+    branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=ROOT,
+                            capture_output=True, text=True).stdout.strip()
+    old_head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    if branch not in ("main", "HEAD"):
+        warn(f"This clone is on branch '{branch}' (not main): leaving the branch as it is.")
+        return None
+    restore_ref = branch if branch == "main" else old_head
+
+    def restore():
+        subprocess.run(["git", "checkout", "-q", restore_ref], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if branch == "main" and old_head:
+            subprocess.run(["git", "reset", "--hard", "-q", old_head], cwd=ROOT,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    if channel == "stable":
+        tag = latest_release_tag()
+        print(f"  Fetching release {tag}...", flush=True)
+        if subprocess.run(["git", "fetch", "--tags", "origin"], cwd=ROOT).returncode != 0:
+            fail("git fetch failed (check your internet connection). Your current build was not changed.")
+        target = subprocess.run(["git", "rev-parse", f"{tag}^{{commit}}"], cwd=ROOT,
+                                capture_output=True, text=True).stdout.strip()
+        if not target:
+            fail(f"Release tag {tag} was not found in the repository. Your current build was not changed.")
+        if target == old_head and branch == "HEAD":
+            ok(f"Already at release {tag}.")
+            return restore
+        if subprocess.run(["git", "checkout", "-q", tag], cwd=ROOT).returncode != 0:
+            restore()
+            fail(f"Could not check out {tag}. Your current build was not changed.")
+        ok(f"Checked out release {tag}.")
+        return restore
+
+    print("  Fetching main from origin...", flush=True)
+    if subprocess.run(["git", "fetch", "origin", "main"], cwd=ROOT).returncode != 0:
+        fail("git fetch origin main failed (check your internet connection). Your current build was not changed.")
+    if subprocess.run(["git", "merge-base", "--is-ancestor", old_head, "origin/main"], cwd=ROOT).returncode != 0:
+        fail("This clone has local commits not on origin/main. They are never overwritten.")
+    new_head = subprocess.run(["git", "rev-parse", "origin/main"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    if branch != "main":
+        if subprocess.run(["git", "checkout", "-B", "main", "origin/main"], cwd=ROOT).returncode != 0:
+            restore()
+            fail("Could not switch to main. Your current build was not changed.")
+    elif new_head != old_head:
+        if subprocess.run(["git", "merge", "--ff-only", "origin/main"], cwd=ROOT).returncode != 0:
+            restore()
+            fail("Could not fast-forward main. Your current build was not changed.")
+    if new_head == old_head and branch == "main":
+        ok(f"Already up to date on main ({new_head[:7]}).")
+    else:
+        ok(f"Updated to main ({new_head[:7]}).")
+    return restore
+
+
+ZIP_PROTECTED = {".git", ".toolchain", "assets", "build"}
+
+
+def zip_source_files(root):
+    out = {}
+    for p in root.rglob("*"):
+        if not p.is_file():
+            continue
+        rel = p.relative_to(root)
+        if rel.parts[0] in ZIP_PROTECTED or "__pycache__" in rel.parts:
+            continue
+        out[rel.as_posix()] = hashlib.sha256(p.read_bytes()).hexdigest()
+    return out
+
+
+def update_zip(channel):
+    """Updates a zip download (no .git): checks for local changes, downloads the archive, unpacks over ROOT
+    (leaving assets/, build/ and .toolchain/ alone), and returns a restore callback."""
+    state = load_state()
+    recorded = state.get("source_hashes")
+    if recorded:
+        current = zip_source_files(ROOT)
+        changed = [rel for rel, h in recorded.items() if current.get(rel) not in (None, h)]
+        if changed and not ask(f"{len(changed)} source file(s) have local changes (e.g. {changed[0]}). Overwrite them?", False):
+            fail("Local changes were kept; the update was cancelled.")
+    if channel == "stable":
+        tag = latest_release_tag()
+        url = f"{GITHUB_ZIP}/tags/{tag}.zip"
+        label = f"release {tag}"
+        ver_lines = [f"describe {tag}", "commit ", "branch "]
+    else:
+        try:
+            sha = str(github_get_json("/commits/main").get("sha") or "").strip()
+        except Exception:
+            sha = ""
+        url = f"{GITHUB_ZIP}/heads/main.zip"
+        label = f"main ({sha[:7]})" if sha else "main"
+        ver_lines = [f"describe {sha[:7]}" if sha else "describe main", f"commit {sha}", "branch main"]
+
+    BUILD_DIR.mkdir(exist_ok=True)
+    archive = BUILD_DIR / "update-download.zip"
+    unpack_dir = BUILD_DIR / "update-unpack.tmp"
+    backup_dir = BUILD_DIR / "update-src.bak"
+    shutil.rmtree(unpack_dir, ignore_errors=True)
+    shutil.rmtree(backup_dir, ignore_errors=True)
+    print(f"  Downloading {label}...", flush=True)
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "rac1-native-setup-update"})
+        with urllib.request.urlopen(req, timeout=30) as r, open(archive, "wb") as f:
+            shutil.copyfileobj(r, f)
+        with zipfile.ZipFile(archive) as zf:
+            zf.extractall(unpack_dir)
+    except Exception as e:
+        archive.unlink(missing_ok=True)
+        shutil.rmtree(unpack_dir, ignore_errors=True)
+        fail(f"Could not download or unpack {label} ({e}). Your current build was not changed.")
+    archive.unlink(missing_ok=True)
+    subdirs = [d for d in unpack_dir.iterdir() if d.is_dir()]
+    src_root = subdirs[0] if len(subdirs) == 1 else unpack_dir
+
+    # Back up existing source files before replacing them
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    old_files = list(zip_source_files(ROOT).keys())
+    for rel in old_files:
+        dst = backup_dir / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ROOT / rel, dst)
+    old_ver = UPDATE_VERSION_FILE.read_bytes() if UPDATE_VERSION_FILE.is_file() else None
+    new_files = list(zip_source_files(src_root).keys())
+
+    def restore():
+        for rel in new_files:
+            if rel not in old_files:
+                (ROOT / rel).unlink(missing_ok=True)
+        for rel in old_files:
+            src = backup_dir / rel
+            if src.is_file():
+                dst = ROOT / rel
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+        if old_ver is None:
+            UPDATE_VERSION_FILE.unlink(missing_ok=True)
+        else:
+            UPDATE_VERSION_FILE.write_bytes(old_ver)
+        shutil.rmtree(backup_dir, ignore_errors=True)
+
+    try:
+        for rel in old_files:
+            if rel not in new_files:
+                (ROOT / rel).unlink(missing_ok=True)
+        for rel in new_files:
+            dst = ROOT / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src_root / rel, dst)
+        UPDATE_VERSION_FILE.parent.mkdir(parents=True, exist_ok=True)
+        UPDATE_VERSION_FILE.write_text("\n".join(ver_lines) + "\n", encoding="ascii")
+    except OSError as e:
+        shutil.rmtree(unpack_dir, ignore_errors=True)
+        restore()
+        fail(f"Could not unpack the new sources ({e}). Your current build was not changed.")
+    shutil.rmtree(unpack_dir, ignore_errors=True)
+    state = load_state()
+    state["source_hashes"] = zip_source_files(ROOT)
+    save_state(state)
+    ok(f"Unpacked {label}.")
+    return restore
+
+
+def run_update(args):
+    """Fetches the update (git or zip), runs the updated setup in a child process while keeping a backup of the
+    current executable and generated sources, and rolls back if anything fails."""
+    channel = configured_channel(args.channel)
+    print(color("1", f"\nRatchet & Clank (rac1-native) update ({channel} channel)"))
+    wait_for_exe()
+    step(1, 2, f"Fetching the latest {'release' if channel == 'stable' else 'commits on main'}")
+    exe_bak = EXE.with_name(EXE.name + ".bak")
+    state_bak = STATE_FILE.with_name(STATE_FILE.name + ".bak")
+    gen_bak = CODE_ROOT / "src.bak"
+    exe_bak.unlink(missing_ok=True)
+    state_bak.unlink(missing_ok=True)
+    shutil.rmtree(gen_bak, ignore_errors=True)
+    if EXE.is_file():
+        shutil.copy2(EXE, exe_bak)
+    if STATE_FILE.is_file():
+        shutil.copy2(STATE_FILE, state_bak)
+    if GEN_SRC.is_dir():
+        shutil.copytree(GEN_SRC, gen_bak)
+
+    restore_sources = update_git(channel) if (ROOT / ".git").exists() else update_zip(channel)
+
+    step(2, 2, "Rebuilding and updating the game's data")
+    child_cmd = [sys.executable, str(ROOT / "tools/setup.py"), "--no-play"]
+    if args.iso:
+        child_cmd += ["--iso", args.iso]
+    if args.jobs:
+        child_cmd += ["-j", str(args.jobs)]
+    if args.force:
+        child_cmd += ["--force", ",".join(sorted(args.force))]
+    rc = subprocess.run(child_cmd, cwd=ROOT).returncode
+    if rc != 0:
+        warn("The update failed: restoring the previous build and sources...")
+        if restore_sources is not None:
+            restore_sources()
+        if gen_bak.is_dir():
+            shutil.rmtree(GEN_SRC, ignore_errors=True)
+            gen_bak.replace(GEN_SRC)
+        if state_bak.is_file():
+            state_bak.replace(STATE_FILE)
+        if exe_bak.is_file():
+            exe_bak.replace(EXE)
+        fail("The update did not succeed; your previous build was kept as it was.")
+
+    exe_bak.unlink(missing_ok=True)
+    state_bak.unlink(missing_ok=True)
+    shutil.rmtree(gen_bak, ignore_errors=True)
+    shutil.rmtree(BUILD_DIR / "update-src.bak", ignore_errors=True)
+    (config_dir() / "update_check.txt").unlink(missing_ok=True)
+    if args.play or (not args.no_play and ask("Start the game now?", True)):
+        sys.exit(subprocess.run([str(EXE)], cwd=ROOT).returncode)
+
+
 # --- main ---------------------------------------------------------------------------------------
 
 def parse_force(value):
@@ -800,17 +1110,25 @@ def main():
     ap = argparse.ArgumentParser(description="Sets up rac1-native: checks the system and your disc image, generates "
                                              "the game's code from it, builds the game and generates the game's data.")
     ap.add_argument("--iso", help="your disc image (Ratchet & Clank: NTSC-U SCUS-97199, or PAL SCES-50916)")
+    ap.add_argument("--update", action="store_true",
+                    help="update to the latest release (or main on the development channel), then rebuild what changed")
+    ap.add_argument("--channel", choices=("stable", "development"), default=None,
+                    help="with --update: the channel to update to (default: Options > Advanced > Update Channel)")
     ap.add_argument("--force", nargs="?", const="all", default=set(), type=parse_force, metavar="STEPS",
                     help=f"regenerate even if up to date: everything, or some steps ({','.join(STEP_NAMES)})")
     ap.add_argument("-j", "--jobs", type=int, default=None, help="parallel jobs (the code generation and the build)")
     ap.add_argument("--no-build", action="store_true", help="skip the build")
     ap.add_argument("--build-only", action="store_true",
                     help="only build the game (and generate its code first if that is missing or out of date)")
+    ap.add_argument("--play", action="store_true", help="start the game when the setup finishes without asking")
     ap.add_argument("--no-play", action="store_true", help="do not offer to start the game at the end")
     args = ap.parse_args()
     if args.iso:
         args.iso = str(Path(args.iso).expanduser().resolve())  # (relative to where the user ran the setup)
     os.chdir(ROOT)
+    if args.update:
+        run_update(args)
+        return
     jobs = args.jobs or default_jobs()
 
     print(color("1", "\nRatchet & Clank (rac1-native) setup"))
@@ -853,7 +1171,7 @@ def main():
     print(color("1;32", "\nAll done: Ratchet & Clank is ready."))
     play = "build\\rac1-native.exe" if WINDOWS else "./build/rac1-native"
     print(f"To play, run this from {ROOT}:\n    {play}\n")
-    if not args.no_play and ask("Start the game now?", True):
+    if args.play or (not args.no_play and ask("Start the game now?", True)):
         sys.exit(subprocess.run([str(EXE)], cwd=ROOT).returncode)
 
 

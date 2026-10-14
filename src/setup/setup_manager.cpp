@@ -40,7 +40,7 @@ void print_usage(const char* prog) {
               << "  --iso <path>       your disc image (default: $RAC1_ISO, then assets/iso/rac1-ntsc-u.iso or rac1-pal.iso)\n"
               << "  --assets <dir>     where to write the data (default: assets; the game reads assets/)\n"
               << "  --force            regenerate files that already exist\n"
-              << "  --step <step>      run one step only: elf, wads, moby, world, flight, overlay (default: all)\n"
+              << "  --step <step>      run one step only: elf, moby, world, flight, overlay (default: all)\n"
               << "  --check-iso        only check the disc image, and make the game find it\n"
               << "  --status           show which parts of the data are present\n"
               << "  --help, -h         show this help\n";
@@ -66,7 +66,6 @@ void print_status(const fs::path& root) {
     const fs::path link = root / (pal ? GAME_ISO_PAL : GAME_ISO);
     check_file("Disc image", fs::exists(link) || !fs::exists(root / "iso/disc-path.txt") ? link : fs::path(disc_path()));
     check_file("Boot executable", root / (pal ? "dumps/SCES_509.16" : "dumps/SCUS_971.99"));
-    count_dir("Level data", root / "extracted/level_wads", 19);
     count_dir("Moby models and textures", root / "generated/mrp/moby", 20);
     count_dir("World geometry and textures", root / "generated/mrp/world", 20);
     check_file("The flight between planets", root / "generated/mrp/moby/flight/textures.mrpt");
@@ -167,18 +166,6 @@ bool overlay_maps(const fs::path& assets, const std::string& iso_path, const Kno
     return true;
 }
 
-bool any_level_missing(const fs::path& wads) {
-    for (int lv = 0; lv <= 18; ++lv) {
-        bool found = false;
-        std::error_code ec;
-        if (fs::exists(wads, ec))
-            for (const auto& e : fs::directory_iterator(wads, ec))
-                if (e.path().filename().string().rfind(std::to_string(lv) + "_", 0) == 0 && fs::exists(e.path() / "level.wad")) found = true;
-        if (!found) return true;
-    }
-    return false;
-}
-
 } // namespace
 
 int run_setup(int argc, char** argv) {
@@ -216,9 +203,9 @@ int run_setup(int argc, char** argv) {
             return 1;
         }
     }
-    if (step != "all" && step != "elf" && step != "wads" && step != "moby" && step != "world" && step != "flight" &&
+    if (step != "all" && step != "elf" && step != "moby" && step != "world" && step != "flight" &&
         step != "overlay") {
-        std::cerr << "Unknown step: " << step << " (elf, wads, moby, world, flight, overlay or all)\n";
+        std::cerr << "Unknown step: " << step << " (elf, moby, world, flight, overlay or all)\n";
         return 1;
     }
 
@@ -252,6 +239,14 @@ int run_setup(int argc, char** argv) {
         if (!val.message.empty()) std::cout << "[setup] Warning: " << val.message << "\n";
     }
     if (!link_iso(assets_path, iso_path, val.disc)) return 1;
+    {
+        std::error_code ec;
+        const fs::path old_wads = assets_path / "extracted/level_wads";
+        if (fs::exists(old_wads, ec)) {
+            fs::remove_all(old_wads, ec);
+            fs::remove(assets_path / "extracted", ec);
+        }
+    }
     if (check_only) return 0;
 
     MappedFile iso_file(iso_path);
@@ -263,8 +258,8 @@ int run_setup(int argc, char** argv) {
     fs::create_directories(assets_path);
 
     auto want = [&](const char* s) { return step == "all" || step == s; };
-    auto begin = [](int n, const char* what) { std::cout << "[setup] [" << n << "/6] " << what << "..." << std::flush; };
-    auto skip = [](int n, const char* what) { std::cout << "[setup] [" << n << "/6] " << what << ": already there\n"; };
+    auto begin = [](int n, const char* what) { std::cout << "[setup] [" << n << "/5] " << what << "..." << std::flush; };
+    auto skip = [](int n, const char* what) { std::cout << "[setup] [" << n << "/5] " << what << ": already there\n"; };
 
     if (want("elf")) {
         const fs::path elf_dest = assets_path / "dumps" / val.disc->boot_file;
@@ -280,23 +275,9 @@ int run_setup(int argc, char** argv) {
         }
     }
 
-    if (want("wads")) {
-        const fs::path wads_dest = assets_path / "extracted/level_wads";
-        if (!force && !any_level_missing(wads_dest)) {
-            skip(2, "Level data");
-        } else {
-            begin(2, "Copying the 19 levels' data");
-            if (!extract_level_wads(iso_span, wads_dest.string(), force) || any_level_missing(wads_dest)) {
-                std::cerr << " failed\n";
-                return 1;
-            }
-            std::cout << " done\n";
-        }
-    }
-
     // (the exporters skip, level by level, what already exists unless forced)
     if (want("moby")) {
-        begin(3, "Converting the moby models and textures, level");
+        begin(2, "Converting the moby models and textures, level");
         if (!export_mrp_mobys(iso_span, (assets_path / "generated/mrp/moby").string(), "all", force)) {
             std::cerr << "\n[setup] Error: the moby export failed\n";
             return 1;
@@ -305,7 +286,7 @@ int run_setup(int argc, char** argv) {
     }
 
     if (want("world")) {
-        begin(4, "Converting the world geometry and textures, level");
+        begin(3, "Converting the world geometry and textures, level");
         if (!export_mrp_world(iso_span, (assets_path / "generated/mrp/world").string(), "all", force)) {
             std::cerr << "\n[setup] Error: the world export failed\n";
             return 1;
@@ -316,9 +297,9 @@ int run_setup(int argc, char** argv) {
     if (want("flight")) {
         const fs::path moby = assets_path / "generated/mrp/moby", world = assets_path / "generated/mrp/world";
         if (!force && fs::exists(moby / "flight/textures.mrpt") && fs::exists(world / "flight/world.mrpw")) {
-            skip(5, "The flight between planets");
+            skip(4, "The flight between planets");
         } else {
-            begin(5, "Converting the flight between planets (the loading screen)");
+            begin(4, "Converting the flight between planets (the loading screen)");
             if (!export_flight(iso_span, moby.string(), world.string(), force)) {
                 std::cerr << " failed\n";
                 return 1;
@@ -336,9 +317,9 @@ int run_setup(int argc, char** argv) {
             if (other) present = present && fs::exists(ovl / ("codegen/level" + std::to_string(lv) + ".txt"));
         }
         if (!force && present) {
-            skip(6, "Overlay address maps");
+            skip(5, "Overlay address maps");
         } else {
-            begin(6, "Matching each level's code to Veldin's, level");
+            begin(5, "Matching each level's code to Veldin's, level");
             if (!overlay_maps(assets_path, iso_path, val.disc)) return 1;
             std::cout << " done\n";
         }

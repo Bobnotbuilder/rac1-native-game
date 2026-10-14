@@ -109,7 +109,6 @@ All of it goes into `assets/`, which git ignores:
 | `assets/iso/disc-path.txt` | on Windows, when the link cannot be made: your disc image's path, which the game reads instead |
 | `assets/dumps/SCUS_971.99` (`SCES_509.16` for the PAL disc) | the game's executable, copied from the disc |
 | `assets/generated/src/` | the generated part of the game's source code, and `generated_sources.cmake`, its list for the build (only the build reads it) |
-| `assets/extracted/level_wads/<n>_<name>/level.wad` | the data of each of the 19 levels |
 | `assets/generated/mrp/moby/` | the moby models and textures for the renderer, per level |
 | `assets/generated/mrp/world/` | the world's geometry and textures for the renderer, per level |
 | `assets/generated/mrp/{moby,world}/flight/` | the loading screen's scene: the ship's flight between planets |
@@ -173,6 +172,9 @@ not supported yet.
   only when the code that makes it changed, or when that step did not finish. A step added by an update (such as the
   flight between planets) runs on its own, without redoing the others. It remembers the disc image's path.
   What was generated, and from which code, is recorded in `assets/setup-state.json`.
+- **`./setup.sh --update`** (`setup.cmd --update` on Windows) fetches the latest release (or `main` when
+  Options > Advanced > Update Channel is Development), then rebuilds and regenerates only what changed;
+  the in-game update notice's **Update Now** button runs it and restarts the game when it finishes.
 - **`./setup.sh --force`** regenerates the code and all the data; **`./setup.sh --force moby,world`**
   only those steps.
 - If you build with CMake yourself (`cmake -S . -B build && cmake --build build`), run `./setup.sh`
@@ -187,10 +189,13 @@ not supported yet.
 | Option | Meaning |
 |---|---|
 | `--iso <path>` | your disc image (otherwise `$RAC1_ISO`, then `assets/iso/rac1-ntsc-u.iso` or `rac1-pal.iso`, then it asks) |
-| `--force [steps]` | regenerate even if up to date: everything, or the steps given (`elf,overlay,code,wads,moby,world,flight`) |
+| `--update` | fetch the latest release (or `main` on the Development channel), then rebuild what changed; on failure the previous build is kept |
+| `--channel stable\|development` | with `--update`: override Options > Advanced > Update Channel |
+| `--force [steps]` | regenerate even if up to date: everything, or the steps given (`elf,overlay,code,moby,world,flight`) |
 | `-j <n>`, `--jobs <n>` | parallel jobs, for the code generation and the build |
 | `--no-build` | skip the build |
 | `--build-only` | only check the system and build (generating the code first if it is missing or out of date, which needs the disc) |
+| `--play` | start the game when the setup finishes without asking |
 | `--no-play` | do not offer to start the game at the end |
 
 `./build/rac1-native --setup` (the data generation on its own, run from the repository's root):
@@ -200,7 +205,7 @@ not supported yet.
 | `--iso <path>` | the disc image (default: `$RAC1_ISO`, then `assets/iso/rac1-ntsc-u.iso` or `rac1-pal.iso`) |
 | `--assets <dir>` | where to write the data (default `assets`; the game itself only reads `assets/`) |
 | `--force` | regenerate even if present |
-| `--step elf\|wads\|moby\|world\|flight\|overlay\|all` | run one step only |
+| `--step elf\|moby\|world\|flight\|overlay\|all` | run one step only |
 | `--check-iso` | only check the disc image, and make the game find it |
 | `--status` | show what is present |
 

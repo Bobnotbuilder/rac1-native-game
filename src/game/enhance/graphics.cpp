@@ -591,9 +591,19 @@ uint32_t graphics_text(int32_t id) {
     return STRINGS + static_cast<uint32_t>(k) * STRING_SIZE;
 }
 
+uint32_t updates_page();
+void update_menu_main_install();
+
 // orig: (none) — enhancement (graphics.h)
 void graphics_menu_back(uint32_t cur, uint32_t to, uint32_t mobys) {
-    if (cur == 0 || to == 0 || (cur != PAGE && cur != POP_PAGE && cur != advanced_page() && cur != controls_page() && cur != update_notice_page())) return;
+    if (cur == 0 || to == 0) return;
+    if (to == ROOT_PAGE && lwu(mobys + 5 * 4) != 0) {  // (the Updates button in slot 5 of the root page)
+        const uint32_t m5 = lwu(mobys + 5 * 4);
+        const uint32_t seq5 = lwu(lwu(m5 + 0x24) + 0x48 + 0x13 * 4);
+        moby_set_anim(m5, 0x13, static_cast<int32_t>(lbu(seq5 + 0x10)) - 1);
+        swc1(m5 + 0x58, -1.0f);
+    }
+    if (cur != PAGE && cur != POP_PAGE && cur != advanced_page() && cur != controls_page() && cur != update_notice_page() && cur != updates_page()) return;
     // `to`'s boxes as the game leaves them: a page entered forward ends on its animations' last frame; a root page
     // (no parent: the menu's first page) is opened by its animations played back to their first frame
     const bool root = lwu(to + 0x38) == 0;
@@ -752,6 +762,7 @@ void graphics_main_menu_install() {
     slot_replace(POP_PAGE, label, POP_LABEL);
     slot_replace(POP_PAGE, picture, POP_PICTURE);
     slot_replace(POP_PAGE, list, POP_LIST);
+    sw(POP_PAGE + 5 * 4, 0x13);
     sw(POP_PAGE + 0x80, 0);
     // the root's New Game: our entry, action 3 to the popup (its list's entries copied)
     if (ng != ROOT_ENTRY) {
@@ -760,6 +771,7 @@ void graphics_main_menu_install() {
         sw(ROOT_ENTRY + 4, POP_PAGE);
         sw(ROOT_NEW_GAME + 0x34, ROOT_ENTRY);
     }
+    update_menu_main_install();
 }
 
 // orig: (none) — enhancement (graphics.h)

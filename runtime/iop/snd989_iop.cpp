@@ -88,6 +88,7 @@ int32_t command(Iop& io, uint32_t id, const uint32_t* a) {
         int32_t r = 0;
         if (snd989_stream_command(io.streams, p, id, a, r)) return r;
         if (id == 0x09) snd989_stream_master_volume(io.streams, a[0], static_cast<int32_t>(a[1]));
+        if (id == 0x16 || id == 0x17) snd989_stream_group_pause(io.streams, a[0], id == 0x16);
     }
     auto s = [&](int i) { return static_cast<int32_t>(a[i]); };
     switch (id) {
@@ -105,9 +106,14 @@ int32_t command(Iop& io, uint32_t id, const uint32_t* a) {
         return static_cast<int32_t>(h);
     }
     case 0x19: return p.SoundStillActive(a[0]) ? s(0) : 0;
+    case 0x13: p.PauseSound(s(0)); return 0;
+    case 0x14: p.ContinueSound(s(0)); return 0;
     case 0x15: p.StopSound(a[0]); return 0;
+    case 0x16: p.PauseAllSoundsInGroup(static_cast<u8>(a[0])); return 0;
+    case 0x17: p.ContinueAllSoundsInGroup(static_cast<u8>(a[0])); return 0;
     case 0x18: p.StopAllSounds(); return 0;
     case 0x09: p.SetMasterVolume(a[0], s(1)); return 0;
+    case 0x0b: p.SetPlaybackMode(s(0)); return 0;
     case 0x06: {
         snd::BankHandle b = bank_of(io, a[0]);
         if (b != nullptr) p.UnloadBank(b);
@@ -168,7 +174,7 @@ void mirror_command(Op& op) {
     const uint32_t queued_to = w[5];
     switch (op.id) {
     case 0x00: case 0x19: case 0x30: case 0x31: case 0x32: case 0x36: case 0x37: case 0x38: case 0x4f: return;
-    case 0x15: case 0x21: case 0x2d: case 0x2e: case 0x2f:
+    case 0x13: case 0x14: case 0x15: case 0x21: case 0x2d: case 0x2e: case 0x2f:
         if (!tr(w[0])) return;
         break;
     case 0x2c:  // play / queue after a stream: the stream the mirror has for it (else one it cannot find: 0xeb7c's rule)

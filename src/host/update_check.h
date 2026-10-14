@@ -21,6 +21,12 @@ void start(bool headless);
 // handed to the update notice (once)
 void poll();
 
+// orig: (none) — host: true when the player chose "Update Now" on the update notice (the main loop leaves)
+bool update_requested();
+
+// orig: (none) — host: after the window and audio are closed: starts the setup in update mode (--update --play)
+void run_update();
+
 }  // namespace rac1::update_check
 
 #endif  // RAC1_HOST_UPDATE_CHECK_H

@@ -2840,6 +2840,7 @@ void mrp_world_draw(int win_w, int win_h, const gs::Viewport* vp) {
     if (g_env_prof_finish) glFinish();  // (the GPU work before it, e.g. the sky, not counted)
     const double t0 = now_ms();
     if (vp != nullptr) {
+        glViewport(vp->x, vp->y, vp->w, vp->h);
         g_last_vp[0] = vp->x;
         g_last_vp[1] = vp->y;
         g_last_vp[2] = vp->w;
