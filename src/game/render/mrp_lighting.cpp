@@ -216,8 +216,8 @@ glm::vec3 sun_direction(float* weight) {
     }
     uint32_t a = 0, b = 0;
     float w = 0.0f;
-    static const bool level_set = std::getenv("RAC1_SUN_LEVEL") != nullptr;  // (testing: set 0, the level's, as before)
-    if (const uint32_t hero = lwu(OV(0x0015ffd8u)); hero != 0 && !level_set) {
+    static const bool zone_dir = std::getenv("RAC1_SUN_ZONE") != nullptr;  // (testing: turn the sun to each zone's light set)
+    if (const uint32_t hero = lwu(OV(0x0015ffd8u)); hero != 0) {
         a = lbu(hero + 0x38);
         b = lbu(hero + 0x39);
         w = static_cast<float>(lbu(hero + 0x3a)) / 256.0f;
@@ -225,7 +225,14 @@ glm::vec3 sun_direction(float* weight) {
         if (b > 15) b = a;
         if (a == 15) a = b = 0;
     }
+    const SetSun s0 = set_sun(0);
     const SetSun sa = set_sun(a), sb = set_sun(b);
+    if (!zone_dir && s0.ok) {
+        const float wa = sa.ok ? sa.weight : 0.0f;
+        const float wb = sb.ok ? sb.weight : 0.0f;
+        *weight = wa + (wb - wa) * w;
+        return s0.dir;
+    }
     if (sa.ok && sb.ok) {
         *weight = sa.weight + (sb.weight - sa.weight) * w;
         return glm::normalize(sa.dir + (sb.dir - sa.dir) * w);
