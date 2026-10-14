@@ -70,7 +70,7 @@ The controller and keyboard bindings, mouse look, look inversion and mouse sensi
 |---|---|
 | Quick Select | Normal, Pause |
 | Aiming | Original, Modern |
-| Movement | Original, RAC 3 |
+| Movement | Original, Strafing, RAC 3 |
 | Fades | Fast, Original |
 | Update Check | On, Off |
 | Update Channel | Stable, Development |
@@ -97,34 +97,33 @@ the window settings or Fades. The mode chosen is kept with the save.
 
 ## The update check
 
-> **Work in progress.** The update check is new: it has been tried only in automated runs and on one
-> machine, so its panel's texts, the moment it appears and the channels may still change. Updating
-> stays manual for now; updating from the panel itself is planned for a later version
-> ([issue #13](https://github.com/daino-selvatico/rac1-native-game/issues/13)).
-
 At start, the game asks GitHub whether there is something newer than the installed build. When there
 is, a panel at the main menu says so: the new version (or, on the development channel, how many new
-commits there are on `main`), the release notes in short, and how to update (`git pull`, then
-`./setup.sh`; on Windows `setup.cmd`; for a downloaded copy, the new release downloaded, then the
-setup). **OK** closes it (it comes back at the next start); **Skip Version** closes it for good
-for that version. The game itself downloads and installs nothing.
+commits there are on `main`), the release notes in short, and three choices:
+
+- **Update Now** quits the game, runs `./setup.sh --update --play` (`setup.cmd --update --play` on
+  Windows) to fetch the new sources and rebuild only what changed, and restarts the game when it is
+  done. If the update fails (network, build, local changes), the previous build is kept as it was.
+- **Not Now** closes the panel (it comes back at the next start).
+- **Skip Version** closes it for good for that version.
+
+Details:
 
 - **What is sent:** one anonymous HTTPS request to the GitHub API (`api.github.com`), for this
   repository only: `GET /repos/daino-selvatico/rac1-native-game/releases/latest` (Stable), or the
-  comparison of the installed commit with `main` (Development). Nothing else: no identifier, no
+  comparison of the installed build with `main` (Development). Nothing else: no identifier, no
   telemetry, nothing about the player or the machine (GitHub sees the request's IP address, as for any
   web request). The answer is kept for 6 hours in `update_check.txt` (in the settings' folder below):
   a start within them asks nothing.
 - **When:** once at start, in the background (`tools/update_check.py`, Python's standard library, run by
-  `src/host/update_check.cpp`): start-up never waits for it. No network, an error or GitHub's rate
-  limit: nothing is shown. Never in a headless run. The panel is shown at most once a run, at the main
-  menu's first page only, never during play.
+  `src/host/update_check.cpp`), and again when the channel is switched in Options > Advanced: start-up
+  never waits for it. No network, an error or GitHub's rate limit: nothing is shown. Never in a headless
+  run. The panel is shown at the main menu's first page only, never during play.
 - **Turning it off:** Options > Advanced > Update Check = Off (in `advanced_options.txt`:
-  `update_check_off 1`). It takes effect at the next start.
-- **The channel:** Options > Advanced > Update Channel. **Stable** (the default) compares the installed
-  version (`project(rac1-native VERSION ...)` in `CMakeLists.txt`) with the latest release's tag.
-  **Development** compares the installed commit with `main`, and only applies to a build from a git
-  clone on the `main` branch (another branch, or a downloaded copy, is checked on Stable).
+  `update_check_off 1`).
+- **The channel:** Options > Advanced > Update Channel. Players can switch between **Stable** (the
+  latest release) and **Development** (`main`) at any time. A developer clone on a branch other than
+  `main` stays on its branch.
 - **The installed version** is printed at start (`[orig] rac1-native 0.1.0 (v0.1.0-10-g7dee3d1, main)`):
   the release's version and, for a git clone, `git describe` and the branch, recorded by the build
   (`cmake/version.cmake`).

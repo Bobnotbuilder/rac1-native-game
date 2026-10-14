@@ -2,11 +2,11 @@
 // original's menu data so that the panel looks and behaves like the game's own pages.
 //
 // The page is a copy of the pause menu's Options page (0x1b4950: its title, list, help label and
-// picture), as the New Game mode popup (graphics.cpp): our title, a list of two entries (OK, Skip
-// Version), the help label showing the selected entry's text (the news, how to update and the release
-// notes in short; the label scrolls a text longer than its box) and our picture ("NEW", advanced.cpp).
-// Both entries are pages (action 3) to the main menu's first page, the page's parent (triangle too);
-// update_notice_choice, a hook in the list's action 3, keeps "Skip Version" in the preferences.
+// picture), as the New Game mode popup (graphics.cpp): our title, a list of three entries (Update Now,
+// Not Now, Skip Version), the help label showing the selected entry's text (the news, the release
+// notes in short and how to update; the label scrolls a text longer than its box) and our picture ("NEW", advanced.cpp).
+// All entries are pages (action 3) to the main menu's first page, the page's parent (triangle too);
+// update_notice_choice, a hook in the list's action 3, triggers the update or keeps "Skip Version" in the preferences.
 //
 // It is opened as the game opens a page (the menu's next page, its +8) by update_notice_menu_frame,
 // once, when the main menu stands idle on its first page: the game's state is not touched otherwise,
@@ -36,8 +36,8 @@ constexpr uint32_t PICTURE = UPD + 0x180;   // its picture (a copy of Options')
 constexpr uint32_t ENTRIES = UPD + 0x200;   // the list's entries (0xc each, ended by text 0)
 constexpr uint32_t HELP = UPD + 0x240;      // the help label's texts, one per entry
 constexpr uint32_t PICTURES = UPD + 0x260;  // the picture's images (sector, count), one per entry
-constexpr uint32_t STRINGS = UPD + 0x400;   // the texts, made at each lookup
-constexpr uint32_t STRING_SIZE = 0x200;
+constexpr uint32_t STRINGS = UPD + 0x300;   // the texts, made at each lookup
+constexpr uint32_t STRING_SIZE = 0x1c0;
 
 // The game's data the page is made from (Veldin's addresses, relocated: also in the boot module)
 constexpr OvConst<0x001b4950u> OPTIONS_PAGE{};
@@ -49,32 +49,32 @@ constexpr uint32_t PIC_UPDATE = 6;  // (advanced.cpp's PIC_UPDATE: "NEW")
 
 // The texts. Ids from TEXT_FIRST (before the Advanced page's 0x7f00..; the game's are 0x4e00..0x5300)
 constexpr int32_t TEXT_FIRST = 0x7e00;
-enum : int32_t { I_TITLE, I_OK, I_SKIP, I_HELP_OK, I_HELP_SKIP, I_COUNT };  // the ids the widgets are given
-static_assert(0x400 + I_COUNT * STRING_SIZE <= 0x1000, "the notice's texts end where its block does");
+enum : int32_t { I_TITLE, I_UPDATE, I_OK, I_SKIP, I_HELP_UPDATE, I_HELP_OK, I_HELP_SKIP, I_COUNT };  // the ids the widgets are given
+static_assert(0x300 + I_COUNT * STRING_SIZE <= 0x1000, "the notice's texts end where its block does");
 // per language (0x15ed88: 0 English, 2 French (in English for now), 3 German, 4 Spanish, 5 Italian); {v} the
 // new version, {i} the installed one, {n} the commits, {s} the setup's command. The release notes are GitHub's (English).
-enum : int32_t { T_TITLE, T_OK, T_SKIP, T_RELEASE, T_COMMITS, T_COMMIT, T_HOW_GIT, T_HOW_ZIP, T_SKIP_RELEASE, T_SKIP_COMMITS, T_COUNT };
+enum : int32_t { T_TITLE, T_UPDATE, T_OK, T_SKIP, T_RELEASE, T_COMMITS, T_COMMIT, T_DO_UPDATE, T_HOW_LATER, T_SKIP_RELEASE, T_SKIP_COMMITS, T_COUNT };
 constexpr const char* TEXTS[4][T_COUNT] = {
-    {"Update Available", "OK", "Skip Version",
+    {"Update Available", "Update Now", "Not Now", "Skip Version",
      "Version {v} is out (you have {i}).", "{n} new commits on main (you have {i}).", "1 new commit on main (you have {i}).",
-     "To update: git pull, then {s}", "To update: download the new release, then {s}",
+     "Downloads and builds the update, then restarts the game.", "To update later: {s} --update",
      "Not shown again for version {v}.", "Not shown again until main has newer commits."},
-    {"Update verfugbar", "OK", "Uberspringen",
+    {"Update verfugbar", "Jetzt aktualisieren", "Spater", "Uberspringen",
      "Version {v} ist da (installiert: {i}).", "{n} neue Commits auf main (installiert: {i}).", "1 neuer Commit auf main (installiert: {i}).",
-     "Aktualisieren: git pull, dann {s}", "Aktualisieren: die neue Version herunterladen, dann {s}",
+     "Ladt das Update herunter, baut es und startet das Spiel neu.", "Spater aktualisieren: {s} --update",
      "Fur Version {v} nicht mehr angezeigt.", "Erst bei neueren Commits auf main wieder angezeigt."},
-    {"Actualizacion disponible", "OK", "Omitir version",
+    {"Actualizacion disponible", "Actualizar ahora", "Ahora no", "Omitir version",
      "Ya esta la version {v} (tienes la {i}).", "{n} commits nuevos en main (tienes {i}).", "1 commit nuevo en main (tienes {i}).",
-     "Para actualizar: git pull y luego {s}", "Para actualizar: descarga la nueva version y luego {s}",
+     "Descarga y compila la actualizacion y reinicia el juego.", "Para actualizar despues: {s} --update",
      "No se mostrara mas para la version {v}.", "No se mostrara hasta que haya commits nuevos en main."},
-    {"Aggiornamento disponibile", "OK", "Salta versione",
+    {"Aggiornamento disponibile", "Aggiorna ora", "Non ora", "Salta versione",
      "E uscita la versione {v} (hai la {i}).", "{n} nuovi commit su main (hai {i}).", "1 nuovo commit su main (hai {i}).",
-     "Per aggiornare: git pull, poi {s}", "Per aggiornare: scarica la nuova versione, poi {s}",
+     "Scarica e compila l'aggiornamento, poi riavvia il gioco.", "Per aggiornare dopo: {s} --update",
      "Non sara piu mostrato per la versione {v}.", "Non sara piu mostrato finche non ci sono nuovi commit su main."},
 };
 
 struct State {
-    bool offered = false, shown = false;
+    bool offered = false, shown = false, update_now = false;
     UpdateOffer offer;
 } st_;
 
@@ -129,10 +129,10 @@ void page_build(uint32_t root) {
     ee_copy(PICTURE, picture, 0x50);
     ee_copy(LIST, list, 0x50);
     sw(TITLE + 0x34, TEXT_FIRST + I_TITLE);
-    // the entries: OK and Skip, each a page (action 3) back to the main menu's first page
+    // the entries: Update Now, Not Now and Skip Version, each a page (action 3) back to the main menu's first page
     const uint32_t ng = lwu(ROOT_NEW_GAME + 0x34);
-    constexpr uint32_t N = 2;
-    static constexpr int32_t NAMES[N] = {I_OK, I_SKIP}, HELPS[N] = {I_HELP_OK, I_HELP_SKIP};
+    constexpr uint32_t N = 3;
+    static constexpr int32_t NAMES[N] = {I_UPDATE, I_OK, I_SKIP}, HELPS[N] = {I_HELP_UPDATE, I_HELP_OK, I_HELP_SKIP};
     for (uint32_t i = 0; i < N; ++i) {
         const uint32_t e = ENTRIES + i * 0xc;
         ee_copy(e, ng, 0xc);
@@ -147,7 +147,7 @@ void page_build(uint32_t root) {
     for (uint32_t i = 0; i < 0xc; i += 4) sw(ENTRIES + N * 0xc + i, 0);
     sw(HELP + N * 4, 0);
     sw(LIST + 0x34, ENTRIES);
-    sw(LIST + 0x40, 0);  // (OK selected first)
+    sw(LIST + 0x40, 0);  // (Update Now selected first)
     sw(LIST + 0x38, 0);
     sw(LIST + 0x3c, 0);
     sw(LABEL + 0x34, HELP);
@@ -164,8 +164,9 @@ void page_build(uint32_t root) {
 
 // orig: (none) — enhancement (update_notice.h)
 void update_notice_offer(const UpdateOffer& offer) {
-    if (st_.offered) return;
+    if (st_.offered && st_.offer.development == offer.development && st_.offer.id == offer.id) return;
     st_.offered = true;
+    st_.shown = false;
     st_.offer = offer;
 }
 
@@ -186,10 +187,21 @@ void update_notice_menu_frame(uint32_t ms, uint32_t root) {
 // orig: (none) — enhancement (update_notice.h)
 void update_notice_choice(uint32_t w) {
     if (w != LIST || !st_.shown) return;
-    if (lw(w + 0x40) == 1) {
+    const int32_t sel = lw(w + 0x40);
+    if (sel == 0) {
+        st_.update_now = true;
+        std::printf("[update] Update Now chosen (%s)\n", st_.offer.id.c_str());
+    } else if (sel == 2) {
         advanced_update_skip(st_.offer.id);
         std::printf("[update] %s skipped: not shown again\n", st_.offer.id.c_str());
     }
+}
+
+// orig: (none) — enhancement: true when the player chose Update Now on the notice
+bool update_notice_update_now(bool* development) {
+    if (!st_.update_now) return false;
+    if (development != nullptr) *development = st_.offer.development;
+    return true;
 }
 
 // orig: (none) — enhancement (update_notice.h)
@@ -201,17 +213,24 @@ uint32_t update_notice_text(int32_t id) {
     const int32_t k = id - TEXT_FIRST;
     const char* const* t = texts();
     const UpdateOffer& o = st_.offer;
-    const std::string how = fill(t[o.git ? T_HOW_GIT : T_HOW_ZIP]);
+    const std::string news = fill(t[o.development ? (o.commits == 1 ? T_COMMIT : T_COMMITS) : T_RELEASE]);
+    const std::string how = fill(t[T_HOW_LATER]);
     std::string s;
     switch (k) {
         case I_TITLE: s = t[T_TITLE]; break;
+        case I_UPDATE: s = t[T_UPDATE]; break;
         case I_OK: s = t[T_OK]; break;
         case I_SKIP: s = t[T_SKIP]; break;
-        case I_HELP_OK:  // (the news, how to update, then the notes: the label scrolls what its box does not hold)
-            s = fill(t[o.development ? (o.commits == 1 ? T_COMMIT : T_COMMITS) : T_RELEASE]) + " " + how + ".";
+        case I_HELP_UPDATE:
+            s = news;
+            if (!o.development && !o.notes.empty()) s += " " + o.notes;
+            s += std::string(" ") + t[T_DO_UPDATE];
+            break;
+        case I_HELP_OK:
+            s = news + " " + how + ".";
             if (!o.development && !o.notes.empty()) s += " " + o.notes;
             break;
-        case I_HELP_SKIP: s = fill(t[o.development ? T_SKIP_COMMITS : T_SKIP_RELEASE]) + " " + how; break;
+        case I_HELP_SKIP: s = fill(t[o.development ? T_SKIP_COMMITS : T_SKIP_RELEASE]) + " " + how + "."; break;
         default: break;
     }
     char* p = static_cast<char*>(ee_ram_ptr(STRINGS + static_cast<uint32_t>(k) * STRING_SIZE));
