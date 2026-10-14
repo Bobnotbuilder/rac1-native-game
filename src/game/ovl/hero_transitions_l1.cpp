@@ -271,6 +271,10 @@ void run_jump() {
         set(advanced_rac3_running_jump() ? 9u : 7u);
         return;
     }
+    if (advanced_strafing()) {  // enhancement: no long running jump while strafing
+        set(7);
+        return;
+    }
     constexpr OvConst<0x0017bdb8u> BAND{};
     if (!(lwc1(BAND + 0xc) < lwc1(P + 0x190))) {
         set(7);
