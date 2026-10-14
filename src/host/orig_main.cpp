@@ -905,7 +905,7 @@ void engine_image_load(int played) {
         return e == nullptr || std::strcmp(e, "0") != 0;
     }();
     const int level = own ? played : 0;
-    if (level != played) LevelLoader::load_level_overlay(level);
+    LevelLoader::load_level_overlay(level);  // (after the level's files, as the PS2: their load writes into the overlay's data, which this copy restores)
     ovl_reloc_set_level(level);
 }
 
