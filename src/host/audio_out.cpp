@@ -199,7 +199,7 @@ void pull_queue(ma_device*, void* out, const void*, ma_uint32 frames_u) {
     rd.fill_avg = rd.fill_avg < 0 ? static_cast<double>(fill) : rd.fill_avg * 0.95 + static_cast<double>(fill) * 0.05;
     int xfade = 0;
     uint64_t r_old = r;
-    const bool burst = fill > rd.target + 12 * kFrame, lasting = rd.fill_avg > rd.target + 4 * kFrame;
+    const bool burst = fill > rd.target + 6 * kFrame, lasting = rd.fill_avg > rd.target + 4 * kFrame;
     if (g_simple ? fill > rd.target + 4 * kFrame : (burst || lasting) && fill > rd.target) {
         const uint64_t skip = static_cast<uint64_t>(fill - rd.target);
         g_skips.fetch_add(1, std::memory_order_relaxed);
