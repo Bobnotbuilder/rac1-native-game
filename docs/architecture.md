@@ -293,9 +293,8 @@ The game runs from the repository's root: every path is relative to the working 
 
 | Path | What | Read by |
 |---|---|---|
-| `assets/iso/rac1-ntsc-u.iso` or `rac1-pal.iso` (or `$RAC1_ISO`) | the player's disc image | `runtime/kernel/disc.cpp` |
+| `assets/iso/rac1-ntsc-u.iso` or `rac1-pal.iso` (or `$RAC1_ISO`) | the player's disc image (including each level's data WAD) | `runtime/kernel/disc.cpp`, `runtime/level/level_loader.cpp` |
 | `assets/dumps/SCUS_971.99` (`SCES_509.16` from the PAL disc) | the game's executable, extracted from the disc | `runtime/kernel/ee_memory.cpp`, `src/game/boot/front_image.cpp` |
-| `assets/extracted/level_wads/<n>_<name>/level.wad` | each level's data | `src/host/orig_main.cpp`, `runtime/level/level_loader.cpp` |
 | `assets/generated/overlay_map/` | the per-level address maps | `src/game/ovl/ovl_reloc.cpp` |
 | `assets/generated/mrp/moby/`, `assets/generated/mrp/world/` | the MRP's assets | `mrp_moby_renderer.cpp`, `mrp_world_renderer.cpp` |
 | `third_party/gamecontrollerdb/gamecontrollerdb.txt` | the controller database | `src/host/orig_main.cpp` |
