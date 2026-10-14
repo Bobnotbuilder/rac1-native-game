@@ -2014,6 +2014,7 @@ int main(int argc, char** argv) {
     FrozenFrame frozen;
     FrozenFrame displayed;  // the last picture drawn, the GS display buffer a blocking loop's frames draw over
     FrozenFrame last_shown;  // the last frame of the game drawn (not a menu's, a fade's, a movie's): the frame buffer a store reads
+    bool displayed_is_last_shown = false;
     MoviePicture movie_picture;
     auto last = std::chrono::steady_clock::now();
     auto next = last;
@@ -2796,7 +2797,8 @@ int main(int argc, char** argv) {
             if (movie_pic != nullptr) {  // a movie plays: its picture is the whole frame
                 movie_picture.draw(*movie_pic, mw, mh, vx, vy, vw, vh);
             } else if (fd.fade) {  // a frame of the screen fade (ADR 0012): the display buffer, the picture shown, its packets drawn over it
-                if (displayed.fbo != 0 && displayed.w == w && displayed.h == h) displayed.blit_to_screen();
+                const FrozenFrame& disp = displayed_is_last_shown ? last_shown : displayed;
+                if (disp.fbo != 0 && disp.w == w && disp.h == h) disp.blit_to_screen();
             } else if (title && !fd.flight) {  // the boot's title level (its menu over it): its sky, ties and shrubs (its mobys: the original pass)
                 if (mrp_world_active()) {  // its own passes' chain, drawn by the MRP world
                     rac1::gs::Viewport wv;
@@ -2942,17 +2944,20 @@ int main(int argc, char** argv) {
                 glViewport(0, 0, w, h);
                 fprof.mark(6);
             }
-            displayed.capture(w, h);  // (the picture shown: what a screen fade darkens)
             if (!menu_mode && !fd.fade && !title && movie_pic == nullptr && !fd.exiting) {
                 // the last frame of the game shown: what the frame buffer holds when the pause menu's start stores it (the
                 // frame drawn when the menu opens is the gameplay chain drawn as a menu frame here: not that one)
                 last_shown.capture(w, h);
+                displayed_is_last_shown = true;
                 g_scene_pic.prefetch(last_shown, vx, vy, vw, vh);
                 g_scene_pic.shown = &last_shown;
                 g_scene_pic.shown_view[0] = vx;
                 g_scene_pic.shown_view[1] = vy;
                 g_scene_pic.shown_view[2] = vw;
                 g_scene_pic.shown_view[3] = vh;
+            } else {
+                displayed.capture(w, h);  // (the picture shown: what a screen fade darkens)
+                displayed_is_last_shown = false;
             }
             if (fd.scene) g_scene_pic.keep(w, h, vx, vy, vw, vh);  // (the picture the game stores after this frame)
 #ifdef RAC1_DEVTOOLS

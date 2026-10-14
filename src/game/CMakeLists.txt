@@ -33,9 +33,6 @@ add_library(rac1_game STATIC
     ovl/hero_state_l1.cpp
     ovl/hero_state_update.cpp
     ovl/hero_state_update_l1.cpp
-    ovl/hero_state_update_l1.cpp
-    ovl/hero_state_update_l1.cpp
-    ovl/hero_state_update_l1.cpp
     ovl/hero_input.cpp
     ovl/hero_transitions.cpp
     ovl/hero_transitions_l1.cpp
