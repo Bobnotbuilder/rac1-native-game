@@ -1636,8 +1636,8 @@ int main(int argc, char** argv) {
     // deterministic, the enhancements off; RAC1_ADVANCED=1 keeps them (testing an enhancement)
     if (headless && std::getenv("RAC1_ADVANCED") == nullptr) rac1::g_advanced_disabled = true;
     std::printf("[orig] rac1-native %s\n", rac1::update_check::version_text().c_str());
-    // the update check (Options > Advanced > Update Check): one anonymous request to GitHub in the background, never
-    // in a headless run; what it finds is shown at the main menu (the update notice)
+    // the update check (Updates > Update Check): started when the main menu opens on the title screen (or on demand
+    // via Check Now), never in a headless run; what it finds is shown as the update notice
     rac1::update_check::start(headless);
     if (const char* ck = std::getenv("RAC1_CLOCK")) g_host_clock_fixed = static_cast<std::time_t>(std::strtoll(ck, nullptr, 0));
     const uint64_t max_frames = std::getenv("RAC1_FRAMES") ? std::strtoull(std::getenv("RAC1_FRAMES"), nullptr, 10) : (headless ? 300 : 0);

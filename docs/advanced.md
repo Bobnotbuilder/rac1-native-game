@@ -10,7 +10,7 @@ from the PS2 compromises the port removes (see [Overview](overview.md#faithful-t
   whether the world pauses. Enhancements are **optional, off by default, and labelled as changes to
   the game**. With all of them off, the game plays as the original.
 
-The Advanced page has six rows:
+The Advanced page has four rows:
 
 | Row | Values (default first) | Kind |
 |---|---|---|
@@ -18,8 +18,6 @@ The Advanced page has six rows:
 | Aiming | Original, Modern | enhancement |
 | Movement | Original, Strafing, RAC 3 | enhancement |
 | Fades | Fast, Original | a removed compromise: Fast is the port's default, Original the PS2's |
-| Update Check | On, Off | the PC version's [update check](settings.md#the-update-check), not a game setting |
-| Update Channel | Stable, Development | which builds the update check compares with |
 
 All of it is in `src/game/enhance/advanced.{h,cpp}`. None of it is a port: every function there is
 annotated `// orig: (none) — enhancement`.

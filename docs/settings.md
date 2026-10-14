@@ -72,12 +72,20 @@ The controller and keyboard bindings, mouse look, look inversion and mouse sensi
 | Aiming | Original, Modern |
 | Movement | Original, Strafing, RAC 3 |
 | Fades | Fast, Original |
+
+See [Advanced options](advanced.md) for what each one does and how it is built.
+
+### Updates (main menu)
+
+On the title screen's main menu (below New Game, Load Game and Options), **Updates** opens the update settings:
+
+| Row | Values (default first) |
+|---|---|
 | Update Check | On, Off |
 | Update Channel | Stable, Development |
+| Check Now | checks GitHub immediately |
 
-See [Advanced options](advanced.md) for what each one does and how it is built, and
-[The update check](#the-update-check) for the last two. Those two belong to the machine: they are kept
-in the preferences only, not with the saves.
+Those settings belong to the machine: they are kept in the preferences only, not with the saves.
 
 ## Original, Modern or Experimental mode
 
@@ -97,7 +105,8 @@ the window settings or Fades. The mode chosen is kept with the save.
 
 ## The update check
 
-At start, the game asks GitHub whether there is something newer than the installed build. When there
+When the player opens the main menu on the title screen (or presses **Check Now** in the main menu's
+**Updates** page), the game asks GitHub whether there is something newer than the installed build. When there
 is, a panel at the main menu says so: the new version (or, on the development channel, how many new
 commits there are on `main`), the release notes in short, and three choices:
 
@@ -114,21 +123,22 @@ Details:
   comparison of the installed build with `main` (Development). Nothing else: no identifier, no
   telemetry, nothing about the player or the machine (GitHub sees the request's IP address, as for any
   web request). The answer is kept for 6 hours in `update_check.txt` (in the settings' folder below):
-  a start within them asks nothing.
-- **When:** once at start, in the background (`tools/update_check.py`, Python's standard library, run by
-  `src/host/update_check.cpp`), and again when the channel is switched in Options > Advanced: start-up
-  never waits for it. No network, an error or GitHub's rate limit: nothing is shown. Never in a headless
-  run. The panel is shown at the main menu's first page only, never during play.
-- **Turning it off:** Options > Advanced > Update Check = Off (in `advanced_options.txt`:
+  an automatic check within them asks nothing (**Check Now** always asks GitHub).
+- **When:** once when opening the main menu on the title screen, in the background (`tools/update_check.py`,
+  Python's standard library, run by `src/host/update_check.cpp`), when the channel is switched in **Updates**,
+  and on demand with **Updates > Check Now**: start-up never waits for it. No network, an error or GitHub's
+  rate limit: nothing is shown. Never in a headless run. The panel is shown at the main menu only, never
+  during play.
+- **Turning it off:** Main menu > Updates > Update Check = Off (in `advanced_options.txt`:
   `update_check_off 1`).
-- **The channel:** Options > Advanced > Update Channel. Players can switch between **Stable** (the
+- **The channel:** Main menu > Updates > Update Channel. Players can switch between **Stable** (the
   latest release) and **Development** (`main`) at any time. A developer clone on a branch other than
   `main` stays on its branch.
 - **The installed version** is printed at start (`[orig] rac1-native 0.1.0 (v0.1.0-10-g7dee3d1, main)`):
   the release's version and, for a git clone, `git describe` and the branch, recorded by the build
   (`cmake/version.cmake`).
 - **Skip Version** is kept in `advanced_options.txt` (`update_skip <tag or commit>`); remove the
-  line to see the notice again.
+  line (or use **Updates > Check Now**) to see the notice again.
 
 To try the panel without a new release: `RAC1_UPDATE_FAKE=0.9.0` (or `dev:12`) with `--debug-tools`
 (see [Environment variables](env-vars.md)).

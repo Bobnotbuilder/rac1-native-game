@@ -68,32 +68,25 @@ constexpr OvConst<0x001b8888u> MAIN_OPTIONS_PAGE{};  // the main menu's Options 
 
 // Our text ids, after the game's (0x4e00..0x5300 in the level text tables)
 constexpr int32_t TEXT_FIRST = 0x7f00;
-enum : int32_t { T_ADVANCED, T_HELP, T_QUICK_SELECT, T_NORMAL, T_PAUSE, T_CONTROLS, T_CLASSIC, T_MODERN, T_MOVEMENT, T_ORIGINAL, T_STRAFING, T_RAC3, T_FADES, T_FAST, T_FADES_ORIGINAL,
-                 T_UPDATE_CHECK, T_ON, T_OFF, T_UPDATE_CHANNEL, T_STABLE, T_DEVELOPMENT, T_COUNT };
+enum : int32_t { T_ADVANCED, T_HELP, T_QUICK_SELECT, T_NORMAL, T_PAUSE, T_CONTROLS, T_CLASSIC, T_MODERN, T_MOVEMENT, T_ORIGINAL, T_STRAFING, T_RAC3, T_FADES, T_FAST, T_FADES_ORIGINAL, T_COUNT };
 // per language (0x15ed88: 0 English, 2 French, 3 German, 4 Spanish, 5 Italian; French in English
 // for now, the font's accented letters not looked at yet)
 constexpr const char* TEXTS[6][T_COUNT] = {
-    {"Advanced", "Extra settings of the PC version", "Quick Select", "Normal", "Pause", "Aiming", "Original", "Modern", "Movement", "Original", "Strafing", "RAC 3", "Fades", "Fast", "Original",
-     "Update Check", "On", "Off", "Update Channel", "Stable", "Development"},
-    {"Advanced", "Extra settings of the PC version", "Quick Select", "Normal", "Pause", "Aiming", "Original", "Modern", "Movement", "Original", "Strafing", "RAC 3", "Fades", "Fast", "Original",
-     "Update Check", "On", "Off", "Update Channel", "Stable", "Development"},
-    {"Advanced", "Extra settings of the PC version", "Quick Select", "Normal", "Pause", "Aiming", "Original", "Modern", "Movement", "Original", "Strafing", "RAC 3", "Fades", "Fast", "Original",
-     "Update Check", "On", "Off", "Update Channel", "Stable", "Development"},
-    {"Erweitert", "Extra-Einstellungen der PC-Version", "Schnellwahl", "Normal", "Pause", "Zielen", "Original", "Modern", "Bewegung", "Original", "Strafing", "RAC 3", "Blenden", "Schnell", "Original",
-     "Update-Suche", "An", "Aus", "Update-Kanal", "Stabil", "Entwicklung"},
-    {"Avanzado", "Ajustes extra de la version PC", "Seleccion rapida", "Normal", "Pausa", "Apuntado", "Original", "Moderno", "Movimiento", "Original", "Strafing", "RAC 3", "Fundidos", "Rapidos", "Originales",
-     "Buscar versiones", "Si", "No", "Canal", "Estable", "Desarrollo"},
-    {"Avanzate", "Impostazioni extra della versione PC", "Scelta rapida", "Normale", "Pausa", "Mira", "Originale", "Moderna", "Movimento", "Originale", "Strafing", "RAC 3", "Dissolvenze", "Rapide", "Originali",
-     "Cerca aggiornamenti", "Si", "No", "Canale", "Stabile", "Sviluppo"},
+    {"Advanced", "Extra settings of the PC version", "Quick Select", "Normal", "Pause", "Aiming", "Original", "Modern", "Movement", "Original", "Strafing", "RAC 3", "Fades", "Fast", "Original"},
+    {"Advanced", "Extra settings of the PC version", "Quick Select", "Normal", "Pause", "Aiming", "Original", "Modern", "Movement", "Original", "Strafing", "RAC 3", "Fades", "Fast", "Original"},
+    {"Advanced", "Extra settings of the PC version", "Quick Select", "Normal", "Pause", "Aiming", "Original", "Modern", "Movement", "Original", "Strafing", "RAC 3", "Fades", "Fast", "Original"},
+    {"Erweitert", "Extra-Einstellungen der PC-Version", "Schnellwahl", "Normal", "Pause", "Zielen", "Original", "Modern", "Bewegung", "Original", "Strafing", "RAC 3", "Blenden", "Schnell", "Original"},
+    {"Avanzado", "Ajustes extra de la version PC", "Seleccion rapida", "Normal", "Pausa", "Apuntado", "Original", "Moderno", "Movimiento", "Original", "Strafing", "RAC 3", "Fundidos", "Rapidos", "Originales"},
+    {"Avanzate", "Impostazioni extra della versione PC", "Scelta rapida", "Normale", "Pausa", "Mira", "Originale", "Moderna", "Movimento", "Originale", "Strafing", "RAC 3", "Dissolvenze", "Rapide", "Originali"},
 };
-constexpr uint32_t STRING_SIZE = 0x30;  // (0x40 before the update rows: 6 languages x T_COUNT texts end before the Graphics block, 0xf2000)
+constexpr uint32_t STRING_SIZE = 0x30;
 static_assert(0x800 + 6 * T_COUNT * STRING_SIZE <= 0x2000, "the Advanced page's texts end where the Graphics page's block begins");
 
 // The page's rows: the name in the settings file, the id in the saves' files (never reused),
 // the byte, the name's text, the values' texts (the byte's value is the index; value 0 is the
 // default: the original's behaviour, or for a console compromise removed ("faithful
 // to the game's code, not to the PS2's limits") the port's - Fades: 0 fast, 1 the original's),
-// and whether the row is kept with the saves (the update check's rows belong to the machine: preferences only)
+// and whether the row is kept with the saves
 struct Row {
     const char* key;
     uint16_t id;
@@ -107,8 +100,6 @@ constexpr Row SETTINGS_ROWS[] = {
     {"controls", 2, CONTROLS, T_CONTROLS, {T_CLASSIC, T_MODERN, -1, -1}},
     {"movement", 3, MOVEMENT, T_MOVEMENT, {T_ORIGINAL, T_STRAFING, T_RAC3, -1}},
     {"fades", 4, FADES, T_FADES, {T_FAST, T_FADES_ORIGINAL, -1, -1}},
-    {"update_check_off", 5, UPDATE_OFF, T_UPDATE_CHECK, {T_ON, T_OFF, -1, -1}, false},
-    {"update_channel", 6, UPDATE_DEV, T_UPDATE_CHANNEL, {T_STABLE, T_DEVELOPMENT, -1, -1}, false},
 };
 constexpr uint32_t ROW_COUNT = sizeof(SETTINGS_ROWS) / sizeof(Row);
 
@@ -174,6 +165,14 @@ bool prefs_read(const std::filesystem::path& path) {
         char* end = nullptr;
         const unsigned long v = std::strtoul(value, &end, 10);
         if (end == value || *end != 0) return;
+        if (std::strcmp(name, "update_check_off") == 0 && v < 2) {
+            sb(UPDATE_OFF, static_cast<uint32_t>(v));
+            return;
+        }
+        if (std::strcmp(name, "update_channel") == 0 && v < 2) {
+            sb(UPDATE_DEV, static_cast<uint32_t>(v));
+            return;
+        }
         for (const Row& r : SETTINGS_ROWS)
             if (std::strcmp(name, r.key) == 0 && v < row_values(r)) sb(r.byte, static_cast<uint32_t>(v));
     });
@@ -202,6 +201,8 @@ void settings_save() {
     if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path(), ec);
     if (FILE* f = platform::open_file(path, "w")) {
         for (const Row& r : SETTINGS_ROWS) std::fprintf(f, "%s %u\n", r.key, lbu(r.byte));
+        std::fprintf(f, "update_check_off %u\n", lbu(UPDATE_OFF));
+        std::fprintf(f, "update_channel %u\n", lbu(UPDATE_DEV));
         if (!g_update_skip.empty()) std::fprintf(f, "update_skip %s\n", g_update_skip.c_str());
         std::fclose(f);
     }
@@ -1184,10 +1185,17 @@ void advanced_pose_hook(uint32_t rec) {
     for (uint32_t j = 92; j <= 110; ++j) turn(j);
 }
 
+bool update_menu_setting_changed(uint32_t byte);
+bool update_menu_settings_dpad(uint32_t w, uint32_t e, uint32_t pressed);
+
 // orig: (none) — enhancement (advanced.h)
 void advanced_setting_changed(uint32_t byte) {
     if (graphics_setting_changed(byte)) return;  // (a Graphics row)
     if (controls_setting_changed(byte)) return;  // (a Controls row)
+    if (update_menu_setting_changed(byte)) {     // (an Updates row)
+        if (!g_advanced_disabled && g_loaded) settings_save();
+        return;
+    }
     // Aiming = Modern needs a strafe (Strafing or RAC 3): turning it on when Movement is Original
     // turns Strafing on; turning Movement back to Original turns Aiming off
     if (byte == CONTROLS && lbu(CONTROLS) != 0 && lbu(MOVEMENT) == 0) sb(MOVEMENT, 1);
@@ -1252,6 +1260,7 @@ bool advanced_settings_dpad(uint32_t w, uint32_t e) {
     const uint32_t pressed = lwu(PAD + 0x1c4);
     if (controls_settings_dpad(w, e, pressed)) return true;
     if (graphics_settings_dpad(w, e, pressed)) return true;
+    if (update_menu_settings_dpad(w, e, pressed)) return true;
     if (w != ROWS_WIDGET || (pressed & 0xa000u) == 0) return false;
     // our Advanced rows: left / right step the value back / forward (the widget's cross steps it forward)
     const uint32_t b = lwu(e + 4);
