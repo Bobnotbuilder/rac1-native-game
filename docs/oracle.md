@@ -138,6 +138,7 @@ shared code every level runs:
 | 0 and 3 | 180 |
 | 0, 1, 3 and 5 | 190 (it proves a fix of the code generator, `tools/codegen/mips2cpp.py`) |
 | 3, 6 and 10 | 191 |
+| 0, 1, 3, 4, 6, 8 and 9 | 192 (the particle types 0x0a, 0x0e, 0x27, 0x49; no dumps: states built from the level) |
 
 For a quick check after a small change, level 0's 63, 79, 118 and 141 are the usual minimum.
 
