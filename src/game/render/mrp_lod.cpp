@@ -50,6 +50,8 @@ void mrp_lod_snapshot() { g_frame_widen_snap = g_frame_widen; }
 namespace {
 // the widening the shadow runs give the passes' frustum (1: none): the view's, when the sides are filled
 float fill_widen() { return g_mrp_lod_widen_off || !g_mrp_wide_fill ? 1.0f : render_view_cull_widen(); }
+// the same for the y tangent (the field of view's scale)
+float fill_widen_y() { return g_mrp_lod_widen_off || !g_mrp_wide_fill ? 1.0f : render_view_cull_widen_y(); }
 }  // namespace
 
 // orig: (host) see mrp_lod.h
@@ -146,9 +148,10 @@ void patch_shrub(float s) {
 // vf24.z) and its copy 0x16cc20 (vf26 / vf27). During the update the projection is the game's own 4:3 one (the
 // host's widened one is put back before each update: render_view_projection_undo), so the shadow run widens the tangent and runs projection_setup in the
 // journal: every constant derived from the tangent follows (patching 0x16caf0 / 0x16cc20 only would leave tfrag the 4:3 radius
-// factor 0x16caf8 - the ground at the sides missing in widescreen). The y tangent is kept (the setup's host hook given
-// the game's own); the view's projections A (render_view_setup 0x1f6e48: 0x166d00 / 0x166d40, which the particles and the sky
-// project with) are not rebuilt: what the pass projects stays in the game's 4:3 frame (the sky's shadow: widen_projection).
+// factor 0x16caf8 - the ground at the sides missing in widescreen). The y tangent (the setup's host hook given the
+// game's own) is widened by the field of view's scale only (the renderer's y tangent is the game's times it); the view's
+// projections A (render_view_setup 0x1f6e48: 0x166d00 / 0x166d40, which the particles and the sky project with) are not
+// rebuilt: what the pass projects stays in the game's 4:3 frame (the sky's shadow: widen_projection).
 // The tie pass's second test (the eight corners of the instance's box through the clip matrix, 0x2963f4..) scales x by
 // 0x160f90 x before VCLIPW: divided by the widening. (Its "needs clipping" flag follows: an instance inside the widened view is
 // drawn by tie A; one across its edge by tie B, whose flagged triangles the MRP then draws whole, mrp_world_renderer.cpp.)
@@ -165,15 +168,15 @@ float sky_y_base(float) { return g_sky_y_base; }
 enum PatchType : int { kPatchNone = 0, kPatchCull = 1, kPatchWiden = 2 };
 struct ShadowPatch {
     int type = kPatchNone;
-    float w = 1.0f;
+    float w = 1.0f, wy = 1.0f;
     float t_game = 0.0f, t_patched = 0.0f;  // the tangent 0x16caf0: the game's, and the shadow's widened one
 } g_patch;
 int g_patch_host = 0;  // the host's own patching calls the setups (not hooked)
 void patch_clear() { g_patch = ShadowPatch{}; }
-void widen_tangent(float w) {
+void widen_tangent(float w, float wy = 1.0f) {
     const float t = lwc1(OV(0x0016caf0u));
     float (*const hook)(float) = g_debug_fov_y_base;
-    g_sky_y_base = hook != nullptr ? hook(t) : t;
+    g_sky_y_base = (hook != nullptr ? hook(t) : t) * wy;
     g_debug_fov_y_base = &sky_y_base;
     swc1(OV(0x0016caf0u), t * w);
     projection_setup();
@@ -182,8 +185,10 @@ void widen_tangent(float w) {
 // The frustum the passes test against: the tangent and what projection_setup derives from it, and the clip matrix 0x166d80
 // (render_view_setup 0x1f6e48: the rotation times projection_setup's 0x16cb80 rows; tfrag's vf12..vf15, the tie pass's box test,
 // with the 4:3 one tfrag dropped the ground at the sides) rebuilt; the projections A 0x166cc0..0x166d7f put back (the
-// passes' own projected output - the particles - stays in the game's 4:3 frame).
-void patch_widen(float w, int kind) {
+// passes' own projected output - the particles - stays in the game's 4:3 frame). `wy`: the y tangent's widening (the field of
+// view's scale, fill_widen_y): with the y tangent kept, a Field of View above x1.00 culled what lies in the bands above and below the
+// 4:3 frame's height.
+void patch_widen(float w, int kind, float wy) {
     static const bool old = std::getenv("RAC1_MRP_WIDEN_0338") != nullptr;  // (testing: patch only the tangent and 0x16cc20)
     if (old) {
         const float t = lwc1(OV(0x0016caf0u)) * w;
@@ -194,13 +199,13 @@ void patch_widen(float w, int kind) {
     }
     ++g_patch_host;
     const float t = lwc1(OV(0x0016caf0u));
-    widen_tangent(w);
+    widen_tangent(w, wy);
     uint8_t a[0xc0];
     std::memcpy(a, ee_ram_ptr(OV(0x00166cc0u)), sizeof a);
     render_view_setup();
     std::memcpy(ee_ram_ptr(OV(0x00166cc0u)), a, sizeof a);
     --g_patch_host;
-    g_patch = ShadowPatch{kPatchWiden, w, t, lwc1(OV(0x0016caf0u))};
+    g_patch = ShadowPatch{kPatchWiden, w, wy, t, lwc1(OV(0x0016caf0u))};
 }
 // The 3D effects' shadow: the sphere test's constants only - the tangent 0x16caf0 and the radius factor sqrt(1 + t^2)
 // at 0x16caf8 and its copy 0x16cc20 (as projection_setup computes it: measured 1.08235 for t = 0.414112) -, nothing else of the
@@ -212,14 +217,16 @@ void patch_cull(float w) {
     swc1(OV(0x0016caf0u), t);
     swc1(OV(0x0016caf8u), r);
     swc1(OV(0x0016cc20u), r);
-    g_patch = ShadowPatch{kPatchCull, w, t0, t};
+    g_patch = ShadowPatch{kPatchCull, w, 1.0f, t0, t};
 }
 // The sky (0x23d968) projects its shells itself with the frame's projection (render_view_setup 0x1f6e48: A 0x166d00 from
 // projection_setup 0x1f7980's matrices), and the MRP draws it as the directions A sees its screen points in: a 4:3 A covers
-// the 4:3 frustum only. Its shadow is run with the whole projection made from the widened tangent (the y tangent kept), the A
-// it used kept for the scene.
-void widen_projection(float w) {
-    widen_tangent(w);
+// the 4:3 frustum only. Its shadow is run with the whole projection made from the widened tangent, the A it used kept for the
+// scene. The y tangent is widened by the field of view's scale `wy` (the renderer's y tangent is the game's times it,
+// render_view_projection): with the y tangent kept, a Field of View above x1.00 drew the sky's clusters of the 4:3 height only,
+// the clear colour in bands above and below them (issue #18).
+void widen_projection(float w, float wy) {
+    widen_tangent(w, wy);
     render_view_setup();
 }
 
@@ -241,23 +248,23 @@ MrpLodSetupScope::~MrpLodSetupScope() {
         if (g_patch.type == kPatchCull) {
             patch_cull(g_patch.w);
         } else {
-            widen_tangent(g_patch.w);
-            g_patch = ShadowPatch{kPatchWiden, g_patch.w, t, lwc1(OV(0x0016caf0u))};
+            widen_tangent(g_patch.w, g_patch.wy);
+            g_patch = ShadowPatch{kPatchWiden, g_patch.w, g_patch.wy, t, lwc1(OV(0x0016caf0u))};
         }
     } else if (g_patch.type == kPatchWiden) {
         // render_view_setup on patch_widen's widened projection: the clip matrix 0x166d80 the widened one (the passes' tests), the rows
         // A 0x166cc0..0x166d7f (what the pass projects with) made from the game's own projection, as patch_widen keeps them
-        const float w = g_patch.w;
+        const float w = g_patch.w, wy = g_patch.wy;
         if (lwc1(OV(0x0016caf0u)) == g_patch.t_patched) swc1(OV(0x0016caf0u), g_patch.t_game);
         const float t = lwc1(OV(0x0016caf0u));
         projection_setup();
         render_view_setup();
         uint8_t a[0xc0];
         std::memcpy(a, ee_ram_ptr(OV(0x00166cc0u)), sizeof a);
-        widen_tangent(w);
+        widen_tangent(w, wy);
         render_view_setup();
         std::memcpy(ee_ram_ptr(OV(0x00166cc0u)), a, sizeof a);
-        g_patch = ShadowPatch{kPatchWiden, w, t, lwc1(OV(0x0016caf0u))};
+        g_patch = ShadowPatch{kPatchWiden, w, wy, t, lwc1(OV(0x0016caf0u))};
     }  // (kPatchCull: the projection stays the game's own, render_view_setup's output too)
     --g_patch_host;
 }
@@ -273,7 +280,7 @@ void mrp_lod_frame_begin() {
     g_mrp_lod_widen_off = true;  // (the game's own culling widened: no shadow run)
     const float w = render_view_cull_widen(), t = lwc1(OV(0x0016caf0u));
     if (!(w > 1.0f)) return;
-    widen_projection(w);
+    widen_projection(w, render_view_cull_widen_y());
     render_view_note_write(lwc1(OV(0x0016caf0u)), t);
 }
 
@@ -389,7 +396,7 @@ void mrp_lod_world_shadow(int kind, void (*pass)(), uint32_t cur) {
                 const Vu0Save vu0_saved(false);
                 const auto hw_saved = eer::hwregs();
                 ee_journal_begin();
-                patch_widen(w_req, 0);
+                patch_widen(w_req, 0, fill_widen_y());
                 mrpw::tfrag_note_pass(host, s_req, w_req);
                 patch_clear();
                 g_st.pages += ee_journal_restore();
@@ -401,7 +408,7 @@ void mrp_lod_world_shadow(int kind, void (*pass)(), uint32_t cur) {
             if (host) return;
         } else {
             const bool host = asked && !selftest && mrp_world_static_lod();
-            mrpw::static_note_pass(kind, host, s_req, w_req);
+            mrpw::static_note_pass(kind, host, s_req, w_req, fill_widen_y());
             if (host) return;
         }
     }
@@ -431,8 +438,8 @@ void mrp_lod_world_shadow(int kind, void (*pass)(), uint32_t cur) {
         else if (kind == 1) patch_tie(s);
         else if (kind == 2) patch_shrub(s);
         if (widen > 1.0f) {
-            if (kind == 3) widen_projection(widen);
-            else patch_widen(widen, kind);
+            if (kind == 3) widen_projection(widen, fill_widen_y());
+            else patch_widen(widen, kind, fill_widen_y());
             ++g_st.widened[kind];
         }
     }
@@ -719,7 +726,7 @@ void mrp_lod_moby_shadow(void (*pass)()) {
     shadow_packet_room();
     patch_moby(s);
     if (widen > 1.0f) {
-        patch_widen(widen, 0);
+        patch_widen(widen, 0, fill_widen_y());
         ++g_mst.widened;
     }
     mrp_scene_shadow_begin();

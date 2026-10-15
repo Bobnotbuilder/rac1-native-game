@@ -249,12 +249,15 @@ at Maximum on Veldin, Novalis and Kerwan.
 
 - **Aspect Ratio**: 4:3 Original, 16:9, or Fill Screen (the 3D widened to the window's shape).
 - **Fit to Screen**: when the picture's shape is not the window's, black bars or stretched.
-- **Field of View**: a scale of the original's horizontal field of view.
+- **Field of View**: a scale of the original's field of view (both its horizontal and vertical angles).
 
 To widen the 3D, the host writes a wider projection into the game's projection block and runs the
 game's own projection set-up (0x1f7980) inside a journal. `render_view_projection_undo` restores the
 bytes before every game update, so **the game only ever sees its own 4:3 projection**. Objects in the
-side bands are culled by the same shadow-run mechanism as the level of detail, with the view widened.
+side bands are culled by the same shadow-run mechanism as the level of detail, with the view widened:
+horizontally by the widescreen and the field of view, vertically by the field of view (the sky too).
+Before the vertical part, a Field of View above x1.00 lost the sky and the objects in bands at the
+top and bottom of the screen.
 Before this, the game's state diverged on most frames of the Veldin intro when the view was widened;
 after it, its state is identical at 4:3 and at 5120x1440.
 
@@ -282,7 +285,9 @@ the GS's 4 MB memory, run VU1 programs where the chain starts them (ported progr
 hash of their code, see [Decisions](decisions.md#5-a-vu-interpreter-for-the-microprograms-not-yet-ported)),
 and draw the result with OpenGL. They draw the HUD, the help text and fonts, the menus, screen tints
 and flashes, fades, and any effect the MRP does not take. The 2D maps cleanly to the screen, so
-emulating it is simple and exact.
+emulating it is simple and exact. What the game draws into its own memory to use as a texture (the
+menus' pictures, such as the ship's planet menu's planet, made of three blended layers) goes into a
+render target that keeps the GS's alpha (0x80 = 1.0); its blending reads that alpha at the GS's scale.
 
 ## The original rendering, kept as the reference
 
@@ -341,7 +346,6 @@ integrated GPU, while the CPU side was 25 to 40 ms before the work above.
 - The mobys' flattened shadow meshes (a second, flattened model some classes have) are not drawn by
   the MRP (`mrp_moby_renderer.cpp`).
 - Drop shadows of mobys drawn only because of a higher level of detail are missing.
-- The field-of-view scale widens the view horizontally only.
 - A moby whose class logic reads its own "drawn" flag behaves as in 4:3 when it is only visible in
   the widened side bands: that flag is game state, and the port does not change it.
 - At a higher level of detail or in widescreen, shrubs' far billboard variants are not drawn.

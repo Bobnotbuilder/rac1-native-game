@@ -70,6 +70,7 @@ struct StaticSnapshot {
     bool valid = false;
     bool on[2] = {};                            // (the pass's instances made here: 0 tie, 1 shrub)
     float scale = 1.0f, widen = 1.0f;           // the slider's distance scale (0 = unlimited), the frustum's widening
+    float widen_y = 1.0f;                       // the frustum's vertical widening (the field of view's scale)
     std::array<std::array<float, 4>, 3> rot{};  // 0x166c80: the camera's rotation (vf25..vf27)
     std::array<std::array<float, 4>, 4> a{};    // 0x166d00: the projection A (vf28..vf31)
     std::array<float, 4> cam{};                 // 0x166dc0 (vf24)
@@ -84,8 +85,8 @@ struct StaticSnapshot {
     uint32_t shrub_data = 0;                    // *(0x16049c): the shrubs' 0x40-byte instance data
 };
 // orig: (host) before the real tie (kind 1) / shrub (kind 2) pass, every game frame (mrp_lod_world_shadow): the snapshot taken;
-// `handle`: the pass's instances made by the host this frame (its shadow run not needed); `scale` / `widen` as the shadow's
-void static_note_pass(int kind, bool handle, float scale, float widen);
+// `handle`: the pass's instances made by the host this frame (its shadow run not needed); `scale` / `widen` / `widen_y` as the shadow's
+void static_note_pass(int kind, bool handle, float scale, float widen, float widen_y = 1.0f);
 
 // The level's tie / shrub classes as the passes find them in EE memory (the class records listed at 0x1c5800 / 0x1bc030) matched
 // to the MRP world asset's classes, each packet with its texture prims' A+D qwords as VU1 memory receives them (taken from EE

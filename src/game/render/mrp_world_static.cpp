@@ -122,12 +122,13 @@ int32_t ftoi(float f, float k) {
 // from 0x166c80 + 0x140 / 0 / 0x10 / 0x20 / 0x80..0xb0; vf18..vf22 from 0x16ca40 + 0x220 / 0xa0 / 0xb0 / 0x1e0; the zones 0x173d00
 // copied to SPR 0x3000; the wind's table 0x1c3ef0 (SPR 0x3500 / 0x3b00) and constants 0x1c3ff0 (SPR 0x3e80 / 0x3c00), the
 // clock 0x15f3f8 (SPR 0x3ea0 / 0x3c20); the maxima *(0x160fe0) / *(0x1604a4))
-void static_note_pass(int kind, bool handle, float scale, float widen) {
+void static_note_pass(int kind, bool handle, float scale, float widen, float widen_y) {
     if (kind != 1 && kind != 2) return;
     StaticSnapshot& S = g_snap;
     S.on[kind - 1] = handle;
     S.scale = scale;
     S.widen = widen;
+    S.widen_y = widen_y;
     for (uint32_t r = 0; r < 3; ++r) S.rot[r] = rq(OV(0x00166c80u) + 0x10 * r);
     for (uint32_t r = 0; r < 4; ++r) S.a[r] = rq(OV(0x00166d00u) + 0x10 * r);
     S.cam = rq(OV(0x00166dc0u));
@@ -276,8 +277,8 @@ struct Cull {
 // orig: (host) the tie pass's second test for an instance across the frustum's edge (0x296404..): the class's 8 box corners (record
 // +0xa0..+0x110) through the instance's matrix (rows x scale, (position - camera) x 1024) and the clip matrix 0x166d80, VCLIPW against w:
 // culled when all the corners are outside one plane (the AND of the unscaled corners' flags, cfc2 before the 0x160f90 scaling, non-zero;
-// the scaled ones only choose tie A / B). `xs`: the widening (the 4:3 clip matrix's x narrowed by it; the shadow runs kept it 4:3)
-bool box_outside(const StaticSnapshot& S, uint32_t rec, uint32_t data, float xs) {
+// the scaled ones only choose tie A / B). `xs` / `ys`: the widening (the 4:3 clip matrix's x / y narrowed by it; the shadow runs kept it 4:3)
+bool box_outside(const StaticSnapshot& S, uint32_t rec, uint32_t data, float xs, float ys) {
     float m[4][4];
     const std::array<float, 4> pos = rq(data + 0x30);
     float rows[4][3];
@@ -302,6 +303,7 @@ bool box_outside(const StaticSnapshot& S, uint32_t rec, uint32_t data, float xs)
             p[l] = acc + m[3][l];
         }
         p[0] = p[0] * xs;
+        p[1] = p[1] * ys;
         const float w = std::fabs(p[3]);
         const uint32_t fl = (p[0] > w ? 1u : 0u) | (p[0] < -w ? 2u : 0u) | (p[1] > w ? 4u : 0u) | (p[1] < -w ? 8u : 0u) | (p[2] > w ? 16u : 0u) | (p[2] < -w ? 32u : 0u);
         all &= fl;
@@ -374,7 +376,7 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
     if (!L.ok || !S.valid) return;
     f.on[0] = check || S.on[0];
     f.on[1] = check || S.on[1];
-    const float s = check ? 1.0f : S.scale, widen = check ? 1.0f : S.widen;
+    const float s = check ? 1.0f : S.scale, widen = check ? 1.0f : S.widen, widen_y = check || !(widen > 1.0f) ? 1.0f : S.widen_y;
     Cull cu{};
     cu.tx = S.tan[0];
     cu.ty = S.tan[1];
@@ -384,12 +386,16 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
         cu.tx = S.tan[0] * widen;
         cu.kx = std::sqrt(1.0f + cu.tx * cu.tx);
     }
+    if (widen_y > 1.0f) {  // (the y tangent by the field of view's scale, as patch_widen)
+        cu.ty = S.tan[1] * widen_y;
+        cu.ky = std::sqrt(1.0f + cu.ty * cu.ty);
+    }
     cu.near = S.near[0] * (1.0f / 1024.0f);  // (vf19.xy x 0x3a800000)
     cu.c23x = S.c23[0] * (1.0f / 1024.0f);   // (vf23.xy x 0x3a800000)
     cu.c23y = S.c23[1] * (1.0f / 1024.0f);
     // (the box test's widening; RAC1_MRPW_STATIC_BOX43=1, testing: the 4:3 clip matrix as the shadow runs had it)
     static const bool box43 = std::getenv("RAC1_MRPW_STATIC_BOX43") != nullptr;
-    const float boxx = widen > 1.0f && !box43 ? 1.0f / widen : 1.0f;
+    const float boxx = widen > 1.0f && !box43 ? 1.0f / widen : 1.0f, boxy = widen_y > 1.0f && !box43 ? 1.0f / widen_y : 1.0f;
     // ---- ties (0x295fa0): per class record, its instances' bounds (0x20 bytes: sphere, +0x10 the instance data, +0x14 the draw
     // distance, +0x18 the zones' mask, +0x19 the zone), the LOD lists (near / mid: LOD 0, far: LOD 1, beyond: LOD 2), emitted per
     // LOD, per packet, its instances in the list's order (each new one at its head)
@@ -415,7 +421,7 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
                 float zv = 0;
                 bool clipf = false;
                 if (!cu.visible(S, sph, dist, zv, clipf)) continue;
-                if (clipf && box_outside(S, c.rec, ru(b + 0x10), boxx)) continue;
+                if (clipf && box_outside(S, c.rec, ru(b + 0x10), boxx, boxy)) continue;
                 ++f.visible[0];
                 const float d = std::max(0.0f, zv);
                 StaticInst si;
@@ -579,7 +585,7 @@ CasterVolume caster_volume(const ShadowCull& c) {
     // (the view the shadows are drawn for: the renderer's projection - the cascades are fitted to it - wider than the passes' culling
     // with the field of view scaled; its sides' receivers must find their casters too)
     const float tx = c.tan_x > 0.0f ? std::max(c.tan_x, S.tan[0]) : S.tan[0] * std::max(1.0f, S.widen);
-    const float ty = c.tan_y > 0.0f ? std::max(c.tan_y, S.tan[1]) : S.tan[1];
+    const float ty = c.tan_y > 0.0f ? std::max(c.tan_y, S.tan[1]) : S.tan[1] * std::max(1.0f, S.widen_y);
     float near_d = 0.1f;
     for (int k = 0; k < 3; ++k) {
         const float far_d = c.splits[k];
@@ -646,6 +652,10 @@ void static_shadow_build(const StaticLevel& L, const ResidentColours& rc, Static
         if (widen > 1.0f) {
             cu.tx = S.tan[0] * widen;
             cu.kx = std::sqrt(1.0f + cu.tx * cu.tx);
+            if (S.widen_y > 1.0f) {
+                cu.ty = S.tan[1] * S.widen_y;
+                cu.ky = std::sqrt(1.0f + cu.ty * cu.ty);
+            }
         }
         cu.near = S.near[0] * (1.0f / 1024.0f);
         cu.c23x = S.c23[0] * (1.0f / 1024.0f);

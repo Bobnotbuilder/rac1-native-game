@@ -53,6 +53,9 @@ glm::vec3 render_camera_position();
 // game's code reads now (the game writes its own 4:3 value back every update: the camera, the cutscenes) against the one
 // render_view_projection makes of it for the drawing (fov scale x widening); >= 1.
 float render_view_cull_widen();
+// The same for the y tangent: the field of view's scale (render_view_projection widens the y tangent by it, not by the
+// widescreen's widening); >= 1.
+float render_view_cull_widen_y();
 
 // orig: (host) (testing, RAC1_WIDEN_REF): a widened x tangent `written` the host wrote over the game's `base` elsewhere
 // (mrp_lod_frame_begin), noted as render_view_projection's own writes are (not widened again, the y tangent the base's)
