@@ -18,6 +18,8 @@
 #include <game/ovl/batalia_hooks.h>
 #include <game/ovl/orxon_hooks.h>
 #include <game/ovl/pokitaru_hooks.h>
+#include <game/ovl/gemlik_hooks.h>
+#include <game/ovl/oltanis_hooks.h>
 #include <game/ovl/variants_l2.h>
 #include <game/ovl/novalis_level_fns.h>
 #include <game/ovl/ovl_reloc.h>
@@ -114,6 +116,14 @@ int32_t camera_type_call(uint32_t fn, uint32_t cam, uint32_t other) {
         int32_t r = 0;
         if (batalia_camera_type_call(fn, cam, other, &r)) return r;
     }
+    if (on_oltanis()) {  // level 14's own camera types (0x13, 0x14, 0x15: accept / init / update / exit at its own addresses)
+        int32_t r = 0;
+        if (oltanis_camera_type_call(fn, cam, other, &r)) return r;
+    }
+    if (on_gemlik()) {  // level 13's own camera type (0x13: accept / init / update at its own addresses)
+        int32_t r = 0;
+        if (gemlik_camera_type_call(fn, cam, other, &r)) return r;
+    }
     if (on_orxon()) {  // level 10's own camera type (0x13: accept / init / update / exit at its own addresses)
         int32_t r = 0;
         if (orxon_camera_type_call(fn, cam, other, &r)) return r;
@@ -178,6 +188,8 @@ void camera_callback_call(uint32_t fn) {
     }
     if (on_orxon() && orxon_camera_callback_call(fn)) return;  // (level 10's own: 0x2f4b78, queued by the camera hook 0x2f4b18)
     if (on_pokitaru() && pokitaru_camera_callback_call(fn)) return;  // (level 11's own: 0x327af0, queued by the camera hook 0x327a90)
+    if (on_gemlik() && gemlik_camera_callback_call(fn)) return;  // (level 13's own: 0x316ba8, queued by the camera hook 0x316b48)
+    if (on_oltanis() && oltanis_camera_callback_call(fn)) return;  // (level 14's own: 0x313240, queued by the camera hook 0x3131e0)
     if (on_gaspar() && gaspar_camera_callback_call(fn)) return;  // (level 9's own: 0x314280, queued by the camera hook 0x314220)
     if (on_umbris() && umbris_camera_callback_call(fn)) return;  // (level 7's own: 0x3280f0, queued by the camera hook 0x328090)
     if (on_blarg() && blarg_camera_callback_call(fn)) return;  // (level 6's own: 0x314810, queued by the camera hook 0x3147b0)

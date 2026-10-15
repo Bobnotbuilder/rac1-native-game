@@ -210,6 +210,10 @@ void batch_160();
 void batch_180();
 void batch_190();
 void batch_191();
+void batch_220();  // Gemlik Base (level 13)
+void batch_221();  // Oltanis (level 14)
+void batch_222();  // Gemlik Base (level 13): RAM dumps
+void batch_223();  // Oltanis (level 14): RAM dumps
 
 }  // namespace rac1::oracle
 

@@ -19,7 +19,7 @@ GP_VALUE = 0x166C00  # $gp: the same on every overlay (gp-relative addresses are
 CODE = (0x1EAA00, 0x2F0CD0)
 SKIP_FILES = {"src/game/ovl/ovl_reloc.h", "src/game/ovl/ovl_reloc.cpp",
               # the per-level variant table (Veldin function -> the level's own): both sides are literal addresses
-              "src/game/ovl/variants_l1.cpp", "src/game/ovl/variants_l2.cpp", "src/game/ovl/variants_l3.cpp", "src/game/ovl/variants_l4.cpp", "src/game/ovl/variants_l5.cpp", "src/game/ovl/variants_l6.cpp", "src/game/ovl/variants_l7.cpp", "src/game/ovl/variants_l8.cpp", "src/game/ovl/variants_l9.cpp", "src/game/ovl/variants_l10.cpp", "src/game/ovl/variants_l11.cpp", "src/game/ovl/variants_sky.cpp",
+              "src/game/ovl/variants_l1.cpp", "src/game/ovl/variants_l2.cpp", "src/game/ovl/variants_l3.cpp", "src/game/ovl/variants_l4.cpp", "src/game/ovl/variants_l5.cpp", "src/game/ovl/variants_l6.cpp", "src/game/ovl/variants_l7.cpp", "src/game/ovl/variants_l8.cpp", "src/game/ovl/variants_l9.cpp", "src/game/ovl/variants_l10.cpp", "src/game/ovl/variants_l11.cpp", "src/game/ovl/variants_l13.cpp", "src/game/ovl/variants_l14.cpp", "src/game/ovl/variants_sky.cpp",
               # the boot module's code (its own image in SCUS_971.99, its own addresses; the host
               # runs its loader with no overlay translation)
               "src/game/boot/front_end.cpp", "src/game/boot/front_end.h",

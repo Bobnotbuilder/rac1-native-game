@@ -52,6 +52,8 @@ add_library(rac1_game STATIC
     ovl/variants_l8.cpp
     ovl/variants_l10.cpp
     ovl/variants_l11.cpp
+    ovl/variants_l13.cpp
+    ovl/variants_l14.cpp
     ovl/eudora_mobys.cpp
     ovl/rilgar_mobys.cpp
     ovl/rilgar_hooks.cpp
@@ -73,6 +75,11 @@ add_library(rac1_game STATIC
     ovl/orxon_hooks.cpp
     ovl/pokitaru_hooks.cpp
     ovl/pokitaru_mobys.cpp
+    ovl/gemlik_mobys.cpp
+    ovl/gemlik_hooks.cpp
+    ovl/oltanis_mobys.cpp
+    ovl/oltanis_hooks.cpp
+    ovl/levels13_14_shared.cpp
     ovl/variants.cpp
     ovl/novalis_mobys.cpp
     ovl/aridia_mobys.cpp

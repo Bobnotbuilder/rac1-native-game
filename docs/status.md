@@ -68,8 +68,8 @@ nothing, so an object whose class is not ported stands still or does not appear.
 | 10 | Orxon | Its own classes ported, with their draw callbacks: Clank's section, and Ratchet's part once he has the O2 mask. Ready for playtest; not played through by hand yet. | |
 | 11 | Pokitaru | First part ported. | Weapons and gadgets bought there not ported. |
 | 12 | Hoven | Loads and runs. | Nothing of its own ported. |
-| 13 | Gemlik Base (code: Oltanis Orbit) | Loads and runs. | Nothing of its own ported. |
-| 14 | Oltanis | Loads and runs. | Nothing of its own ported. |
+| 13 | Gemlik Base (code: Oltanis Orbit) | Its own code ported: its 60 classes with their draw callbacks, Qwark's space fight (the player's ship, Qwark's ship and his health bar), camera type 0x13, its sound emitter, the camera mode hook, class 63's carry hooks; particle type 0x44 (shared, the ship's engines). Ready for playtest; not played through by hand yet. | Qwark has not been beaten in an automated run (the fight runs; no scripted run aimed the ship's lasers at him). |
+| 14 | Oltanis | Its own code ported: its own build of the hero controller (24 functions, with the RAC 3 movement hook points), its 59 classes with their draw callbacks, camera types 0x13 / 0x14 / 0x15, four sound emitter types, the camera mode hook, class 252's carry hooks, the arrival scene's extras. Ready for playtest; not played through by hand yet. | Not played through end to end in an automated run yet. |
 | 15 | Quartu | Loads and runs. | Nothing of its own ported. |
 | 16 | Kalebo III | Loads and runs. | Nothing of its own ported. |
 | 17 | Drek's fleet (code: Veldin Orbit) | Loads and runs. | Nothing of its own ported. |
@@ -111,8 +111,8 @@ nothing, so an object whose class is not ported stands still or does not appear.
 
 ## Not done yet
 
-- **The second half of the game.** Levels 8 to 11 have their first part ported; levels 12 to 18
-  have nothing of their own ported yet.
+- **The second half of the game.** Levels 8 to 11 have their first part ported, levels 13 and 14 their own code;
+  levels 12 and 15 to 18 have nothing of their own ported yet.
 - **Shared code still stubbed.** Every level still reaches a few `TODO_PORT` stubs that are not its
   own code: some kernel and DMA calls the host does not need. Several weapon and gadget classes are
   not ported on any level yet.

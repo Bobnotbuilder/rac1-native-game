@@ -10,6 +10,8 @@
 #include <game/ovl/carry_hooks.h>
 #include <game/ovl/eudora_mobys.h>
 #include <game/ovl/gaspar_mobys.h>
+#include <game/ovl/gemlik_hooks.h>
+#include <game/ovl/oltanis_hooks.h>
 #include <game/ovl/novalis_hooks.h>
 #include <game/ovl/orxon_mobys.h>
 #include <game/ovl/ovl_reloc.h>
@@ -135,6 +137,10 @@ bool class_hook_call_level(uint32_t fn, uint32_t m, uint32_t a1, uint32_t a2, fl
         case L11_CASE(0x003162f0): ret = u_call(pok_hook_3162f0_u, m, a1, a2, f12); return true;
         default: return false;
         }
+    case 13:  // Gemlik Base: class 0x3f (table 0x1f6174)
+        return gemlik_class_hook_call(fn, m, a1, a2, f12, ret);
+    case 14:  // Oltanis: class 0xfc (table 0x1fd9d0), class 0x10e's hook +0xc (table 0x1fd9e8)
+        return oltanis_class_hook_call(fn, m, a1, a2, f12, ret);
     default:
         return false;
     }

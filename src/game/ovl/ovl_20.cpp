@@ -173,6 +173,7 @@ void hero_footsteps_update() {
 int32_t hero_ledge_check_v(const Vec4& pos, const float* ref_yaw) {
     if (on_batalia()) return bat_ledge_check_call(pos, ref_yaw);  // (level 8's own: L8:0x0021e4c8)
     if (on_pokitaru()) return pok_ledge_check_call(pos, ref_yaw);  // (level 11's own: L11:0x0023d240)
+    if (on_oltanis()) return olt_ledge_check_call(pos, ref_yaw);  // (level 14's own: L14:0x0021e770)
     if (on_l1_family() || on_rilgar()) return hero_ledge_check_v_l1(pos, ref_yaw);
     const uint32_t P = g::PLAYER, OUTB = OV(0x00173e40);
     if (lh(P + 0x308) == 2) return 0;
@@ -257,6 +258,7 @@ int32_t hero_ledge_check(uint32_t pos, const float* ref_yaw) { return hero_ledge
 void hero_ledge_grab_check() {
     if (on_batalia()) { bat_call(bat_hero_ledge_grab_check_u); return; }  // (level 8's own: L8:0x0021dd20)
     if (on_pokitaru()) { pok_call(pok_hero_ledge_grab_check_u); return; }  // (level 11's own: L11:0x0023ca98)
+    if (on_oltanis()) { olt_call(olt_hero_ledge_grab_check_u); return; }  // (level 14's own: L14:0x0021dfc8)
     if (on_l1_family() || on_rilgar()) return hero_ledge_grab_check_l1();
     const uint32_t P = g::PLAYER, OUTB = OV(0x00173e40);
     if (lh(P + 0x308) == 2) return;
@@ -816,6 +818,7 @@ uint32_t sub_00205000(int32_t flag) {
     if (on_blarg()) return blg_call(blg_sub_205000_u, static_cast<uint32_t>(flag)).v0;  // (level 6's own: L6:0x0021d0a0)
     if (on_batalia()) return bat_call(bat_sub_205000_u, static_cast<uint32_t>(flag)).v0;  // (level 8's own: L8:0x00217b80)
     if (on_pokitaru()) return pok_call(pok_sub_205000_u, static_cast<uint32_t>(flag)).v0;  // (level 11's own: L11:0x00236968)
+    if (on_oltanis()) return olt_call(olt_sub_00205000_u, static_cast<uint32_t>(flag)).v0;  // (level 14's own: L14:0x00218610)
     if (on_l1_family() || on_rilgar()) return sub_00205000_l1(flag);
     const uint32_t mode = lbu(g::PLAYER + 0x20a4);
     if (mode == 2) return 0;
@@ -1215,6 +1218,7 @@ void sub_00209848(int32_t n, int32_t limit) {
 void sub_002076a8() {
     if (on_batalia()) { bat_call(bat_sub_2076a8_u); return; }  // (level 8's own: L8:0x00219ab0)
     if (on_pokitaru()) { pok_call(pok_sub_2076a8_u); return; }  // (level 11's own: L11:0x00238890)
+    if (on_oltanis()) { olt_call(olt_sub_002076a8_u); return; }  // (level 14's own: L14:0x0021a628)
     if (on_l1_family()) return sub_002076a8_l1();
     if (lw(g::PLAYER + 0x22f4) != 0) {
         const uint32_t v = lwu(g::PLAYER + 0x22f8);
