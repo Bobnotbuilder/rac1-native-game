@@ -332,6 +332,33 @@ static void ram_hash_frame(FILE* f, uint64_t frame) {
 // HostPacer (VSync on with no frame-rate cap: paced at the display's refresh); elsewhere VSync is the swap interval 1.
 // orig: (host)
 static int host_swap_interval(bool vsync) { return vsync && glfwGetPlatform() != GLFW_PLATFORM_WAYLAND ? 1 : 0; }
+// orig: (host) the monitor the Graphics page's Monitor row chose (an index in GLFW's list), else the primary
+// monitor, which on Wayland is only the first output the compositor advertises
+static GLFWmonitor* host_fullscreen_monitor() {
+    GLFWmonitor* primary = glfwGetPrimaryMonitor();
+    int n = 0;
+    GLFWmonitor** all = glfwGetMonitors(&n);
+    const int row = rac1::graphics_display().monitor;
+    if (all == nullptr || row < 0 || row >= n) return primary;
+    const GLFWvidmode* mode = glfwGetVideoMode(all[row]);
+    std::printf("[orig] the monitor: %s (%d), %s x %s at %d Hz\n", glfwGetMonitorName(all[row]), row, mode != nullptr ? std::to_string(mode->width).c_str() : "?", mode != nullptr ? std::to_string(mode->height).c_str() : "?",
+                mode != nullptr ? mode->refreshRate : 0);
+    return all[row];
+}
+// orig: (host) a windowed window centred on the monitor the Graphics page's Monitor row chose. GLFW cannot place a
+// window on Wayland (the compositor does, and ignores the request), so this does nothing there; it is for X11.
+static void host_window_on_monitor(GLFWwindow* w, int row) {
+    if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND || row < 0) return;
+    int n = 0;
+    GLFWmonitor** all = glfwGetMonitors(&n);
+    if (all == nullptr || row >= n) return;
+    const GLFWvidmode* mode = glfwGetVideoMode(all[row]);
+    if (mode == nullptr) return;
+    int mx = 0, my = 0, ww = 0, wh = 0;
+    glfwGetMonitorPos(all[row], &mx, &my);
+    glfwGetWindowSize(w, &ww, &wh);
+    glfwSetWindowPos(w, mx + std::max(0, (mode->width - ww) / 2), my + std::max(0, (mode->height - wh) / 2));
+}
 // orig: (host) the display's refresh rate (the window's monitor, else the first; 60 when unknown)
 static double host_refresh_hz(GLFWwindow* w) {
     GLFWmonitor* m = glfwGetWindowMonitor(w);
@@ -1619,6 +1646,13 @@ int main(int argc, char** argv) {
     // Options > Graphics: the window, the view, the level of detail as the player left them (not read in a
     // headless run: g_advanced_disabled); the testing switches below override them
     rac1::graphics_load();
+    if (!headless) {  // Options > Graphics's Monitor row: the host's monitors, for the row and for the window to go on
+        std::vector<std::string> names;
+        int n = 0;
+        if (GLFWmonitor** all = glfwGetMonitors(&n); all != nullptr)
+            for (int i = 0; i < n; ++i) names.emplace_back(glfwGetMonitorName(all[i]));
+        rac1::graphics_set_monitors(std::move(names));
+    }
     int win_w0 = 960, win_h0 = 720;  // testing: RAC1_WINDOW=WxH, RAC1_VIEW_MODE=0|1|2 (render_toggles.h)
     if (!headless) {
         win_w0 = rac1::graphics_display().window_w;
@@ -1632,7 +1666,7 @@ int main(int argc, char** argv) {
     GLFWmonitor* fs_monitor = nullptr;
     const char* fs_env = std::getenv("RAC1_FULLSCREEN");
     if (!headless && (fs_env != nullptr ? std::atoi(fs_env) != 0 : rac1::graphics_display().fullscreen)) {
-        fs_monitor = glfwGetPrimaryMonitor();
+        fs_monitor = host_fullscreen_monitor();
         if (const GLFWvidmode* mode = fs_monitor != nullptr ? glfwGetVideoMode(fs_monitor) : nullptr) {
             win_w0 = mode->width;
             win_h0 = mode->height;
@@ -1643,6 +1677,7 @@ int main(int argc, char** argv) {
     GLFWwindow* window = glfwCreateWindow(win_w0, win_h0, "Ratchet & Clank - original runtime", fs_monitor, nullptr);
     if (window == nullptr) { std::fprintf(stderr, "rac1-native: no OpenGL 4.6 window\n"); return 1; }
     glfwMakeContextCurrent(window);
+    if (!headless && fs_monitor == nullptr) host_window_on_monitor(window, rac1::graphics_display().monitor);
     glfwSwapInterval(headless ? 0 : host_swap_interval(rac1::graphics_display().vsync));
     if (!headless) host_input_init(window);  // the controls: the controller database, the bindings
     // the Controls page's host side; its changes saved in a window, headless only to an explicit RAC1_CONTROLS_FILE
@@ -2001,9 +2036,13 @@ int main(int argc, char** argv) {
                 display_serial = rac1::graphics_display_serial();
                 display_settle = 60;
                 const rac1::GraphicsDisplay& gd = rac1::graphics_display();
-                if (gd.fullscreen && !is_fs) {
+                if (gd.fullscreen && is_fs) {  // (the Monitor row changed while fullscreen: the window goes to that screen)
+                    if (GLFWmonitor* m = host_fullscreen_monitor(); m != nullptr && m != glfwGetWindowMonitor(window)) {
+                        if (const GLFWvidmode* mode = glfwGetVideoMode(m); mode != nullptr) glfwSetWindowMonitor(window, m, 0, 0, mode->width, mode->height, mode->refreshRate);
+                    }
+                } else if (gd.fullscreen && !is_fs) {
                     glfwGetWindowPos(window, &windowed_pos[0], &windowed_pos[1]);
-                    GLFWmonitor* m = glfwGetPrimaryMonitor();
+                    GLFWmonitor* m = host_fullscreen_monitor();
                     if (const GLFWvidmode* mode = m != nullptr ? glfwGetVideoMode(m) : nullptr) glfwSetWindowMonitor(window, m, 0, 0, mode->width, mode->height, mode->refreshRate);
                 } else if (!gd.fullscreen && is_fs) {
                     glfwSetWindowMonitor(window, nullptr, windowed_pos[0], windowed_pos[1], gd.window_w, gd.window_h, 0);
@@ -2011,6 +2050,7 @@ int main(int argc, char** argv) {
                     int cw = 0, ch = 0;
                     glfwGetWindowSize(window, &cw, &ch);
                     if (cw != gd.window_w || ch != gd.window_h) glfwSetWindowSize(window, gd.window_w, gd.window_h);
+                    host_window_on_monitor(window, gd.monitor);  // (the Monitor row: the window over on that screen)
                 }
                 glfwSwapInterval(host_swap_interval(env_vsync >= 0 ? env_vsync != 0 : gd.vsync));
             } else if (display_settle > 0) {

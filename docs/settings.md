@@ -29,6 +29,7 @@ and behave like the game's own pages. Left and right change a row's value; Cross
 | Row | Values | Default |
 |---|---|---|
 | Display | Window, Fullscreen | Window |
+| Monitor | the connected monitors by name (DP-1, HDMI-A-1, ...) | the first one |
 | Window Size | 960x720 to 3840x2160 (11 sizes) | 960x720 |
 | V-Sync | Off, On | On |
 | Frame Rate Cap | 30, 60, 120, 144, 240, Unlimited | 60 |
@@ -46,6 +47,11 @@ and behave like the game's own pages. Left and right change a row's value; Cross
 | Texture Detail | Full, Original (PS2) | Full |
 
 - **The frame-rate cap** only paces the picture. The game itself always runs at 60 frames a second.
+- **Monitor** chooses which screen the window is on: fullscreen goes to it at its own mode, and in
+  window mode the window is centred on it. GLFW cannot place a window on Wayland, where the
+  compositor decides, so the window mode half does nothing there. The choice is kept by the
+  monitor's name, not by its place in the list, because that order is not fixed; a monitor that is
+  not connected when the game starts falls back to the first one.
 - **Render Resolution** scales the 3D; the HUD stays at the window's resolution.
 - **Aspect Ratio** Fill Screen widens the 3D to the window's shape without changing what the game
   sees; **Fit to Screen** applies when the chosen shape is not the window's. See
