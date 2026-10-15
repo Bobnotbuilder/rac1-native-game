@@ -331,8 +331,14 @@ bool prefs_read(const std::filesystem::path& path) {
     while (std::fscanf(f, "%63s", key) == 1) {
         int a = 0, b = 0;
         if (std::strcmp(key, "monitor") == 0) {  // (the name, not the index: GLFW's order is not stable)
-            char name[64];
-            if (std::fscanf(f, "%63s", name) == 1) gs_.monitor_name = name;
+            // (the rest of the line: a monitor's name can hold spaces, and an empty one must not take the next line's key)
+            char name[256] = {};
+            if (std::fgets(name, sizeof name, f) != nullptr) {
+                std::string n = name;
+                while (!n.empty() && (n.back() == '\n' || n.back() == '\r' || n.back() == ' ')) n.pop_back();
+                const size_t start = n.find_first_not_of(' ');
+                gs_.monitor_name = start == std::string::npos ? std::string() : n.substr(start);
+            }
             continue;
         }
         if (std::strcmp(key, "window") == 0) {
