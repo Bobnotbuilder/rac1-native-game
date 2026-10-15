@@ -10,16 +10,14 @@ from the PS2 compromises the port removes (see [Overview](overview.md#faithful-t
   whether the world pauses. Enhancements are **optional, off by default, and labelled as changes to
   the game**. With all of them off, the game plays as the original.
 
-The Advanced page has six rows:
+The Advanced page has four rows:
 
 | Row | Values (default first) | Kind |
 |---|---|---|
 | Quick Select | Normal, Pause | enhancement |
 | Aiming | Original, Modern | enhancement |
-| Movement | Original, RAC 3 | enhancement |
+| Movement | Original, Strafing, RAC 3 | enhancement |
 | Fades | Fast, Original | a removed compromise: Fast is the port's default, Original the PS2's |
-| Update Check | On, Off | the PC version's [update check](settings.md#the-update-check), not a game setting |
-| Update Channel | Stable, Development | which builds the update check compares with |
 
 All of it is in `src/game/enhance/advanced.{h,cpp}`. None of it is a port: every function there is
 annotated `// orig: (none) — enhancement`.
@@ -51,12 +49,12 @@ port's fast fades). Left and right on a row step the value (`advanced_settings_d
   `update_channel`, and `update_skip`, the version the update notice's Skip Version chose).
 
 **The New Game choice.** Picking "Modern mode" at New Game turns Quick Select, Aiming and Movement
-on; "Original mode" turns them off (`advanced_apply_mode`). Fades is left as it is. Every setting can
-be changed at any time afterwards.
+(RAC 3) on; "Original mode" turns them off (`advanced_apply_mode`). Fades is left as it is. Every
+setting can be changed at any time afterwards.
 
-**Linked settings.** Modern aiming is built on the RAC 3 strafe, so turning Aiming to Modern turns
-Movement to RAC 3, and turning Movement back to Original turns Aiming back to Original
-(`advanced_setting_changed`).
+**Linked settings.** Modern aiming is built on the strafe, so turning Aiming to Modern when Movement
+is Original turns Movement to Strafing (keeping RAC 3 if already chosen), and turning Movement back
+to Original turns Aiming back to Original (`advanced_setting_changed`).
 
 ## Quick Select: Pause
 
@@ -81,11 +79,17 @@ coroutine does not suspend there (see
 [Game logic](game-logic.md#the-game-frame-on-a-coroutine)). `RAC1_FADES=original` or `fast` sets
 it from the environment.
 
-## Movement: RAC 3
+## Movement: Strafing and RAC 3
 
 Ratchet & Clank 3 (Up Your Arsenal, UYA) moves Ratchet differently from the first game: the run
 follows the stick's tilt, he turns and stops quicker, his jumps leave the ground sooner, and L2 or R2
-held makes him strafe. Movement = RAC 3 brings that feel to the first game's hero code.
+held makes him strafe.
+
+- **Movement = Strafing** adds the strafe (L2 or R2 held, or L2 with Aiming = Modern) while keeping
+  R&C1's original movement parameters: run speeds, acceleration, turning, jump heights, long jumps,
+  side flips and wrench timings stay the original's.
+- **Movement = RAC 3** brings UYA's full on-foot movement and wrench feel to the first game's hero
+  code, together with the strafe.
 
 ### How it was built: a study of UYA's code
 

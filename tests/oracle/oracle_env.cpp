@@ -2,6 +2,7 @@
 #include <game/ovl/ovl_reloc.h>
 #include "oracle_env.h"
 
+#include <runtime/kernel/disc.h>
 #include <runtime/level/level_loader.h>
 #include <runtime/sif/sif_rpc.h>
 
@@ -14,27 +15,18 @@ namespace rac1::oracle {
 
 int g_oracle_level = 0;
 
-const char* oracle_level_dir(int level) {  // (wrench's directory names, as src/host/orig_main.cpp's level_dir)
-    static const char* const dirs[19] = {"0_veldin_tutorial", "1_novalis", "2_aridia", "3_kerwan", "4_eudora", "5_rilgar", "6_nebula_g34",
-                                         "7_umbris", "8_batalia", "9_gaspar", "10_orxon", "11_pokitaru", "12_hoven", "13_oltanis_orbit",
-                                         "14_oltanis", "15_quartu", "16_kalebo_iii", "17_veldin_orbit", "18_veldin_finale"};
-    return level >= 0 && level < 19 ? dirs[level] : nullptr;
-}
-
 bool setup_level(int level) {
-    const char* dir = oracle_level_dir(level);
-    if (dir == nullptr) {
+    if (level < 0 || level >= 19) {
         std::printf("no level %d\n", level);
         return false;
     }
-    const std::string wad = std::string("assets/extracted/level_wads/") + dir + "/level.wad";
-    if (!std::filesystem::exists("assets/dumps/SCUS_971.99") || !std::filesystem::exists(wad)) {
+    if (!std::filesystem::exists("assets/dumps/SCUS_971.99") || !disc_has_level(level)) {
         std::printf("SKIP: game data missing (./setup.sh with the NTSC-U disc: the oracle runs on it only)\n");
         return false;
     }
     init_memory();
-    LevelLoader::load_level_overlay(wad);  // the level's own overlay image, as the host loads it
-    ovl_reloc_set_level(level);            // the ports' (and the generators') addresses on it
+    LevelLoader::load_level_overlay(level);  // the level's own overlay image, as the host loads it
+    ovl_reloc_set_level(level);              // the ports' (and the generators') addresses on it
     if (ovl_reloc_level() != level) {
         std::printf("SKIP: no overlay map for level %d (run ./setup.sh)\n", level);
         return false;

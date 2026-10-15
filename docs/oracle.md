@@ -135,11 +135,18 @@ shared code every level runs:
 | 9 | 121, 150, 170 |
 | 10 | 122, 123, 171 |
 | 11 | 124, 146 |
-| 15 | 240, 241, 242 |
-| 16 | 250, 242 |
+| 12 | 192, 200, 202 |
+| 0, 8, 11, 12, 13, 14, 15, 16, 17 and 18 | 203 (the PDA, hero item 0x20) |
+| 13 | 123, 220, 222 |
+| 14 | 44 .. 55, 221, 223 |
+| 15 | 240, 241, 242 (and the hero batches 44 .. 55, 123) |
+| 16 | 250, 242 (and the hero batches 44 .. 55, 123) |
 | 0 and 3 | 180 |
 | 0, 1, 3 and 5 | 190 (it proves a fix of the code generator, `tools/codegen/mips2cpp.py`) |
 | 3, 6 and 10 | 191 |
+| 0, 1, 3, 4, 6, 8 and 9 | 192 (the particle types 0x0a, 0x0e, 0x27, 0x49; no dumps: states built from the level) |
+| 17 | 260, 261, 271 (and the hero batches 44 .. 55) |
+| 18 | 270, 261, 271 (and the hero batches 44 .. 55) |
 
 For a quick check after a small change, level 0's 63, 79, 118 and 141 are the usual minimum.
 
@@ -190,6 +197,8 @@ missing skips those checks and says which set it wanted; it does not fail.
 | `gaspar_orxon/` | 170, 171 | the command lines in the batches' headers |
 | `weapons_dumps/` | 180, 190 | the command lines in batch 180's header |
 | `kerwan_heli/`, `kerwan_heli_jump/`, `orxon_clank/` | 191 | the command lines in batch 191's header (also `clank_0415/`) |
+| `gemlik_oltanis/` | 222, 223 | `tools/oracle/gemlik_oltanis_tour.sh dumps` |
+| `drek_veldin/` | 271 | `tools/oracle/drek_veldin_tour.sh dumps` |
 | `levels_15_16/` | 241, 242 | the command lines in the batches' headers |
 
 A dump is written by a headless run of the game: `RAC1_RAMDUMP=<frame>,<file>` writes the 32 MB of

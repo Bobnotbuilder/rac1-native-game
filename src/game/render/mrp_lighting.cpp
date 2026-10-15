@@ -216,8 +216,8 @@ glm::vec3 sun_direction(float* weight) {
     }
     uint32_t a = 0, b = 0;
     float w = 0.0f;
-    static const bool level_set = std::getenv("RAC1_SUN_LEVEL") != nullptr;  // (testing: set 0, the level's, as before)
-    if (const uint32_t hero = lwu(OV(0x0015ffd8u)); hero != 0 && !level_set) {
+    static const bool zone_dir = std::getenv("RAC1_SUN_ZONE") != nullptr;  // (testing: turn the sun to each zone's light set)
+    if (const uint32_t hero = lwu(OV(0x0015ffd8u)); hero != 0) {
         a = lbu(hero + 0x38);
         b = lbu(hero + 0x39);
         w = static_cast<float>(lbu(hero + 0x3a)) / 256.0f;
@@ -225,7 +225,14 @@ glm::vec3 sun_direction(float* weight) {
         if (b > 15) b = a;
         if (a == 15) a = b = 0;
     }
+    const SetSun s0 = set_sun(0);
     const SetSun sa = set_sun(a), sb = set_sun(b);
+    if (!zone_dir && s0.ok) {
+        const float wa = sa.ok ? sa.weight : 0.0f;
+        const float wb = sb.ok ? sb.weight : 0.0f;
+        *weight = wa + (wb - wa) * w;
+        return s0.dir;
+    }
     if (sa.ok && sb.ok) {
         *weight = sa.weight + (sb.weight - sa.weight) * w;
         return glm::normalize(sa.dir + (sb.dir - sa.dir) * w);
@@ -415,24 +422,45 @@ void point_tiles_update() {
     for (int i = 0; i < g_sh.npts && i < kMaxPts; ++i) {
         const glm::vec3 p(g_sh.pt_pos[i]);
         const float r = g_sh.pt_pos[i].w;
-        float x0 = 1e30f, y0 = 1e30f, x1 = -1e30f, y1 = -1e30f;
-        // (the clip w is the view depth: a sphere wholly behind the camera reaches no pixel; one across the camera's plane, every one)
         const float wc = (g_sh.view_proj * glm::vec4(p, 1.0f)).w;
-        if (!all && wc + r < 0.01f) continue;
-        bool behind = all || wc - r < 0.01f;
-        for (int c = 0; c < 8 && !behind; ++c) {
-            const glm::vec4 q = g_sh.view_proj * glm::vec4(p + glm::vec3((c & 1) ? r : -r, (c & 2) ? r : -r, (c & 4) ? r : -r), 1.0f);
-            if (q.w < 0.01f) {
-                behind = true;
-                break;
-            }
-            x0 = std::min(x0, q.x / q.w);
-            x1 = std::max(x1, q.x / q.w);
-            y0 = std::min(y0, q.y / q.w);
-            y1 = std::max(y1, q.y / q.w);
-        }
+        if (!all && wc + r < 0.05f) continue;
+        const glm::vec3 dcam = p - g_sh.cam;
+        const bool inside_cam = all || glm::dot(dcam, dcam) <= (r + 0.15f) * (r + 0.15f);
         int tx0 = 0, tx1 = kTilesX - 1, ty0 = 0, ty1 = kTilesY - 1;
-        if (!behind) {
+        if (!inside_cam) {
+            constexpr float kNearW = 0.05f;
+            glm::vec4 q[8];
+            int nfront = 0;
+            float x0 = 1e30f, y0 = 1e30f, x1 = -1e30f, y1 = -1e30f;
+            for (int c = 0; c < 8; ++c) {
+                q[c] = g_sh.view_proj * glm::vec4(p + glm::vec3((c & 1) ? r : -r, (c & 2) ? r : -r, (c & 4) ? r : -r), 1.0f);
+                if (q[c].w >= kNearW) {
+                    ++nfront;
+                    const float inv_w = 1.0f / q[c].w;
+                    x0 = std::min(x0, q[c].x * inv_w);
+                    x1 = std::max(x1, q[c].x * inv_w);
+                    y0 = std::min(y0, q[c].y * inv_w);
+                    y1 = std::max(y1, q[c].y * inv_w);
+                }
+            }
+            if (nfront == 0) continue;
+            if (nfront < 8) {
+                // Clip the 12 AABB edges that straddle the w = kNearW plane
+                for (int a = 0; a < 8; ++a) {
+                    for (int bit = 1; bit <= 4; bit <<= 1) {
+                        const int b = a ^ bit;
+                        if (a < b && (q[a].w >= kNearW) != (q[b].w >= kNearW)) {
+                            const float t = (kNearW - q[a].w) / (q[b].w - q[a].w);
+                            const float cx = (q[a].x + t * (q[b].x - q[a].x)) * (1.0f / kNearW);
+                            const float cy = (q[a].y + t * (q[b].y - q[a].y)) * (1.0f / kNearW);
+                            x0 = std::min(x0, cx);
+                            x1 = std::max(x1, cx);
+                            y0 = std::min(y0, cy);
+                            y1 = std::max(y1, cy);
+                        }
+                    }
+                }
+            }
             if (x1 < -1.0f || x0 > 1.0f || y1 < -1.0f || y0 > 1.0f) continue;  // (off the screen)
             tx0 = std::clamp(static_cast<int>(std::floor((x0 * 0.5f + 0.5f) * kTilesX)), 0, kTilesX - 1);
             tx1 = std::clamp(static_cast<int>(std::floor((x1 * 0.5f + 0.5f) * kTilesX)), 0, kTilesX - 1);
@@ -708,7 +736,10 @@ struct Ao {
     GLuint prog = 0, blur = 0, vao = 0;
     GLuint dfbo = 0, dtex = 0, afbo = 0, atex = 0;
     int w = 0, h = 0;
+    GLint last_fb = -1;
     GLenum dfmt = 0;
+    GLint u_depth = -1, u_inv_vp = -1, u_vp = -1, u_cam = -1, u_param = -1;
+    GLint u_b_depth = -1, u_b_ao = -1, u_b_texel = -1;
 } g_ao_s;
 }  // namespace
 
@@ -725,25 +756,37 @@ void mrp_lighting_ao_pass() {
     glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prev_vao);
     glGetIntegerv(GL_VIEWPORT, prev_vp);
     glGetIntegerv(GL_ACTIVE_TEXTURE, &prev_active);
-    // the depth format of the framebuffer drawn into (the blit wants the same)
-    GLint dbits = 24, sbits = 8, dtype = GL_UNSIGNED_NORMALIZED;
-    glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(fb));
-    const GLenum datt = fb == 0 ? GL_DEPTH : GL_DEPTH_ATTACHMENT, satt = fb == 0 ? GL_STENCIL : GL_STENCIL_ATTACHMENT;
-    glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, datt, GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE, &dbits);
-    glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, datt, GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE, &dtype);
-    glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, satt, GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE, &sbits);
-    while (glGetError() != GL_NO_ERROR) {}
-    const GLenum fmt = dtype == GL_FLOAT ? (sbits > 0 ? GL_DEPTH32F_STENCIL8 : GL_DEPTH_COMPONENT32F)
-                                         : (sbits > 0 ? GL_DEPTH24_STENCIL8 : (dbits >= 32 ? GL_DEPTH_COMPONENT32 : dbits >= 24 ? GL_DEPTH_COMPONENT24 : GL_DEPTH_COMPONENT16));
     const int w = vp[2], h = vp[3];
     if (A.prog == 0) {
         A.prog = ao_link(kAoFs);
         A.blur = ao_link(kAoBlurFs);
+        A.u_depth = glGetUniformLocation(A.prog, "uDepth");
+        A.u_inv_vp = glGetUniformLocation(A.prog, "uInvVP");
+        A.u_vp = glGetUniformLocation(A.prog, "uVP");
+        A.u_cam = glGetUniformLocation(A.prog, "uCam");
+        A.u_param = glGetUniformLocation(A.prog, "uParam");
+        A.u_b_depth = glGetUniformLocation(A.blur, "uDepth");
+        A.u_b_ao = glGetUniformLocation(A.blur, "uAo");
+        A.u_b_texel = glGetUniformLocation(A.blur, "uTexel");
         glGenVertexArrays(1, &A.vao);
         glGenFramebuffers(1, &A.dfbo);
         glGenFramebuffers(1, &A.afbo);
         glGenTextures(1, &A.dtex);
         glGenTextures(1, &A.atex);
+    }
+    GLenum fmt = A.dfmt;
+    if (fb != A.last_fb || fmt == 0) {
+        // the depth format of the framebuffer drawn into (the blit wants the same)
+        GLint dbits = 24, sbits = 8, dtype = GL_UNSIGNED_NORMALIZED;
+        glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(fb));
+        const GLenum datt = fb == 0 ? GL_DEPTH : GL_DEPTH_ATTACHMENT, satt = fb == 0 ? GL_STENCIL : GL_STENCIL_ATTACHMENT;
+        glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, datt, GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE, &dbits);
+        glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, datt, GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE, &dtype);
+        glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, satt, GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE, &sbits);
+        while (glGetError() != GL_NO_ERROR) {}
+        fmt = dtype == GL_FLOAT ? (sbits > 0 ? GL_DEPTH32F_STENCIL8 : GL_DEPTH_COMPONENT32F)
+                                : (sbits > 0 ? GL_DEPTH24_STENCIL8 : (dbits >= 32 ? GL_DEPTH_COMPONENT32 : dbits >= 24 ? GL_DEPTH_COMPONENT24 : GL_DEPTH_COMPONENT16));
+        A.last_fb = fb;
     }
     if (A.w != w || A.h != h || A.dfmt != fmt) {
         A.w = w;
@@ -802,11 +845,11 @@ void mrp_lighting_ao_pass() {
     glActiveTexture(GL_TEXTURE0);
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_tex);
     glBindTexture(GL_TEXTURE_2D, A.dtex);
-    glUniform1i(glGetUniformLocation(A.prog, "uDepth"), 0);
-    glUniformMatrix4fv(glGetUniformLocation(A.prog, "uInvVP"), 1, GL_FALSE, glm::value_ptr(IVP));
-    glUniformMatrix4fv(glGetUniformLocation(A.prog, "uVP"), 1, GL_FALSE, glm::value_ptr(VP));
-    glUniform3f(glGetUniformLocation(A.prog, "uCam"), g_sh.cam.x, g_sh.cam.y, g_sh.cam.z);
-    glUniform4f(glGetUniformLocation(A.prog, "uParam"), radius, strength, 0.02f, 0.0f);
+    glUniform1i(A.u_depth, 0);
+    glUniformMatrix4fv(A.u_inv_vp, 1, GL_FALSE, glm::value_ptr(IVP));
+    glUniformMatrix4fv(A.u_vp, 1, GL_FALSE, glm::value_ptr(VP));
+    glUniform3f(A.u_cam, g_sh.cam.x, g_sh.cam.y, g_sh.cam.z);
+    glUniform4f(A.u_param, radius, strength, 0.02f, 0.0f);
     glDrawArrays(GL_TRIANGLES, 0, 3);
     // blurred, multiplied into the colour
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(fb));
@@ -819,9 +862,9 @@ void mrp_lighting_ao_pass() {
     GLint prev_tex1 = 0;
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_tex1);
     glBindTexture(GL_TEXTURE_2D, A.atex);
-    glUniform1i(glGetUniformLocation(A.blur, "uDepth"), 0);
-    glUniform1i(glGetUniformLocation(A.blur, "uAo"), 1);
-    glUniform2f(glGetUniformLocation(A.blur, "uTexel"), 1.0f / static_cast<float>(w), 1.0f / static_cast<float>(h));
+    glUniform1i(A.u_b_depth, 0);
+    glUniform1i(A.u_b_ao, 1);
+    glUniform2f(A.u_b_texel, 1.0f / static_cast<float>(w), 1.0f / static_cast<float>(h));
     glDrawArrays(GL_TRIANGLES, 0, 3);
     glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(prev_tex1));
     glActiveTexture(GL_TEXTURE0);

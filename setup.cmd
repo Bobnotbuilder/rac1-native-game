@@ -50,5 +50,6 @@ if defined DROPPED (
 set "RESULT=%errorlevel%"
 
 :done
+if not "%RESULT%"=="0" set "WAIT=1"
 if defined WAIT pause
 exit /b %RESULT%

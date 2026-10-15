@@ -3,10 +3,10 @@
  "tool": "mkall.py",
  "env": {},
  "entries": [
-  "274e48:particle_47_update:void:a0"
+  "274818:particle_44_update:void:a0"
  ],
  "glue_files": [],
  "files": [
-  "src/game/ovl/particle_47_tr.cpp"
+  "src/game/ovl/particle_44_tr.cpp"
  ]
 }

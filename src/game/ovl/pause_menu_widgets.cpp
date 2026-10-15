@@ -4,6 +4,7 @@
 // the menu's buffers (0x1ba1b8) and the image upload.
 #include <game/enhance/advanced.h>
 #include <game/lib/libc.h>
+#include <game/ovl/end_menu_tr.h>
 #include <game/ovl/ovl_reloc.h>
 #include <game/lib/snd989.h>
 #include <game/ovl/galactic_map.h>
@@ -106,7 +107,9 @@ bool menu_page_widget_call(uint32_t fn, uint32_t w, int32_t a1, int32_t& r) {
         case 0x00277be8: r = icon_list_draw(w); return true;
         case 0x0027f240: r = weapons_help_focus_in(w); return true;
         case 0x0027f308: r = gadgets_help_focus_in(w); return true;
-        default: return galactic_map_widget_call(fn, w, a1, r);  // (the ship's galactic map)
+        default:
+            if (end_menu_widget_call(ovl_code_to_veldin(fn), w, a1, r)) return true;  // (the menu at the end of the game: end_menu_tr.cpp)
+            return galactic_map_widget_call(fn, w, a1, r);  // (the ship's galactic map)
     }
 }
 

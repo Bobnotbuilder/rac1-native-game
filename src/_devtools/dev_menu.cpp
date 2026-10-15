@@ -25,6 +25,7 @@
 #include <game/render/shader_manager.h>
 #include <runtime/iop/snd989_iop.h>
 #include <runtime/ipu/movie_hw.h>
+#include <runtime/kernel/disc.h>
 #include <runtime/kernel/ee_memory.h>
 
 #include <GLFW/glfw3.h>
@@ -800,9 +801,6 @@ void tab_audio() {
 const char* const PLANETS[19] = {"Veldin (tutorial)", "Novalis", "Aridia", "Kerwan (Metropolis)", "Eudora", "Rilgar", "Nebula G34",
                                  "Umbris", "Batalia", "Gaspar", "Orxon", "Pokitaru", "Hoven", "Oltanis Orbit", "Oltanis",
                                  "Quartu", "Kalebo III", "Veldin Orbit", "Veldin (finale)"};
-const char* const LEVEL_DIRS[19] = {"0_veldin_tutorial", "1_novalis", "2_aridia", "3_kerwan", "4_eudora", "5_rilgar", "6_nebula_g34",
-                                    "7_umbris", "8_batalia", "9_gaspar", "10_orxon", "11_pokitaru", "12_hoven", "13_oltanis_orbit",
-                                    "14_oltanis", "15_quartu", "16_kalebo_iii", "17_veldin_orbit", "18_veldin_finale"};
 
 // the summary lines of tools/overlay_match's map of a level (assets/generated/overlay_map)
 std::vector<std::string> overlay_map_summary(int level) {
@@ -844,7 +842,7 @@ void tab_levels() {
     if (ImGui::BeginTable("planets", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_ScrollY, ImVec2(0, 260))) {
         ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 24);
         ImGui::TableSetupColumn("Planet");
-        ImGui::TableSetupColumn("Host data", ImGuiTableColumnFlags_WidthFixed, 110);
+        ImGui::TableSetupColumn("Disc data", ImGuiTableColumnFlags_WidthFixed, 110);
         ImGui::TableHeadersRow();
         for (int i = 0; i < 19; ++i) {
             ImGui::TableNextRow();
@@ -854,12 +852,7 @@ void tab_levels() {
             if (ImGui::Selectable(PLANETS[i], selected == i, ImGuiSelectableFlags_SpanAllColumns)) selected = i;
             ImGui::TableNextColumn();
             static int have[19] = {};
-            if (have[i] == 0) {
-                const std::string wad = std::string("assets/extracted/level_wads/") + LEVEL_DIRS[i] + "/level.wad";
-                FILE* f = std::fopen(wad.c_str(), "rb");
-                have[i] = f != nullptr ? 1 : 2;
-                if (f != nullptr) std::fclose(f);
-            }
+            if (have[i] == 0) have[i] = disc_has_level(i) ? 1 : 2;
             ImGui::TextUnformatted(have[i] == 1 ? "ready" : "missing");
         }
         ImGui::EndTable();

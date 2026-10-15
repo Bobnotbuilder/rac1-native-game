@@ -1,6 +1,8 @@
-// Oracle batch 241 (levels/quartu-kalebo, release 0.3.0 levels): particle type 0x47's update (Veldin 0x274e48, L15:0x264958), ported at
-// Veldin's addresses (assets/generated/src/game/ovl/particle_47_tr.cpp, generated from tools/codegen/gen/mkall/veldin_particle47.json).
-// First reached on Quartu (a TODO_PORT moby callback in the first factory hall). ORACLE_LEVEL=15, on RAM dumps of headless runs of the
+// Oracle batch 241 (levels/quartu-kalebo, release 0.3.0 levels): particle type 0x47's update (Veldin 0x274e48, L15:0x264958) on Quartu's
+// own copy. The port is the one at Veldin's addresses that the drek-veldin work generated (particle_types4_tr.cpp, group
+// veldin_particles4, registered in particle_types4.cpp); batch 271 proves it on Drek's fleet's copy (L17:0x26eae0, its dumps), this batch
+// on Quartu's (L15:0x264958), where it was first reached unported (in the first factory hall).
+// ORACLE_LEVEL=15, on RAM dumps of headless runs of the
 // port (assets/dumps/oracle/levels_15_16/, skipped without them), from the repository's root:
 //   p47_{1000,1200}_L15.bin  RAC1_HEADLESS=1 RAC1_LEVEL=15 RAC1_SIM_INPUT=forward RAC1_FRAMES=<f>+2 RAC1_RAMHASH=/dev/null
 //                              RAC1_RAMDUMP=<f>,assets/dumps/oracle/levels_15_16/p47_<f>_L15.bin (Ratchet walking into the first hall: the
@@ -14,7 +16,7 @@
 
 #include <game/ovl/ovl_common.h>
 #include <game/ovl/ovl_reloc.h>
-#include <game/ovl/particle_47_tr.h>
+#include <game/ovl/particle_types4_tr.h>
 #include <runtime/ee/ee_interpreter.h>
 
 #include <cmath>

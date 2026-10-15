@@ -48,8 +48,9 @@ struct Part {
 struct Stream {
     uint32_t handle = 0;  // 0: free
     uint16_t serial = 0;
-    bool paused = false;   // the record's flag 2
-    bool started = false;  // flag 8
+    bool paused = false;        // the record's flag 2 (0x2c flag 1, 0x2d / 0x2e, 0x13 / 0x14)
+    bool group_paused = false;  // paused by group mask (0x16 / 0x17)
+    bool started = false;       // flag 8
     int32_t vol = 0, pan = 0, group = 0;
     std::deque<Part> queue;
     Part part;
@@ -149,7 +150,7 @@ snd::VolPair stream_volume(const Stream& s) {
 // orig: (host) the IRX's sceSdSetParam of VOLL / VOLR / PITCH in 0xf5bc / 0xf7ec
 void voice_apply(Stream& s) {
     if (!s.voice) return;
-    if (s.paused) {
+    if (s.paused || s.group_paused) {
         s.voice->SetVolume(0, 0);
         s.voice->SetPitch(0);
         return;
@@ -286,6 +287,7 @@ int32_t stream_play(snd::Player& p, const uint32_t* args) {
     s->pan = (static_cast<uint32_t>(pan + 2) < 2u) ? 0 : pan;
     s->group = group;
     s->paused = (flags & 1) != 0;
+    s->group_paused = false;
     s->data_end = false;
     s->played = s->copied = 0;
     s->queue.clear();
@@ -362,6 +364,17 @@ void snd989_stream_master_volume(Snd989Streams* io, uint32_t group, int32_t vol)
         if (s.handle != 0 && s.group == static_cast<int32_t>(group)) voice_apply(s);
 }
 
+// orig: (host) 989snd's group pause / continue (commands 0x16 / 0x17, 0xcd2c / 0xce74) applied to the stream voices
+void snd989_stream_group_pause(Snd989Streams* io, uint32_t mask, bool pause) {
+    Use use(io);
+    for (Stream& s : st().streams) {
+        if (s.handle != 0 && s.group >= 0 && s.group < 32 && ((mask >> s.group) & 1u) != 0) {
+            s.group_paused = pause;
+            voice_apply(s);
+        }
+    }
+}
+
 // The stream commands, the IRX's handlers by the table 0x17bdc (see the file's head).
 // orig: (host) the IRX's command dispatch 0x15d4 for the stream ids
 bool snd989_stream_command(Snd989Streams* io, snd::Player& p, uint32_t id, const uint32_t* args, int32_t& result) {
@@ -385,10 +398,14 @@ bool snd989_stream_command(Snd989Streams* io, snd::Player& p, uint32_t id, const
         return true;
     }
     case 0x2c: result = stream_play(p, args); return true;
+    case 0x13:
+    case 0x14:
+        if (!snd989_is_stream_handle(a(0))) return false;
+        [[fallthrough]];
     case 0x2d:
     case 0x2e: {  // pause / continue
         if (Stream* s = find(a(0))) {
-            s->paused = id == 0x2d;
+            s->paused = id == 0x2d || id == 0x13;
             voice_apply(*s);
             if (g_snd989_trace && !quiet()) std::fprintf(stderr, "[989snd] stream %08x %s\n", s->handle, s->paused ? "paused" : "continued");
         }
@@ -493,7 +510,7 @@ std::string snd989_stream_describe(Snd989Streams* io) {
     char b[48];
     for (const Stream& s : st().streams) {
         if (s.handle == 0) continue;
-        std::snprintf(b, sizeof b, "%s%d:%x%s", out.empty() ? "" : " ", s.group, s.part.lsn, s.paused ? "p" : "");
+        std::snprintf(b, sizeof b, "%s%d:%x%s", out.empty() ? "" : " ", s.group, s.part.lsn, (s.paused || s.group_paused) ? "p" : "");
         out += b;
     }
     return out;

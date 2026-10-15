@@ -1,0 +1,117 @@
+// Gemlik Base (level 13) own code, transliterated: the level's own moby classes, the sound emitter, the camera type, the class hooks, the draw callbacks, the HUD element, the camera mode hook, and their level-only callees. (part 7 of 7)
+// Transliterated instruction by instruction from level 13's own overlay with tools/codegen/mips2cpp.py (tools/codegen/mkall.py:
+// the original's control flow and PS2 float rules by construction), reviewed in the oracle (batch 220, ORACLE_LEVEL=13), not rewritten
+// by hand: the names are the entries', the helpers `gml_<addr>_l13` (uniform ABI: TrRet).
+#include <game/lib/libc.h>
+#include <game/lib/libgcc_fp.h>
+#include <game/ovl/gemlik_mobys.h>
+#include <game/ovl/quad_draw.h>
+#include <game/ovl/ammo_pickup.h>
+#include <game/ovl/arrival.h>
+#include <game/ovl/carry_hooks.h>
+#include <game/ovl/checkpoint.h>
+#include <game/ovl/cutscene.h>
+#include <game/ovl/devastator.h>
+#include <game/ovl/enemy_749.h>
+#include <game/ovl/hydro.h>
+#include <game/ovl/level_change.h>
+#include <game/ovl/metal.h>
+#include <game/ovl/music_streams.h>
+#include <game/ovl/ovl.h>
+#include <game/ovl/pause_menu.h>
+#include <game/ovl/save_menus.h>
+#include <game/ovl/screen_fade.h>
+#include <game/lib/snd989.h>
+#include <game/math/vecmath.h>
+#include <game/ovl/veldin_mobys.h>
+#include <game/ovl/visibomb.h>
+#include <game/ovl/visibomb_ball.h>
+#include <game/ovl/walker.h>
+#include <game/ovl/weapons.h>
+#include <game/math/vecmath.h>
+#include <game/ovl/arrival.h>
+#include <game/ovl/checkpoint.h>
+#include <game/ovl/cutscene.h>
+#include <game/ovl/level_change.h>
+#include <game/ovl/movie_mode.h>
+#include <game/ovl/veldin_mobys.h>
+#include <game/ovl/ee_regs.h>
+#include <game/ovl/enemy_749.h>
+#include <game/ovl/hero_l1.h>
+#include <game/ovl/novalis_mobys2.h>
+#include <game/ovl/ovl_reloc.h>
+#include <game/ovl/variants_l13.h>
+#include <game/ovl/vu0_regs.h>
+#include <game/ovl/walker.h>
+#include <game/port_stubs.h>
+
+namespace rac1 {
+
+using namespace eer;
+using namespace vu0m;
+
+//@gen gml_2f7208_l13
+
+//@gen gml_2f7480_l13
+
+//@gen gml_2f79d0_l13
+
+//@gen gml_cb_2f5f30_l13
+
+//@gen gml_cb_2fcc08_l13
+
+//@gen gml_cb_3051a0_l13
+
+//@gen gml_cb_3098d0_l13
+
+//@gen gml_259060_l13
+
+//@gen gml_2ae9f0_l13
+
+//@gen gml_2af528_l13
+
+//@gen gml_2595f0_l13
+
+//@gen gml_2af5d0_l13
+
+//@gen gml_20b500_l13
+
+//@gen gml_2ab548_l13
+
+//@gen gml_2af8b8_l13
+
+//@gen gml_2afae8_l13
+
+//@gen gml_cb_30a460_l13
+
+//@gen gml_298328_l13
+
+//@gen gml_emitter1_l13
+
+//@gen gml_316f80_l13
+
+//@gen gml_cam_type19_accept_u
+
+//@gen gml_cam_type19_init_l13
+
+//@gen gml_cam_type19_update_l13
+
+//@gen gml_hook_2b7980_u
+
+//@gen gml_hook_2b79d0_u
+
+//@gen gml_hook_2b7a20_u
+
+//@gen gml_hook_2b7ad0_u
+
+//@gen gml_hook_2b7b00_u
+
+//@gen gml_1f6b08_l13
+
+//@gen gml_cam0_hook_l13
+
+//@gen gml_cam_callback_l13
+
+//@gen gml_hud_245cf8_l13
+
+}  // namespace rac1
