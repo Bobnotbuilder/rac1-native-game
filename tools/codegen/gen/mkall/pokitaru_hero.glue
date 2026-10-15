@@ -19,3 +19,4 @@
 0x00251e90: { const TrRet r = pok_hero_item_use_u(a0.w(), a1.w(), a2.w(), a3.w(), t0.w(), t1.w(), t2.w(), t3.w(), fr[12], fr[13], fr[14], fr[15], fr[16], fr[17], fr[18], fr[19]); set32(v0, r.v0); fr[0] = r.f0; }
 0x00253280: { const TrRet r = pok_hero_land_u(a0.w(), a1.w(), a2.w(), a3.w(), t0.w(), t1.w(), t2.w(), t3.w(), fr[12], fr[13], fr[14], fr[15], fr[16], fr[17], fr[18], fr[19]); set32(v0, r.v0); fr[0] = r.f0; }
 0x00253a18: { const TrRet r = pok_hero_input_update_u(a0.w(), a1.w(), a2.w(), a3.w(), t0.w(), t1.w(), t2.w(), t3.w(), fr[12], fr[13], fr[14], fr[15], fr[16], fr[17], fr[18], fr[19]); set32(v0, r.v0); fr[0] = r.f0; }
+0x002bd5a8: vendor_screen_start_tr(a0.w());  // (Veldin 0x29a6b0, the vendor's screens with no Vendor moby: hero item 0x20; its port's declaration has no `orig:` line)

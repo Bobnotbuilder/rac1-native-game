@@ -2478,6 +2478,7 @@ void hero_input_update() {
     if (on_blarg()) { blg_call(blg_hero_input_update_u); return; }  // (level 6's own: L6:0x0023b440)
     if (on_batalia()) { bat_call(bat_hero_input_update_u); return; }  // (level 8's own: L8:0x002370d8)
     if (on_pokitaru()) { pok_call(pok_hero_input_update_u); return; }  // (level 11's own: L11:0x00253a18)
+    if (on_hoven()) { hov_call(hov_hero_input_update_u); return; }  // (level 12's own: L12:0x002461f0)
     if (on_rilgar()) { ril_call(ril_hero_input_update_u); return; }  // (Rilgar's own: L5:0x00255960)
     if (on_l1_family()) return hero_input_update_l1();
     const uint32_t hm = lwu(P + 0x2080);

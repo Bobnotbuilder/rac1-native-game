@@ -210,6 +210,9 @@ void batch_160();
 void batch_180();
 void batch_190();
 void batch_191();
+void batch_200();  // Hoven (level 12): its own code (levels/pokitaru-hoven)
+void batch_201();  // particle type 0x49 (Veldin 0x275320, met on Hoven)
+void batch_202();  // Pokitaru (11) and Hoven (12): their own classes on RAM dumps
 
 }  // namespace rac1::oracle
 

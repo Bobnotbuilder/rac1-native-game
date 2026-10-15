@@ -66,8 +66,8 @@ nothing, so an object whose class is not ported stands still or does not appear.
 | 8 | Batalia | Ported: its own classes and their draw callbacks (the turret's sights and radars, the Trespasser puzzle, the Sandmouse), the rain, the Metal Detector's HUD element. Its exits (the Commando to Orxon, the deserter to Gaspar, the ship) reached in automated runs. Waiting for a playtest. | The turret challenge has not been won in an automated run. A few of its classes are never placed on the level, so the original could not be compared with them. |
 | 9 | Gaspar | Its own classes ported, with their draw callbacks (the lava's animated texture, the background ships' glows, the Visibomb's static) and the Pilot's Helmet pickup. Ready for playtest; not played through by hand yet. | |
 | 10 | Orxon | Its own classes ported, with their draw callbacks: Clank's section, and Ratchet's part once he has the O2 mask. Ready for playtest; not played through by hand yet. | |
-| 11 | Pokitaru | First part ported. | Weapons and gadgets bought there not ported. |
-| 12 | Hoven | Loads and runs. | Nothing of its own ported. |
+| 11 | Pokitaru | Its own classes, hero code, sound emitters and camera hook ported; the weapons and gadgets fire there without unported code; the PDA's call of the vendor screens (hero item 0x20) is no longer a stub there. Ready for playtest; not played through by hand yet. | The Jet Fighter section and the Thruster-Pack lock have not been reached in an automated run. A few of its classes are never placed on the level, so the original could not be compared with them. |
+| 12 | Hoven | Its own classes (with their draw callbacks), its own build of the hero code, sound emitters, camera hook and class hooks ported, and particle type 0x49 (shared). No unported code of its own met in automated runs next to each of its classes. Ready for playtest; not played through by hand yet. | A few of its classes are never placed on the level, so the original could not be compared with them. |
 | 13 | Gemlik Base (code: Oltanis Orbit) | Loads and runs. | Nothing of its own ported. |
 | 14 | Oltanis | Loads and runs. | Nothing of its own ported. |
 | 15 | Quartu | Loads and runs. | Nothing of its own ported. |
@@ -111,7 +111,7 @@ nothing, so an object whose class is not ported stands still or does not appear.
 
 ## Not done yet
 
-- **The second half of the game.** Levels 8 to 11 have their first part ported; levels 12 to 18
+- **The second half of the game.** Levels 8 to 12 have their own code ported; levels 13 to 18
   have nothing of their own ported yet.
 - **Shared code still stubbed.** Every level still reaches a few `TODO_PORT` stubs that are not its
   own code: some kernel and DMA calls the host does not need. Several weapon and gadget classes are

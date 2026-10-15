@@ -18,6 +18,7 @@
 #include <game/ovl/batalia_hooks.h>
 #include <game/ovl/orxon_hooks.h>
 #include <game/ovl/pokitaru_hooks.h>
+#include <game/ovl/hoven_hooks.h>
 #include <game/ovl/variants_l2.h>
 #include <game/ovl/novalis_level_fns.h>
 #include <game/ovl/ovl_reloc.h>
@@ -130,6 +131,10 @@ int32_t camera_type_call(uint32_t fn, uint32_t cam, uint32_t other) {
         int32_t r = 0;
         if (rilgar_camera_type_call(fn, cam, other, &r)) return r;
     }
+    if (on_hoven()) {  // level 12's own camera type function (type 0x12's accept; its init / update / exit are Veldin's)
+        int32_t r = 0;
+        if (hoven_camera_type_call(fn, cam, other, &r)) return r;
+    }
     if (on_eudora()) {  // Eudora's own camera type (1: accept / init / update / exit at its own addresses, no Veldin equivalent)
         switch (lvl_key(fn)) {
         case L4_CASE(0x002ed850): return static_cast<int32_t>(eud_cam_type1_accept_u(cam, other, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f).v0);
@@ -178,6 +183,7 @@ void camera_callback_call(uint32_t fn) {
     }
     if (on_orxon() && orxon_camera_callback_call(fn)) return;  // (level 10's own: 0x2f4b78, queued by the camera hook 0x2f4b18)
     if (on_pokitaru() && pokitaru_camera_callback_call(fn)) return;  // (level 11's own: 0x327af0, queued by the camera hook 0x327a90)
+    if (on_hoven() && hoven_camera_callback_call(fn)) return;  // (level 12's own: 0x314950, queued by the camera hook 0x3148f0)
     if (on_gaspar() && gaspar_camera_callback_call(fn)) return;  // (level 9's own: 0x314280, queued by the camera hook 0x314220)
     if (on_umbris() && umbris_camera_callback_call(fn)) return;  // (level 7's own: 0x3280f0, queued by the camera hook 0x328090)
     if (on_blarg() && blarg_camera_callback_call(fn)) return;  // (level 6's own: 0x314810, queued by the camera hook 0x3147b0)
