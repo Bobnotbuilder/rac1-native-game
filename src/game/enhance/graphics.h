@@ -12,6 +12,7 @@
 #define RAC1_GAME_ENHANCE_GRAPHICS_H
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace rac1 {
@@ -23,7 +24,11 @@ struct GraphicsDisplay {
     int window_w = 960, window_h = 720;  // the size in window mode
     bool vsync = true;
     int fps_cap = 60;  // 0: unlimited
+    int monitor = -1;  // the Graphics page's Monitor row, an index in the host's list (-1: the primary monitor)
 };
+// orig: (none) — enhancement: the host's monitors as GLFW names them, in its order, given once after GLFW is up
+// (the Monitor row's values; the list is not fixed, and its order is not stable between sessions)
+void graphics_set_monitors(std::vector<std::string> names);
 // orig: (none) — enhancement: the preferences read and applied to the renderer (view mode, aspect,
 // field of view, level of detail), once; nothing read while every enhancement is off (headless
 // runs, the oracle): the defaults

@@ -92,7 +92,7 @@ constexpr uint32_t PICTURE_SECTOR = 0xadf00000u;
 enum : uint32_t { PIC_ORIGINAL = 2, PIC_MODERN = 3, PIC_EXPERIMENTAL = 5 };  // (advanced.cpp's PIC_ ids)
 
 // The settings
-enum Setting : uint32_t { S_DISPLAY, S_WINDOW, S_SCALE, S_ASPECT, S_FIT, S_LOD, S_FOV, S_VSYNC, S_CAP, S_LIGHTING, S_DYN_SHADOWS, S_SEC_LIGHTS, S_SHADOW_DIST, S_AO, S_MIPS, S_OVERSCAN, S_COUNT };
+enum Setting : uint32_t { S_DISPLAY, S_MONITOR, S_WINDOW, S_SCALE, S_ASPECT, S_FIT, S_LOD, S_FOV, S_VSYNC, S_CAP, S_LIGHTING, S_DYN_SHADOWS, S_SEC_LIGHTS, S_SHADOW_DIST, S_AO, S_MIPS, S_OVERSCAN, S_COUNT };
 constexpr float SHADOW_DISTS[] = {40.0f, 80.0f, 140.0f, 0.0f};  // Low, Medium, High, Maximum (0: as far as the cascades reach)
 constexpr int SCALES[] = {50, 75, 100, 125, 150, 175, 200};
 constexpr int FOVS[] = {75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 130, 140, 150};
@@ -108,8 +108,8 @@ constexpr uint32_t SIZE_COUNT = sizeof(SIZES) / sizeof(Size);
 constexpr int32_t TEXT_FIRST = 0x7f40;
 enum : int32_t {
     T_GRAPHICS, T_OPTIONS_HELP,
-    T_DISPLAY, T_WINDOW_SIZE, T_SCALE, T_ASPECT, T_FIT, T_LOD, T_FOV, T_VSYNC, T_CAP, T_LIGHTING, T_DYN_SHADOWS, T_SEC_LIGHTS, T_SHADOW_DIST, T_AO, T_MIPS, T_OVERSCAN,
-    H_DISPLAY, H_WINDOW_SIZE, H_SCALE, H_ASPECT, H_FIT, H_LOD, H_FOV, H_VSYNC, H_CAP, H_LIGHTING, H_DYN_SHADOWS, H_SEC_LIGHTS, H_SHADOW_DIST, H_AO, H_MIPS, H_OVERSCAN,
+    T_DISPLAY, T_MONITOR, T_WINDOW_SIZE, T_SCALE, T_ASPECT, T_FIT, T_LOD, T_FOV, T_VSYNC, T_CAP, T_LIGHTING, T_DYN_SHADOWS, T_SEC_LIGHTS, T_SHADOW_DIST, T_AO, T_MIPS, T_OVERSCAN,
+    H_DISPLAY, H_MONITOR, H_WINDOW_SIZE, H_SCALE, H_ASPECT, H_FIT, H_LOD, H_FOV, H_VSYNC, H_CAP, H_LIGHTING, H_DYN_SHADOWS, H_SEC_LIGHTS, H_SHADOW_DIST, H_AO, H_MIPS, H_OVERSCAN,
     T_WINDOW, T_FULLSCREEN, T_43, T_169, T_FILL, T_BARS, T_STRETCH,
     T_ORIGINAL, T_LOW, T_MEDIUM, T_HIGH, T_MAXIMUM, T_OFF, T_ON, T_UNLIMITED, T_SEC_GAME, T_SEC_ALL, T_FULL, T_TV, T_FULL_FRAME,
     T_MODE_ORIGINAL, T_MODE_MODERN, T_MODE_EXPERIMENTAL, H_MODE_ORIGINAL, H_MODE_MODERN, H_MODE_EXPERIMENTAL,
@@ -118,8 +118,8 @@ enum : int32_t {
 };
 constexpr const char* TEXTS[4][T_COUNT] = {
     {"Graphics", "Display, picture shape, detail and view of the PC version",
-     "Display", "Window Size", "Render Resolution", "Aspect Ratio", "Fit to Screen", "Level of Detail", "Field of View", "V-Sync", "Frame Rate Cap", "Lighting", "Dynamic Shadows", "Secondary Lights", "Shadow Distance", "Ambient Occlusion", "Texture Detail", "Overscan",
-     "In a window or on the whole screen.", "The window's size (in window mode).", "The 3D's resolution, times the screen's. The HUD stays sharp.",
+     "Display", "Monitor", "Window Size", "Render Resolution", "Aspect Ratio", "Fit to Screen", "Level of Detail", "Field of View", "V-Sync", "Frame Rate Cap", "Lighting", "Dynamic Shadows", "Secondary Lights", "Shadow Distance", "Ambient Occlusion", "Texture Detail", "Overscan",
+     "In a window or on the whole screen.", "Which screen the window is put on.", "The window's size (in window mode).", "The 3D's resolution, times the screen's. The HUD stays sharp.",
      "4:3 as the original, 16:9, or the view widened to fill the screen.", "When the picture's shape is not the screen's: black bars, or stretched.",
      "How far objects keep their detail and stay drawn.", "x1.00 is the original's view.", "Waits for the screen's refresh: no tearing.",
      "The most frames drawn a second. The game itself always runs at 60.",
@@ -137,8 +137,8 @@ constexpr const char* TEXTS[4][T_COUNT] = {
      "Widescreen, more detail, modern aiming and movement. All can be changed in Options.",
      "Modern plus all the new lighting: shadows, lights, occlusion. Experimental, heavy."},
     {"Grafik", "Anzeige, Bildformat, Details und Sicht der PC-Version",
-     "Anzeige", "Fenstergrosse", "Renderauflosung", "Seitenverhaltnis", "Bildanpassung", "Detailstufe", "Sichtfeld", "V-Sync", "Bildratenlimit", "Beleuchtung", "Dynamische Schatten", "Zusatzlichter", "Schattendistanz", "Umgebungsverdeckung", "Texturdetail", "Overscan",
-     "Im Fenster oder im Vollbild.", "Die Grosse des Fensters (im Fenstermodus).", "Die Auflosung der 3D-Grafik, mal die des Bildschirms. Das HUD bleibt scharf.",
+     "Anzeige", "Bildschirm", "Fenstergrosse", "Renderauflosung", "Seitenverhaltnis", "Bildanpassung", "Detailstufe", "Sichtfeld", "V-Sync", "Bildratenlimit", "Beleuchtung", "Dynamische Schatten", "Zusatzlichter", "Schattendistanz", "Umgebungsverdeckung", "Texturdetail", "Overscan",
+     "Im Fenster oder im Vollbild.", "Auf welchem Bildschirm das Fenster liegt.", "Die Grosse des Fensters (im Fenstermodus).", "Die Auflosung der 3D-Grafik, mal die des Bildschirms. Das HUD bleibt scharf.",
      "4:3 wie im Original, 16:9 oder auf den Bildschirm erweitert.", "Wenn das Bildformat nicht passt: schwarze Balken oder gestreckt.",
      "Wie weit Objekte ihre Details behalten und gezeichnet werden.", "x1.00 ist die Sicht des Originals.", "Wartet auf den Bildaufbau: kein Tearing.",
      "Hochstens so viele Bilder pro Sekunde. Das Spiel lauft immer mit 60.",
@@ -156,8 +156,8 @@ constexpr const char* TEXTS[4][T_COUNT] = {
      "Breitbild, mehr Details, modernes Zielen und Bewegen. Alles in Optionen anderbar.",
      "Modern plus die neue Beleuchtung: Schatten, Lichter, Verdeckung. Experimentell, aufwendig."},
     {"Graficos", "Pantalla, formato, detalle y vista de la version PC",
-     "Pantalla", "Tamano de ventana", "Resolucion 3D", "Relacion de aspecto", "Ajuste", "Nivel de detalle", "Campo de vision", "V-Sync", "Limite de FPS", "Iluminacion", "Sombras dinamicas", "Luces secundarias", "Distancia de sombras", "Oclusion ambiental", "Detalle de texturas", "Overscan",
-     "En una ventana o a pantalla completa.", "El tamano de la ventana (en modo ventana).", "La resolucion del 3D, por la de la pantalla. El HUD sigue nitido.",
+     "Pantalla", "Monitor", "Tamano de ventana", "Resolucion 3D", "Relacion de aspecto", "Ajuste", "Nivel de detalle", "Campo de vision", "V-Sync", "Limite de FPS", "Iluminacion", "Sombras dinamicas", "Luces secundarias", "Distancia de sombras", "Oclusion ambiental", "Detalle de texturas", "Overscan",
+     "En una ventana o a pantalla completa.", "En que pantalla se abre la ventana.", "El tamano de la ventana (en modo ventana).", "La resolucion del 3D, por la de la pantalla. El HUD sigue nitido.",
      "4:3 como el original, 16:9 o la vista ampliada a la pantalla.", "Si el formato no es el de la pantalla: bandas negras o estirado.",
      "Hasta donde los objetos conservan su detalle y se dibujan.", "x1.00 es la vista del original.", "Espera al refresco de la pantalla: sin cortes.",
      "Los cuadros por segundo como maximo. El juego siempre va a 60.",
@@ -175,8 +175,8 @@ constexpr const char* TEXTS[4][T_COUNT] = {
      "Panoramico, mas detalle, apuntado y movimiento modernos. Todo cambia en Opciones.",
      "Moderno y la nueva iluminacion al maximo: sombras, luces, oclusion. Experimental, pesado."},
     {"Grafica", "Schermo, formato, dettaglio e visuale della versione PC",
-     "Schermo", "Finestra", "Risoluzione 3D", "Formato", "Adattamento", "Livello di dettaglio", "Campo visivo", "V-Sync", "Limite FPS", "Illuminazione", "Ombre dinamiche", "Luci secondarie", "Distanza ombre", "Occlusione ambientale", "Dettaglio texture", "Overscan",
-     "In una finestra o a schermo intero.", "La dimensione della finestra (in modalita finestra).", "La risoluzione del 3D, per quella dello schermo. L'HUD resta nitido.",
+     "Schermo", "Monitor", "Finestra", "Risoluzione 3D", "Formato", "Adattamento", "Livello di dettaglio", "Campo visivo", "V-Sync", "Limite FPS", "Illuminazione", "Ombre dinamiche", "Luci secondarie", "Distanza ombre", "Occlusione ambientale", "Dettaglio texture", "Overscan",
+     "In una finestra o a schermo intero.", "Su quale schermo va la finestra.", "La dimensione della finestra (in modalita finestra).", "La risoluzione del 3D, per quella dello schermo. L'HUD resta nitido.",
      "4:3 come l'originale, 16:9 o la visuale allargata allo schermo.", "Se il formato non e quello dello schermo: bande nere o stirato.",
      "Fin dove gli oggetti tengono il dettaglio e restano disegnati.", "x1.00 e la visuale dell'originale.", "Attende il refresh dello schermo: niente tearing.",
      "I fotogrammi al secondo al massimo. Il gioco va sempre a 60.",
@@ -202,7 +202,7 @@ struct Row {
 };
 // (grouped: the window, the picture, the view, the light)
 constexpr Row ROWS_DEF[] = {
-    {S_DISPLAY, T_DISPLAY, H_DISPLAY},       {S_WINDOW, T_WINDOW_SIZE, H_WINDOW_SIZE},          {S_VSYNC, T_VSYNC, H_VSYNC},
+    {S_DISPLAY, T_DISPLAY, H_DISPLAY},       {S_MONITOR, T_MONITOR, H_MONITOR},                {S_WINDOW, T_WINDOW_SIZE, H_WINDOW_SIZE},          {S_VSYNC, T_VSYNC, H_VSYNC},
     {S_CAP, T_CAP, H_CAP},                   {S_SCALE, T_SCALE, H_SCALE},                       {S_ASPECT, T_ASPECT, H_ASPECT},
     {S_FIT, T_FIT, H_FIT},                   {S_OVERSCAN, T_OVERSCAN, H_OVERSCAN},    {S_FOV, T_FOV, H_FOV},                             {S_LOD, T_LOD, H_LOD},
     {S_LIGHTING, T_LIGHTING, H_LIGHTING},    {S_SHADOW_DIST, T_SHADOW_DIST, H_SHADOW_DIST},     {S_DYN_SHADOWS, T_DYN_SHADOWS, H_DYN_SHADOWS},
@@ -216,7 +216,9 @@ static_assert(0x1000 + (T_COUNT + VISIBLE) * STRING_SIZE <= 0x4000, "the Graphic
 // The state the host reads (C++ side: the window is not the game's)
 struct State {
     // (the defaults: window, 100 %, 4:3 with bars, original LOD, 100 %, v-sync, 60, original lighting, no dynamic shadows, all secondary lights)
-    int value[S_COUNT] = {0, 0, 2, 0, 0, 0, 5, 1, 1, 0, 0, 2, 3, 0, 0, 0};  // (shadow distance: Maximum; no ambient occlusion; full textures; the TV's area)
+    int value[S_COUNT] = {0, 0, 0, 2, 0, 0, 0, 5, 1, 1, 0, 0, 2, 3, 0, 0, 0};  // (the monitor: the first of the host's list; shadow distance: Maximum; no ambient occlusion; full textures; the TV's area)
+    std::vector<std::string> monitors;  // the host's monitors as it named them (graphics_set_monitors), GLFW's order
+    std::string monitor_name;           // the monitor chosen, by name: what the preferences keep (the order is not stable)
     int top = 0, prev_sel = 0;  // the page's window: the first row shown; the selection the last frame
     int win_w = 960, win_h = 720;                      // the window mode's size
     bool host_fullscreen = false;
@@ -241,6 +243,7 @@ uint32_t value_count(Setting s) {
         case S_LIGHTING: return 4;  // Original, Low, Medium, High (mrp_lighting.h: off, the maps at 1024 / 2048 / 4096)
         case S_FOV: return sizeof(FOVS) / sizeof(int);
         case S_CAP: return sizeof(CAPS) / sizeof(int);
+        case S_MONITOR: return static_cast<uint32_t>(gs_.monitors.size());  // (the host's list; one before GLFW is up: the row shows '?')
         default: return 1;
     }
 }
@@ -290,8 +293,9 @@ void apply() {
     d.window_h = gs_.win_h;
     d.vsync = v[S_VSYNC] != 0;
     d.fps_cap = CAPS[v[S_CAP]];
+    d.monitor = v[S_MONITOR];
     if (d.fullscreen != gs_.display.fullscreen || d.window_w != gs_.display.window_w || d.window_h != gs_.display.window_h || d.vsync != gs_.display.vsync ||
-        d.fps_cap != gs_.display.fps_cap) {
+        d.fps_cap != gs_.display.fps_cap || d.monitor != gs_.display.monitor) {
         gs_.display = d;
         ++gs_.serial;
     }
@@ -326,6 +330,11 @@ bool prefs_read(const std::filesystem::path& path) {
     char key[64];
     while (std::fscanf(f, "%63s", key) == 1) {
         int a = 0, b = 0;
+        if (std::strcmp(key, "monitor") == 0) {  // (the name, not the index: GLFW's order is not stable)
+            char name[64];
+            if (std::fscanf(f, "%63s", name) == 1) gs_.monitor_name = name;
+            continue;
+        }
         if (std::strcmp(key, "window") == 0) {
             if (std::fscanf(f, "%d %d", &a, &b) == 2 && a >= 320 && b >= 240 && a <= 16384 && b <= 16384) {
                 gs_.win_w = a;
@@ -393,8 +402,8 @@ void prefs_write() {
     if (path.has_parent_path()) std::filesystem::create_directories(path.parent_path(), ec);
     if (FILE* f = platform::open_file(path, "w")) {
         const int* v = gs_.value;
-        std::fprintf(f, "display %d\nwindow %d %d\nrender_scale %d\naspect %d\nfit %d\nlod %d\nfov %d\nvsync %d\nfps_cap %d\nlighting %d\ndynamic_shadows %d\nsecondary_lights %d\nshadow_distance %d\nambient_occlusion %d\ntexture_detail %d\noverscan %d\nmode %u\n",
-                     v[S_DISPLAY], gs_.win_w, gs_.win_h, SCALES[v[S_SCALE]], v[S_ASPECT], v[S_FIT], v[S_LOD], FOVS[v[S_FOV]], v[S_VSYNC], CAPS[v[S_CAP]], v[S_LIGHTING], v[S_DYN_SHADOWS],
+        std::fprintf(f, "display %d\nmonitor %s\nwindow %d %d\nrender_scale %d\naspect %d\nfit %d\nlod %d\nfov %d\nvsync %d\nfps_cap %d\nlighting %d\ndynamic_shadows %d\nsecondary_lights %d\nshadow_distance %d\nambient_occlusion %d\ntexture_detail %d\noverscan %d\nmode %u\n",
+                     v[S_DISPLAY], gs_.monitor_name.c_str(), gs_.win_w, gs_.win_h, SCALES[v[S_SCALE]], v[S_ASPECT], v[S_FIT], v[S_LOD], FOVS[v[S_FOV]], v[S_VSYNC], CAPS[v[S_CAP]], v[S_LIGHTING], v[S_DYN_SHADOWS],
                      v[S_SEC_LIGHTS], v[S_SHADOW_DIST], v[S_AO], v[S_MIPS], v[S_OVERSCAN], gs_.mode);
         std::fclose(f);
     }
@@ -404,6 +413,7 @@ void prefs_write() {
 // orig: (none) — enhancement: a value changed by the page (or a mode, or a save): applied, the
 // preferences to be written
 void changed() {
+    if (gs_.value[S_MONITOR] >= 0 && static_cast<size_t>(gs_.value[S_MONITOR]) < gs_.monitors.size()) gs_.monitor_name = gs_.monitors[gs_.value[S_MONITOR]];  // (the row's choice kept by name)
     apply();
     values_to_ee();
     gs_.dirty = true;
@@ -427,6 +437,7 @@ std::string value_text(Setting s) {
     char b[48];
     switch (s) {
         case S_DISPLAY: return t[v != 0 ? T_FULLSCREEN : T_WINDOW];
+        case S_MONITOR: return v >= 0 && static_cast<size_t>(v) < gs_.monitors.size() ? gs_.monitors[v] : std::string("?");
         case S_WINDOW: std::snprintf(b, sizeof b, "%d x %d", gs_.win_w, gs_.win_h); return b;
         case S_SCALE: std::snprintf(b, sizeof b, "x%d.%02d", SCALES[v] / 100, SCALES[v] % 100); return b;  // (the font's '%' is a button)
         case S_ASPECT: return t[v == 0 ? T_43 : v == 1 ? T_169 : T_FILL];
@@ -469,6 +480,7 @@ void step(Setting s, int d) {
         return;
     }
     const int n = static_cast<int>(value_count(s));
+    if (n <= 0) return;  // (the monitor row before GLFW is up: nothing to step through)
     gs_.value[s] = (gs_.value[s] + d + n) % n;
     changed();
 }
@@ -593,6 +605,26 @@ uint32_t graphics_text(int32_t id) {
 
 uint32_t updates_page();
 void update_menu_main_install();
+
+// orig: (none) — enhancement (graphics.h)
+void graphics_set_monitors(std::vector<std::string> names) {
+    gs_.monitors = std::move(names);
+    // the chosen monitor's name to its place in the host's list; not among them (or none chosen): the
+    // first, and its name kept, so the row shows what the window is on
+    int index = -1;
+    if (!gs_.monitor_name.empty())
+        for (size_t i = 0; i < gs_.monitors.size(); ++i)
+            if (gs_.monitors[i] == gs_.monitor_name) index = static_cast<int>(i);
+    if (index < 0) {
+        const std::string wanted = gs_.monitor_name;
+        index = gs_.monitors.empty() ? -1 : 0;
+        gs_.monitor_name = index >= 0 ? gs_.monitors[0] : std::string();
+        if (!wanted.empty())
+            std::printf("[graphics] the monitor '%s' is not connected: '%s' used\n", wanted.c_str(), gs_.monitor_name.c_str());
+    }
+    gs_.value[S_MONITOR] = index;
+    if (index >= 0) apply();  // (the host's window: the choice read from the preferences is in it)
+}
 
 // orig: (none) — enhancement (graphics.h)
 void graphics_menu_back(uint32_t cur, uint32_t to, uint32_t mobys) {
