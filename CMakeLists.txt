@@ -50,6 +50,7 @@ include(cmake/dependencies.cmake)
 # ---- src/platform/ : the operating system's calls, behind one interface (Linux: POSIX; Windows: Win32) ----
 if(WIN32)
     add_library(rac1_platform STATIC src/platform/platform_win32.cpp)
+    target_link_libraries(rac1_platform PUBLIC winmm)  # (timeBeginPeriod: the system timer's period)
 else()
     add_library(rac1_platform STATIC src/platform/platform_posix.cpp)
 endif()

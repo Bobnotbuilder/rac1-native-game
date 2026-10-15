@@ -7,6 +7,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <mmsystem.h>
 
 #include "platform.h"
 
@@ -264,6 +265,39 @@ double thread_cpu_ms() {
 }
 
 bool local_time(std::time_t t, std::tm* out) { return localtime_s(out, &t) == 0; }
+
+// ---- The process's host settings ----
+
+namespace {
+DWORD g_console_mode = 0;  // (the console input's mode before process_begin)
+bool g_console_mode_set = false;
+bool g_timer_period = false;
+}  // namespace
+
+void process_begin() {
+    // QuickEdit off: ENABLE_EXTENDED_FLAGS must be in the mode for ENABLE_QUICK_EDIT_MODE's bit to be taken
+    // (a console the process does not have, or input redirected from a file: GetConsoleMode fails, nothing done)
+    const HANDLE in = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD mode = 0;
+    if (in != nullptr && in != INVALID_HANDLE_VALUE && GetConsoleMode(in, &mode) != 0) {
+        const DWORD want = (mode | ENABLE_EXTENDED_FLAGS) & ~static_cast<DWORD>(ENABLE_QUICK_EDIT_MODE);
+        if (want != mode && SetConsoleMode(in, want) != 0) {
+            g_console_mode = mode;
+            g_console_mode_set = true;
+        }
+    }
+    g_timer_period = timeBeginPeriod(1) == TIMERR_NOERROR;
+}
+
+void process_end() {
+    if (g_console_mode_set) {
+        const HANDLE in = GetStdHandle(STD_INPUT_HANDLE);
+        if (in != nullptr && in != INVALID_HANDLE_VALUE) SetConsoleMode(in, g_console_mode | ENABLE_EXTENDED_FLAGS);
+        g_console_mode_set = false;
+    }
+    if (g_timer_period) timeEndPeriod(1);
+    g_timer_period = false;
+}
 
 // ---- Debugging ----
 

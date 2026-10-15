@@ -43,6 +43,7 @@ compiles one of them. `src/game/` and `runtime/` call the interface and stay sta
 | The setup's helper programs | `src/setup/setup_manager.cpp` | `posix_spawnp` | `CreateProcessW` |
 | The environment | the debug tools gate | `environ`, `unsetenv` | `_environ`, `_putenv_s` |
 | Backtraces (`EE_BT`) | `runtime/kernel/ee_memory.cpp` | glibc's `backtrace` | the return addresses (`CaptureStackBackTrace`), for `addr2line` |
+| The console and the timer at start (`process_begin` / `process_end`) | `src/host/orig_main.cpp`'s `main` | nothing | the console's QuickEdit mode off (a click in the console window paused the game) and `timeBeginPeriod(1)` (a sleep wakes up within ~1 ms, not 15.6 ms), both put back at the exit |
 | Thread priority | `src/host/host_priority_{posix,win32}.cpp` | rtkit over D-Bus | `SetThreadPriority` |
 | The disc image's link | the setup, `runtime/kernel/disc.cpp` | a symbolic link | a link if allowed, else the path in `assets/iso/disc-path.txt` |
 

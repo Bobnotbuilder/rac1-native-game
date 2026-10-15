@@ -84,6 +84,16 @@ double thread_cpu_ms();
 // `t` as the local time (localtime_r). False on an error.
 bool local_time(std::time_t t, std::tm* out);
 
+// ---- The process's host settings ----
+
+// At the game's start: Windows: the console's QuickEdit mode turned off (with it, a click in the console's window
+// starts a text selection, and while one is up every write to the console waits: the game's thread, which logs, stops
+// there - the game frozen until the selection ends) and the system timer's period set to 1 ms (a sleep wakes up to
+// 15.6 ms late otherwise: the frame pacing's wait and a host frame's wait for the next game frame overslept, the
+// frames' timing uneven). Nothing on Linux. process_end puts both back (the console's mode for the shell it belongs to).
+void process_begin();
+void process_end();
+
 // ---- Debugging ----
 
 // The calling thread's call stack (up to `frames` return addresses) printed on stderr; nothing where

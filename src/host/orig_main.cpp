@@ -211,6 +211,13 @@ static int s_mrp_skip_mode = 1;  // orig: (host) RAC1_MRP_SKIP, see main()
 FILE* g_audio_dump = nullptr;
 // orig: (host) a vsync: the timer, the vsync callback, the IOP's time (the SPU2's output)
 uint64_t g_vsyncs = 0;  // (testing: the vsyncs passed, RAC1_STALL_LOG)
+// (testing) RAC1_TEST_ZERO_FB=<first>,<last>[,raw]: the host frames of the frames first..last (exclusive) see a framebuffer
+// of 0 x 0, as a minimised window's (Windows: a fullscreen window alt-tabbed out of); `raw`: given to the renderers as it
+// is, without the minimised window's skip (the behaviour before it)
+uint64_t g_test_zero_fb_from = 0, g_test_zero_fb_to = 0;
+bool g_test_zero_fb_raw = false;
+// orig: (host) testing: RAC1_TEST_ZERO_FB's size at this frame
+static bool test_zero_fb(uint64_t frame) { return g_test_zero_fb_to != 0 && frame >= g_test_zero_fb_from && frame < g_test_zero_fb_to; }
 // the longest game step of the last host frame; a step longer than kStallMs is a stall (a load) the host does
 // not catch up
 double g_last_steps_ms = 0.0;
@@ -1611,6 +1618,10 @@ void pad_packet(GLFWwindow* win, uint64_t frame) {
 }  // namespace
 
 int main(int argc, char** argv) {
+    // (Windows: the console's QuickEdit off - a click in the console window froze the game - and the timer at 1 ms;
+    // put back at the exit: platform.h)
+    rac1::platform::process_begin();
+    std::atexit(rac1::platform::process_end);
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--setup" || std::string(argv[i]) == "-s") {
             return rac1::setup::run_setup(argc, argv);
@@ -2064,6 +2075,15 @@ int main(int argc, char** argv) {
     // testing: RAC1_DIE_AT=<frame>: at that game frame Ratchet is killed through the game's own death state
     // (the debug menu's Kill Ratchet)
     const long long die_at = std::getenv("RAC1_DIE_AT") != nullptr ? std::atoll(std::getenv("RAC1_DIE_AT")) : -1;
+    if (const char* z = std::getenv("RAC1_TEST_ZERO_FB"); z != nullptr && g_test_switches) {
+        unsigned long long a = 0, b = 0;
+        char raw[8] = {};
+        if (std::sscanf(z, "%llu,%llu,%7s", &a, &b, raw) >= 2) {
+            g_test_zero_fb_from = a;
+            g_test_zero_fb_to = b;
+            g_test_zero_fb_raw = std::strcmp(raw, "raw") == 0;
+        }
+    }
     FrameProf fprof;
     HostPacer pacer;
     // (testing) RAC1_RAMHASH=<file>: after each game frame's update the 4 KB pages' hashes of the game's EE RAM
@@ -2142,26 +2162,34 @@ int main(int argc, char** argv) {
         if (host_delay_ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(host_delay_ms));  // (testing: a slow host frame)
         bool iop_alone = true;  // (the IOP's mirror may play alone while the game's thread stalls; not while the host holds the game)
         bool host_paused = false;  // (the debug menu holds the game: its frames still drawn, the menu over them)
-#ifdef RAC1_DEVTOOLS
         // (testing) RAC1_REALTIME=1: a headless run steps the game as a window does (60 game frames a second of the wall
         // clock, the stalls not caught up), with RAC1_FPS_CAP its host frames' rate and RAC1_AUDIO_DEVICE=null the sound's queue
         static const bool realtime_test = headless && std::getenv("RAC1_REALTIME") != nullptr && std::atoi(std::getenv("RAC1_REALTIME")) != 0;
         if (!headless || realtime_test) {
+            // the debug menu's pause, single step and speed (a build without the debug tools: none, speed 1). The game's
+            // frames come from the wall clock in every build: without the debug tools the window ran one game frame per host
+            // frame, the game's speed tied to the display's refresh rate
+            bool paused = false, step_once = false;
+            double speed = 1.0;
+#ifdef RAC1_DEVTOOLS
             if (!headless) dt::dev_menu_poll(window);
             const dt::DevSettings& ds = dt::dev_settings();
-            const bool paused = ds.paused || (ds.open && ds.pause_when_open);
-            iop_alone = !paused && ds.speed == 1.0f;
+            paused = ds.paused || (ds.open && ds.pause_when_open);
+            step_once = ds.step_once;
+            speed = static_cast<double>(ds.speed);
+            if (paused) dt::dev_settings().step_once = false;
+#endif
+            iop_alone = !paused && speed == 1.0;
             host_paused = paused;
             if (paused) {
                 game_time = 0.0;
-                steps = ds.step_once ? 1 : 0;
-                dt::dev_settings().step_once = false;
+                steps = step_once ? 1 : 0;
             } else {
                 // a game frame that took the host long (a load: a level's start, a checkpoint's reload, a movie's open)
                 // is not caught up: the game goes on from where it was, as the PS2 after a long frame, instead of running the
                 // owed frames at once (up to 6 game frames in one host frame: a jump in the picture, a burst of sound)
                 const double owed_s = g_last_steps_ms > kStallMs ? std::min(dt_s, 1.0 / 60.0) : std::min(dt_s, 0.1);
-                game_time += owed_s * 60.0 * static_cast<double>(ds.speed);
+                game_time += owed_s * 60.0 * speed;
                 // nor the time the IOP's mirror already played alone while the game was late (ADR 0013): the PS2's
                 // IOP played on and the EE did not run those frames again; caught up, their sound would come on top of what
                 // was played (a surplus the queue skips). Only the frames owed beyond this host frame's own one are taken off:
@@ -2177,7 +2205,6 @@ int main(int argc, char** argv) {
                 steps = std::min(steps, 8);
             }
         }
-#endif
         audio_out_set_alone(iop_alone);
         g_last_steps_ms = 0.0;
         fprof.begin();
@@ -2395,6 +2422,7 @@ int main(int argc, char** argv) {
         fprof.mark(0);
         auto prepare = [&](FrameDraw& fd, bool snapshot) {
             glfwGetFramebufferSize(window, &fd.w, &fd.h);
+            if (test_zero_fb(frame)) fd.w = fd.h = 0;  // (testing: RAC1_TEST_ZERO_FB with raw)
             w = fd.w;
             h = fd.h;
             fd.vx = 0, fd.vy = 0, fd.vw = fd.w, fd.vh = fd.h;
@@ -3005,6 +3033,28 @@ int main(int argc, char** argv) {
                 }
             }
         };
+        // a minimised window (Windows: a fullscreen window alt-tabbed out of is minimised, GLFW_AUTO_ICONIFY) has a framebuffer
+        // of 0 x 0: nothing is prepared, drawn nor presented (the renderers' buffers, captures and views would be sized from it,
+        // their scales divided by its 0; the swap of a minimised window waits for no vsync). The game goes on at 60 game frames
+        // a second, as in a window not shown (a host frame of several game frames does not draw the earlier ones either), the
+        // host sleeping until the next game frame is due; a pipelined frame waiting is dropped
+        {
+            int fb_w = 0, fb_h = 0;
+            if (!headless) glfwGetFramebufferSize(window, &fb_w, &fb_h);
+            const bool zero = (!headless && (fb_w <= 0 || fb_h <= 0 || glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0)) ||
+                              (test_zero_fb(frame) && !g_test_zero_fb_raw);
+            if (zero && !(max_frames != 0 && frame >= max_frames)) {
+                if (have_pend) {
+                    have_pend = false;
+                    mrp_world_drop_frame();
+                }
+                fprof.end_frame();
+                // (the next game frame is due when game_time reaches 0.5; the debug menu holding the game: a frame's time)
+                const double wait_s = host_paused ? 1.0 / 60.0 : std::max(0.0, 0.5 - game_time) / 60.0;
+                std::this_thread::sleep_for(std::chrono::duration<double>(std::max(wait_s, 0.001)));
+                continue;
+            }
+        }
         // the pipelined frame of the last host frame: drawn now, after this host frame's game frames (its scene built meanwhile)
         bool presented = false;
         if (have_pend) {
@@ -3129,6 +3179,7 @@ int main(int argc, char** argv) {
     rac1::vu0::fallback_report();  // (testing: RAC1_VU_FALLBACK)
     rac1::vu1::fallback_report();
     if (std::getenv("RAC1_VU0_CHAIN") != nullptr) std::fprintf(stderr, "[vu0-chain] %016llx\n", static_cast<unsigned long long>(rac1::vu0::chain_hash()));
+    rac1::platform::process_end();  // (std::_Exit runs no atexit handler)
     rac1::update_check::run_update();
     std::_Exit(0);  // the renderers' static GL objects would be freed after the context is gone
 }
