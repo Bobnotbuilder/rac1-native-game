@@ -14,6 +14,8 @@
 #include <game/ovl/orxon_mobys.h>
 #include <game/ovl/ovl_reloc.h>
 #include <game/ovl/pokitaru_mobys.h>
+#include <game/ovl/quartu_mobys.h>
+#include <game/ovl/kalebo_mobys.h>
 #include <game/ovl/rilgar_mobys.h>
 #include <game/ovl/variants_l2.h>
 #include <game/ovl/variants_l3.h>
@@ -24,6 +26,8 @@
 #include <game/ovl/variants_l9.h>
 #include <game/ovl/variants_l10.h>
 #include <game/ovl/variants_l11.h>
+#include <game/ovl/variants_l15.h>
+#include <game/ovl/variants_l16.h>
 
 namespace rac1 {
 
@@ -133,6 +137,24 @@ bool class_hook_call_level(uint32_t fn, uint32_t m, uint32_t a1, uint32_t a2, fl
         case L11_CASE(0x00316270): ret = u_call(pok_hook_316270_u, m, a1, a2, f12); return true;
         case L11_CASE(0x003162d0): ret = u_call(pok_hook_3162d0_u, m, a1, a2, f12); return true;
         case L11_CASE(0x003162f0): ret = u_call(pok_hook_3162f0_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 15:  // Quartu: the 749-type five-hook table 0x1e3e9c (Veldin's class-749 hooks with other constants: 9 -> 7, 5 -> 1, pvars + 0x60)
+        switch (lvl_key(fn)) {
+        case L15_CASE(0x002bc4b0): ret = u_call(qua_hook_2bc4b0_u, m, a1, a2, f12); return true;
+        case L15_CASE(0x002bc500): ret = u_call(qua_hook_2bc500_u, m, a1, a2, f12); return true;
+        case L15_CASE(0x002bc550): ret = u_call(qua_hook_2bc550_u, m, a1, a2, f12); return true;
+        case L15_CASE(0x002bc5a0): ret = u_call(qua_hook_2bc5a0_u, m, a1, a2, f12); return true;
+        case L15_CASE(0x002bc5d0): ret = u_call(qua_hook_2bc5d0_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 16:  // Kalebo III: the 749-type five-hook table 0x1e9050 (Veldin's class-749 hooks with other constants: 9 -> 7, 5 -> 1, pvars + 0x60)
+        switch (lvl_key(fn)) {
+        case L16_CASE(0x002e65d0): ret = u_call(kal_hook_2e65d0_u, m, a1, a2, f12); return true;
+        case L16_CASE(0x002e6620): ret = u_call(kal_hook_2e6620_u, m, a1, a2, f12); return true;
+        case L16_CASE(0x002e6670): ret = u_call(kal_hook_2e6670_u, m, a1, a2, f12); return true;
+        case L16_CASE(0x002e66c0): ret = u_call(kal_hook_2e66c0_u, m, a1, a2, f12); return true;
+        case L16_CASE(0x002e66f0): ret = u_call(kal_hook_2e66f0_u, m, a1, a2, f12); return true;
         default: return false;
         }
     default:

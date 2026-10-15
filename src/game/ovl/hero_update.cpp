@@ -40,6 +40,8 @@ void hero_timers_update() {
     if (on_blarg()) { blg_call(blg_hero_timers_update_u); return; }  // (level 6's own: L6:0x002348d0)
     if (on_batalia()) { bat_call(bat_hero_timers_update_u); return; }  // (level 8's own: L8:0x0022fd98)
     if (on_pokitaru()) { pok_call(pok_hero_timers_update_u); return; }  // (level 11's own: L11:0x0024cdb0)
+    if (on_quartu()) { qua_call(qua_hero_timers_update_u); return; }  // (level 15's own: L15:0x00215e58)
+    if (on_kalebo()) { kal_call(kal_hero_timers_update_u); return; }  // (level 16's own: L16:0x0021d5f8)
     if (on_l1_family() || on_rilgar()) return hero_timers_update_l1();
     if (lbu(P + 0x20ad) == 0) hero_tilt_update();
     sw(P + 0x198, lwu(P + 0x198) + 1);
@@ -199,6 +201,8 @@ void hero_surface_update() {
     if (on_blarg()) { blg_call(blg_hero_surface_update_u); return; }  // (level 6's own: L6:0x00222fb8)
     if (on_batalia()) { bat_call(bat_hero_surface_update_u); return; }  // (level 8's own: L8:0x0021d9c0)
     if (on_pokitaru()) { pok_call(pok_hero_surface_update_u); return; }  // (level 11's own: L11:0x0023c7a0)
+    if (on_quartu()) { qua_call(qua_hero_surface_update_u); return; }  // (level 15's own: L15:0x002044c8)
+    if (on_kalebo()) { kal_call(kal_hero_surface_update_u); return; }  // (level 16's own: L16:0x002097a0)
     if (on_rilgar()) { ril_call(ril_hero_surface_update_u); return; }  // (Rilgar's own: L5:0x00239fc0)
     if (on_novalis() || on_kerwan()) return hero_surface_update_l1();
     if (on_aridia()) return hero_surface_update_l2();
@@ -467,6 +471,8 @@ void hero_frame_update() {
     if (on_blarg()) { blg_call(blg_hero_frame_update_u); return; }  // (level 6's own: L6:0x0021ef38)
     if (on_batalia()) { bat_call(bat_hero_frame_update_u); return; }  // (level 8's own: L8:0x002194e0)
     if (on_pokitaru()) { pok_call(pok_hero_frame_update_u); return; }  // (level 11's own: L11:0x002382c8)
+    if (on_quartu()) { qua_call(qua_hero_frame_update_u); return; }  // (level 15's own: L15:0x00200228)
+    if (on_kalebo()) { kal_call(kal_hero_frame_update_u); return; }  // (level 16's own: L16:0x002051c8)
     if (on_l1_family() || on_rilgar()) return hero_frame_update_l1();
     const float x = lwc1(P + 0x80);
     const float y = lwc1(P + 0x84);

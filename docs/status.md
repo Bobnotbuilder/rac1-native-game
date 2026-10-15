@@ -70,8 +70,8 @@ nothing, so an object whose class is not ported stands still or does not appear.
 | 12 | Hoven | Loads and runs. | Nothing of its own ported. |
 | 13 | Gemlik Base (code: Oltanis Orbit) | Loads and runs. | Nothing of its own ported. |
 | 14 | Oltanis | Loads and runs. | Nothing of its own ported. |
-| 15 | Quartu | Loads and runs. | Nothing of its own ported. |
-| 16 | Kalebo III | Loads and runs. | Nothing of its own ported. |
+| 15 | Quartu | Its own code ported: its own build of the hero controller (with the RAC 3 movement options), its classes and the callbacks they install (the draw callbacks among them), its camera types, sound emitters and class hooks, and particle type 0x47 (shared). Giant Clank's section played in automated runs. Ready for playtest; not played through by hand yet. | A few of its classes are not placed on the level (spawned by others or by scenes): proved on mobys the check spawns. |
+| 16 | Kalebo III | Its own code ported: its own build of the hero controller (the hoverboard's, with the RAC 3 movement options), its classes and the callbacks they install, its camera types, sound emitters and class hooks. The hoverboard race and the Gadgetron headquarters reached in automated runs. Ready for playtest; not played through by hand yet. | The race has not been finished in an automated run. |
 | 17 | Drek's fleet (code: Veldin Orbit) | Loads and runs. | Nothing of its own ported. |
 | 18 | Veldin, the finale | Loads and runs. | Nothing of its own ported. |
 

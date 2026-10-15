@@ -1,0 +1,159 @@
+// Kalebo III (level 16) own code, transliterated: the level's own moby classes, the sound emitters, the camera types, the class hooks, the draw callbacks, and their level-only callees. (part 4 of 5)
+// Transliterated instruction by instruction from level 16's own overlay with tools/codegen/mips2cpp.py (tools/codegen/mkall.py:
+// the original's control flow and PS2 float rules by construction), reviewed in the oracle (batch 250, ORACLE_LEVEL=16), not rewritten
+// by hand: the names are the entries', the helpers `kal_<addr>_l16` (uniform ABI: TrRet).
+#include <game/lib/libc.h>
+#include <game/ovl/kalebo_mobys.h>
+#include <game/ovl/quad_draw.h>
+#include <game/ovl/weapons.h>
+#include <game/ovl/arrival.h>
+#include <game/ovl/carry_hooks.h>
+#include <game/ovl/checkpoint.h>
+#include <game/ovl/cutscene.h>
+#include <game/ovl/devastator.h>
+#include <game/ovl/enemy_749.h>
+#include <game/ovl/hydro.h>
+#include <game/ovl/level_change.h>
+#include <game/ovl/nanotech_draw.h>
+#include <game/ovl/ovl.h>
+#include <game/ovl/particle_16_spawn.h>
+#include <game/ovl/screen_fade.h>
+#include <game/math/vecmath.h>
+#include <game/ovl/veldin_mobys.h>
+#include <game/math/vecmath.h>
+#include <game/ovl/arrival.h>
+#include <game/ovl/checkpoint.h>
+#include <game/ovl/cutscene.h>
+#include <game/ovl/level_change.h>
+#include <game/ovl/movie_mode.h>
+#include <game/ovl/veldin_mobys.h>
+#include <game/ovl/ee_regs.h>
+#include <game/ovl/enemy_749.h>
+#include <game/ovl/hero_l1.h>
+#include <game/ovl/novalis_mobys2.h>
+#include <game/ovl/ovl_reloc.h>
+#include <game/ovl/variants_l16.h>
+#include <game/ovl/vu0_regs.h>
+#include <game/ovl/walker.h>
+#include <game/port_stubs.h>
+
+namespace rac1 {
+
+using namespace eer;
+using namespace vu0m;
+
+//@gen kal_class1826_update_l16
+
+//@gen kal_class1891_update_l16
+
+//@gen kal_2c7388_l16
+
+//@gen kal_2c44f0_l16
+
+//@gen kal_2e0de0_l16
+
+//@gen kal_2e0e28_l16
+
+//@gen kal_2c4710_l16
+
+//@gen kal_2e8b08_l16
+
+//@gen kal_class1923_update_l16
+
+//@gen kal_class1943_update_l16
+
+//@gen kal_class1947_update_l16
+
+//@gen kal_class1948_update_l16
+
+//@gen kal_class1952_update_l16
+
+//@gen kal_class1953_update_l16
+
+//@gen kal_286d80_l16
+
+//@gen kal_emitter1_l16
+
+//@gen kal_286ea8_l16
+
+//@gen kal_emitter3_l16
+
+//@gen kal_emitter6_l16
+
+//@gen kal_cam_type3_accept_u
+
+//@gen kal_2efe48_l16
+
+//@gen kal_cam_type3_init_l16
+
+//@gen kal_cam_type3_update_l16
+
+//@gen kal_cam_type3_exit_l16
+
+//@gen kal_cam_type8_accept_u
+
+//@gen kal_2f3fc8_l16
+
+//@gen kal_2f3e60_l16
+
+//@gen kal_2f4048_l16
+
+//@gen kal_2f41e8_l16
+
+//@gen kal_cam_type8_init_l16
+
+//@gen kal_2f43e0_l16
+
+//@gen kal_2f47f0_l16
+
+//@gen kal_cam_type8_update_l16
+
+//@gen kal_cam0_set_124_u
+
+//@gen kal_hook_2e65d0_u
+
+//@gen kal_hook_2e6620_u
+
+//@gen kal_hook_2e6670_u
+
+//@gen kal_hook_2e66c0_u
+
+//@gen kal_hook_2e66f0_u
+
+//@gen kal_1e9988_l16
+
+//@gen kal_cam0_hook_l16
+
+//@gen kal_cam_callback_l16
+
+//@gen kal_cb_2351f8_l16
+
+//@gen kal_cb_235268_l16
+
+//@gen kal_cb_235660_l16
+
+//@gen kal_cb_2388b0_l16
+
+//@gen kal_cb_2388f8_l16
+
+//@gen kal_1f9cd8_l16
+
+//@gen kal_cb_238a30_l16
+
+//@gen kal_cb_238e20_l16
+
+//@gen kal_cb_2c9cd0_l16
+
+//@gen kal_cb_2cef60_l16
+
+//@gen kal_2cf850_l16
+
+//@gen kal_cb_2cf7a8_l16
+
+//@gen kal_1fe280_l16
+
+//@gen kal_299e28_l16
+
+//@gen kal_1fafa8_l16
+
+}  // namespace rac1

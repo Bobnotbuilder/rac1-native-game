@@ -15,6 +15,9 @@
 #include <game/ovl/batalia_hooks.h>
 #include <game/ovl/orxon_hooks.h>
 #include <game/ovl/pokitaru_hooks.h>
+#include <game/ovl/quartu_hooks.h>
+#include <game/ovl/kalebo_hooks.h>
+#include <game/ovl/levels_15_16_shared.h>
 #include <game/ovl/novalis_mobys.h>
 #include <game/ovl/novalis_level_fns.h>
 #include <game/ovl/novalis_water.h>
@@ -62,6 +65,8 @@ static std::vector<LevelMobyFnEntry>& level_moby_fns() {
         batalia_moby_fns_register();
         orxon_moby_fns_register();
         pokitaru_moby_fns_register();
+        quartu_moby_fns_register();
+        kalebo_moby_fns_register();
         novalis_level_fns_register();
         novalis_water_fns_register();
     }
@@ -102,6 +107,7 @@ static std::vector<MobyFnEntry>& moby_fns() {
         empty_class_updates_register();
         veldin_extras_register();
         weapon_classes_register();
+        levels_15_16_shared_register();
     }
     return table;
 }

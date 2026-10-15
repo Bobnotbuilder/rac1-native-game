@@ -1,6 +1,7 @@
 // Ported overlay code 0x00220000..0x0022ffff.
 #include <game/ovl/ovl_common.h>
 #include <game/ovl/rilgar_hero.h>
+#include <game/ovl/kalebo_call.h>
 
 #include <game/ovl/ovl_reloc.h>
 namespace rac1 {
@@ -359,6 +360,7 @@ int32_t hero_idle_event_pick(int32_t* out) {
 // orig: 0x00221310
 void hero_motion_update() {
     if (on_rilgar()) { ril_call(ril_hero_motion_update_u); return; }  // (Rilgar's own: L5:0x0024bdc0)
+    if (on_kalebo()) { kal_call(kal_hero_motion_update_u); return; }  // (level 16's own: L16:0x0021d270)
     const uint32_t P = g::PLAYER, OUTB = OV(0x00173e40);
     if (lbu(P + 0x20ad) == 0) hero_move_integrate();
     if (lw(OV(0x0015f5cc)) % 3 == 0) {

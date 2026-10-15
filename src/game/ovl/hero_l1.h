@@ -15,6 +15,8 @@
 #include <game/ovl/blarg_call.h>
 #include <game/ovl/batalia_call.h>
 #include <game/ovl/pokitaru_call.h>
+#include <game/ovl/quartu_call.h>
+#include <game/ovl/kalebo_call.h>
 #include <game/ovl/variants_l6.h>
 
 namespace rac1 {

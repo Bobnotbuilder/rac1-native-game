@@ -14,6 +14,7 @@
 #include <game/ovl/pause_menu_pages.h>
 #include <game/ovl/screen_fade.h>
 #include <game/ovl/umbris_call.h>
+#include <game/ovl/quartu_call.h>
 #include <game/port_stubs.h>
 
 namespace rac1 {
@@ -308,6 +309,7 @@ void cutscene_end() {
 // orig: 0x0023e268
 void cutscene_level_extras() {
     if (on_umbris()) { umb_call(umb_cutscene_level_extras_u); return; }  // (level 7's own: L7:0x00265bd8)
+    if (on_quartu()) { qua_call(qua_cutscene_level_extras_u); return; }  // (level 15's own: L15:0x0022db50)
     if (lw(0x0015ed84) == 0) {
         for (int32_t i = 0; i < lh(SC + 0x44); ++i) {
             const uint32_t m = lwu(SC + 0x178 + static_cast<uint32_t>(i) * 4);

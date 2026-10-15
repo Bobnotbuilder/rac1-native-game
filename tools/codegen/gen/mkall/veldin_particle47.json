@@ -1,0 +1,12 @@
+{
+ "level": 0,
+ "tool": "mkall.py",
+ "env": {},
+ "entries": [
+  "274e48:particle_47_update:void:a0"
+ ],
+ "glue_files": [],
+ "files": [
+  "src/game/ovl/particle_47_tr.cpp"
+ ]
+}
