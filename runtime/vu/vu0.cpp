@@ -45,16 +45,11 @@ uint64_t g_micro_gen = 1;  // counts the writes of the micro memory and the regi
 }
 
 namespace detail {
-Vu0* g_global = nullptr;
-Vu0& global_init() {
-    static Vu0 v = [] {
-        Vu0 x;
-        x.st.vf[0].f[3] = 1.0f;
-        return x;
-    }();
-    g_global = &v;
-    return v;
-}
+Vu0 g_instance = [] {
+    Vu0 x;
+    x.st.vf[0].f[3] = 1.0f;
+    return x;
+}();
 }  // namespace detail
 
 namespace {

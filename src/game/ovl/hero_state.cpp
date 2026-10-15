@@ -95,6 +95,8 @@ void hero_enter_idle() {
     if (on_blarg()) { blg_call(blg_hero_enter_idle_u); return; }  // (level 6's own: L6:0x00239528)
     if (on_batalia()) { bat_call(bat_hero_enter_idle_u); return; }  // (level 8's own: L8:0x00234c18)
     if (on_pokitaru()) { pok_call(pok_hero_enter_idle_u); return; }  // (level 11's own: L11:0x00251558)
+    if (on_hoven()) { hov_call(hov_hero_enter_idle_u); return; }  // (level 12's own: L12:0x00243d00)
+    if (on_oltanis()) { olt_call(olt_hero_enter_idle_u); return; }  // (level 14's own: L14:0x002336d8)
     if (on_veldin_finale()) { vf_call(vf_hero_enter_idle_u); return; }  // (level 18's own: L18:0x0022c418)
     if (on_veldin_orbit()) { vo_call(vo_hero_enter_idle_u); return; }  // (level 17's own: L17:0x00223380)
     if (on_l1_family() || on_rilgar()) return hero_enter_idle_l1();
@@ -120,6 +122,8 @@ void hero_mode_enter(uint32_t mode, uint32_t state, uint32_t moby) {
     if (on_blarg()) { blg_call(blg_hero_mode_enter_u, mode, state, moby); return; }  // (level 6's own: L6:0x00227bf0)
     if (on_batalia()) { bat_call(bat_hero_mode_enter_u, mode, state, moby); return; }  // (level 8's own: L8:0x002225c8)
     if (on_pokitaru()) { pok_call(pok_hero_mode_enter_u, mode, state, moby); return; }  // (level 11's own: L11:0x00240d50)
+    if (on_hoven()) { hov_call(hov_hero_mode_enter_u, mode, state, moby); return; }  // (level 12's own: L12:0x00232380)
+    if (on_oltanis()) { olt_call(olt_hero_mode_enter_u, mode, state, moby); return; }  // (level 14's own: L14:0x00222870)
     if (on_veldin_orbit()) { vo_call(vo_hero_mode_enter_u, mode, state, moby); return; }  // (level 17's own: L17:0x0020d960)
     if (on_l1_family() || on_rilgar()) return hero_mode_enter_l1(mode, state, moby);
     hero_hold_release();
@@ -164,6 +168,8 @@ void hero_mode_exit() {
     if (on_blarg()) { blg_call(blg_hero_mode_exit_u); return; }  // (level 6's own: L6:0x00227cf8)
     if (on_batalia()) { bat_call(bat_hero_mode_exit_u); return; }  // (level 8's own: L8:0x002226d0)
     if (on_pokitaru()) { pok_call(pok_hero_mode_exit_u); return; }  // (level 11's own: L11:0x00240e58)
+    if (on_hoven()) { hov_call(hov_hero_mode_exit_u); return; }  // (level 12's own: L12:0x00232488)
+    if (on_oltanis()) { olt_call(olt_hero_mode_exit_u); return; }  // (level 14's own: L14:0x00222978)
     if (on_veldin_finale()) { vf_call(vf_hero_mode_exit_u); return; }  // (level 18's own: L18:0x00218928)
     if (on_veldin_orbit()) { vo_call(vo_hero_mode_exit_u); return; }  // (level 17's own: L17:0x0020da68)
     if (on_l1_family() || on_rilgar()) return hero_mode_exit_l1();
@@ -1664,6 +1670,8 @@ int32_t hero_set_state(uint32_t state, int32_t mode) {
     if (on_blarg()) return static_cast<int32_t>(blg_call(blg_hero_set_state_u, state, static_cast<uint32_t>(mode)).v0);  // (level 6's own: L6:0x002356a0)
     if (on_batalia()) return static_cast<int32_t>(bat_call(bat_hero_set_state_u, state, static_cast<uint32_t>(mode)).v0);  // (level 8's own: L8:0x00230b38)
     if (on_pokitaru()) return static_cast<int32_t>(pok_call(pok_hero_set_state_u, state, static_cast<uint32_t>(mode)).v0);  // (level 11's own: L11:0x0024db50)
+    if (on_hoven()) return static_cast<int32_t>(hov_call(hov_hero_set_state_u, state, static_cast<uint32_t>(mode)).v0);  // (level 12's own: L12:0x002400d0)
+    if (on_oltanis()) return static_cast<int32_t>(olt_call(olt_hero_set_state_u, state, static_cast<uint32_t>(mode)).v0);  // (level 14's own: L14:0x0022ff58)
     if (on_veldin_finale()) return static_cast<int32_t>(vf_call(vf_hero_set_state_u, state, static_cast<uint32_t>(mode)).v0);  // (level 18's own: L18:0x00227dd0)
     if (on_veldin_orbit()) return static_cast<int32_t>(vo_call(vo_hero_set_state_u, state, static_cast<uint32_t>(mode)).v0);  // (level 17's own: L17:0x0021e530)
     if (on_rilgar()) return static_cast<int32_t>(ril_call(ril_hero_set_state_u, state, static_cast<uint32_t>(mode)).v0);  // (Rilgar's own: L5:0x0024cee8)

@@ -11,6 +11,9 @@
 #include <game/ovl/batalia_hooks.h>
 #include <game/ovl/orxon_hooks.h>
 #include <game/ovl/pokitaru_hooks.h>
+#include <game/ovl/hoven_hooks.h>
+#include <game/ovl/gemlik_hooks.h>
+#include <game/ovl/oltanis_hooks.h>
 #include <game/ovl/veldin_orbit_hooks.h>
 #include <game/ovl/veldin_finale_hooks.h>
 #include <game/ovl/kerwan_hooks.h>
@@ -442,6 +445,9 @@ void sound_emitters_update() {
         else if (on_umbris() && umbris_sound_emitter_call(fn, em)) {}  // (level 7's own emitter types 3 / 6)
         else if (on_orxon() && orxon_sound_emitter_call(fn, em)) {}  // (level 10's own emitter type 3)
         else if (on_pokitaru() && pokitaru_sound_emitter_call(fn, em)) {}  // (level 11's own emitter types 1 / 5)
+        else if (on_hoven() && hoven_sound_emitter_call(fn, em)) {}  // (level 12's own emitter types 1 / 3 / 5 / 6)
+        else if (on_gemlik() && gemlik_sound_emitter_call(fn, em)) {}  // (level 13's own emitter type 1)
+        else if (on_oltanis() && oltanis_sound_emitter_call(fn, em)) {}  // (level 14's own emitter types 1 / 3 / 4 / 6)
         else if (on_veldin_orbit() && veldin_orbit_sound_emitter_call(fn, em)) {}  // (level 17's own emitter type 5)
         else if (on_veldin_finale() && veldin_finale_sound_emitter_call(fn, em)) {}  // (level 18's own emitter types 3 / 5 / 6)
         else if (on_gaspar() && gaspar_sound_emitter_call(fn, em)) {}  // (level 9's own emitter types 1 / 3)

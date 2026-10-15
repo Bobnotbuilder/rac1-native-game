@@ -28,6 +28,8 @@ bool snd989_is_stream_handle(uint32_t h);
 bool snd989_stream_command(Snd989Streams* io, snd::Player& p, uint32_t id, const uint32_t* args, int32_t& result);
 // The master volume of a group changed (command 0x09): the streams' voices follow.
 void snd989_stream_master_volume(Snd989Streams* io, uint32_t group, int32_t vol);
+// Pause (command 0x16) or continue (0x17) all streams whose volume group is in `mask` (bit g = group g).
+void snd989_stream_group_pause(Snd989Streams* io, uint32_t mask, bool pause);
 // The gains of the movie's sound (command 0x3b with volume 0x400, pan 0, group 5, mode 3; the IRX's 0xa2c0 starts the
 // voices): the left channel's voice and the right channel's, as factors of the ADPCM samples (the SPU2's voice volume
 // / 0x4000), by the stream volume formula with the group 5 master volume now (the game's IOP).

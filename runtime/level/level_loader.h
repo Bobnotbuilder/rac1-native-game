@@ -60,6 +60,7 @@ public:
     static constexpr std::uint32_t VIRT_ADDR_STAGING       = host_layout::STAGING;
     static constexpr std::uint32_t VIRT_ADDR_DECOMPRESSED  = host_layout::CORE;
 
+    static void load_level_wad(int level);
     static void load_level_wad(const std::filesystem::path& level_wad_path);
     // The legacy host renderers' copy of the level (the textures for the GS renderer, the host world's tfrag /
     // tie / shrub meshes and their GL caches, the GLB mobys' models): ~150..250 ms of a level's start, used only by the host
@@ -67,11 +68,15 @@ public:
     // host scene (RAC1_TITLE_HOST). Built at the level's load when `g_legacy_level_needed` says one of them is in use
     // (nullptr: always), else left pending and built by legacy_level_ensure when one is chosen later (the debug menu).
     static void legacy_level_ensure();
-    // The level's file read and its core decompressed ahead on a worker thread (the level exit's start, when the
-    // next level is known): load_level_wad of that file then takes them instead of reading and decompressing (~40..70 ms,
-    // and a cold disk's read, ~300 ms) on the game's thread. Only the host's file: nothing of the game's state.
+    // The level's sectors read from the disc and its core decompressed ahead on a worker thread (the level exit's start, when the
+    // next level is known): load_level_wad of that level then takes them instead of reading and decompressing (~40..70 ms,
+    // and a cold disk's read, ~300 ms) on the game's thread. Only the host's copy: nothing of the game's state.
+    static void prefetch(int level);
     static void prefetch(const std::filesystem::path& level_wad_path);
+    static void register_level_textures(std::span<const std::byte> level_wad_data);
     static void register_level_textures(const std::filesystem::path& level_wad_path);
+    static std::uint32_t load_level_overlay(int level);
+    static std::uint32_t load_level_overlay(std::span<const std::byte> level_wad_data);
     static std::uint32_t load_level_overlay(const std::filesystem::path& level_wad_path);
 };
 

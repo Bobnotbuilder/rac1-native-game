@@ -2,9 +2,9 @@
 #
 # The hand ports of Veldin's hero code (and Novalis's, the *_l1.cpp files) call src/game/enhance/advanced.h at the points
 # where R&C 3's movement, the strafe and the modern aim differ from the original. Rilgar (L5),
-# Blarg's Nebula G34 (L6), Batalia (L8), Pokitaru (L11), Drek's fleet (L17) and Veldin's finale (L18) run their own builds of those functions, machine-transliterated
-# (rilgar_hero_tr_*.cpp, blarg_hero_tr_*.cpp, batalia_hero_tr_*.cpp, pokitaru_hero_tr_*.cpp, veldin_orbit_hero_tr_*.cpp,
-# veldin_finale_hero_tr_*.cpp): the generator puts the same
+# Blarg's Nebula G34 (L6), Batalia (L8), Pokitaru (L11), Hoven (L12), Oltanis (L14), Drek's fleet (L17) and Veldin's finale (L18) run their own
+# builds of those functions, machine-transliterated (rilgar_hero_tr_*.cpp, blarg_hero_tr_*.cpp, batalia_hero_tr_*.cpp, pokitaru_hero_tr_*.cpp,
+# hoven_hero_tr_*.cpp, oltanis_hero_tr_*.cpp, veldin_orbit_hero_tr_*.cpp, veldin_finale_hero_tr_*.cpp): the generator puts the same
 # calls there, at the instruction of the level's own code that corresponds to the hand port's point (the alignment of the
 # two instruction streams).
 #
@@ -93,6 +93,39 @@ L11 0x0024b5fc: advanced_move_speed();  // enhancement (K)
 L11 0x002545c0: advanced_move_speed();  // enhancement (K)
 L11 0x00254664: advanced_move_speed();  // enhancement (K)
 
+# ---- Hoven (level 12): hero_state_update 0x238900, hero_set_state 0x2400d0, hero_input_update 0x2461f0,
+# hero_horizontal_velocity 0x235c08 (no K: its hero_stick_speed is Veldin's code, the port with its own call; J: Hoven's build has more
+# code between the 2 / 6 factors and the call of 0x213e68, the point jumps over the factors only)
+L12 0x0023cf5c: if (advanced_rac3_movement()) { advanced_rac3_along_stick(); set32(s0, s5.w() + -0xcb0); goto L_23d000; }  // enhancement (A)
+L12 0x0023d0c4: if (advanced_rac3_movement()) { fr[20] = advanced_rac3_run_turn(); goto L_23d238; }  // enhancement (B)
+L12 0x0023d264: if (advanced_rac3_movement()) { fr[0] = 37.0f; fr[1] = 30.0f; }  // enhancement (C)
+L12 0x00242a98: advanced_rac3_jump();  // enhancement (D)
+L12 0x0024a868: if (advanced_rac3_movement()) { set32(a0, advanced_rac3_running_jump() ? 9u : 7u); goto L_24b4d8; }  // enhancement (E)
+L12 0x00247b6c: if (advanced_strafe_flip()) { hero_set_state(0xb, 1); advanced_strafe_flip_entered(); set32(s0, s4.w() + -0xcb0); goto L_24b514; }  // enhancement (F)
+L12 0x00247f60: if (advanced_rac3_movement()) { advanced_rac3_stop(); set32(s0, s4.w() + -0xcb0); goto L_248068; }  // enhancement (G)
+L12 0x00248068 label
+L12 0x00247994: if (advanced_rac3_swing_exit(s1.w())) { set32(s0, s4.w() + -0xcb0); goto L_24b514; }  // enhancement (H)
+L12 0x00235ef0: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_235f84; }  // enhancement (I)
+L12 0x0023630c: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_236324; }  // enhancement (J)
+# ---- Oltanis (level 14): hero_state_update 0x228cd0, hero_set_state 0x22ff58, hero_input_update 0x235600,
+# hero_horizontal_velocity 0x226020, hero_stick_speed 0x223710 (its own: K; five call sites, one more than Pokitaru's)
+L14 0x0022bd64: if (advanced_rac3_movement()) { advanced_rac3_along_stick(); set32(s0, s6.w() + -0xcb0); goto L_22be08; }  // enhancement (A)
+L14 0x0022becc: if (advanced_rac3_movement()) { fr[20] = advanced_rac3_run_turn(); goto L_22c040; }  // enhancement (B)
+L14 0x0022c06c: if (advanced_rac3_movement()) { fr[0] = 37.0f; fr[1] = 30.0f; }  // enhancement (C)
+L14 0x0023235c: advanced_rac3_jump();  // enhancement (D)
+L14 0x0023a29c: if (advanced_rac3_movement()) { set32(a0, advanced_rac3_running_jump() ? 9u : 7u); goto L_23af54; }  // enhancement (E)
+L14 0x002368e0: if (advanced_strafe_flip()) { hero_set_state(0xb, 1); advanced_strafe_flip_entered(); set32(s0, s4.w() + -0xcb0); goto L_23af90; }  // enhancement (F)
+L14 0x00236c90: if (advanced_rac3_movement()) { advanced_rac3_stop(); set32(s0, s4.w() + -0xcb0); goto L_236d98; }  // enhancement (G)
+L14 0x00236d98 label
+L14 0x00236708: if (advanced_rac3_swing_exit(s1.w())) { set32(s0, s4.w() + -0xcb0); goto L_23af90; }  // enhancement (H)
+L14 0x00226308: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_22639c; }  // enhancement (I)
+L14 0x00226724: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_22673c; }  // enhancement (J)
+L14 0x0022bbc8: advanced_move_speed();  // enhancement (K)
+L14 0x0022be50: advanced_move_speed();  // enhancement (K)
+L14 0x0022da04: advanced_move_speed();  // enhancement (K)
+L14 0x002361e4: advanced_move_speed();  // enhancement (K)
+L14 0x00236288: advanced_move_speed();  // enhancement (K)
+
 # ---- Drek's fleet (level 17): hero_state_update 0x214760, hero_set_state 0x21e530, hero_input_update 0x2258a8 (its hero_horizontal_velocity,
 # hero_stick_speed and hero_item_use are Veldin's: the hand ports' points run there). The points found by aligning Blarg's functions with level 17's
 # (the masked instruction streams); the code around each one is the same as Blarg's, the registers are level 17's
@@ -130,6 +163,10 @@ L8 0x002355c4: if (advanced_rac3_wrench_out()) goto L_2355bc;  // enhancement (L
 L8 0x00239508: if (advanced_rac3_wrench_out()) goto L_239514;  // enhancement (M)
 L11 0x00251f04: if (advanced_rac3_wrench_out()) goto L_251efc;  // enhancement (L)
 L11 0x00255b00: if (advanced_rac3_wrench_out()) goto L_255b0c;  // enhancement (M)
+L12 0x002446ac: if (advanced_rac3_wrench_out()) goto L_2446a4;  // enhancement (L)
+L12 0x00248940: if (advanced_rac3_wrench_out()) goto L_24894c;  // enhancement (M)
+L14 0x00233abc: if (advanced_rac3_wrench_out()) goto L_233ab4;  // enhancement (L)
+L14 0x00237598: if (advanced_rac3_wrench_out()) goto L_2375a4;  // enhancement (M)
 L17 0x00228290: if (advanced_rac3_wrench_out()) goto L_22829c;  // enhancement (M)
 L18 0x0022cde4: if (advanced_rac3_wrench_out()) goto L_22cddc;  // enhancement (L)
 L18 0x00230e2c: if (advanced_rac3_wrench_out()) goto L_230e38;  // enhancement (M)
@@ -147,5 +184,9 @@ L8 PAL:0x00225d1c: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0
 L8 PAL:0x0022611c: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_PAL_226134; }  // enhancement (J)
 L11 PAL:0x002443ac: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_PAL_244440; }  // enhancement (I)
 L11 PAL:0x002447ac: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_PAL_2447c4; }  // enhancement (J)
+L12 PAL:0x00235a54: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_PAL_235ae8; }  // enhancement (I)
+L12 PAL:0x00235e70: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_PAL_235e88; }  // enhancement (J)
+L14 PAL:0x00225eec: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_PAL_225f80; }  // enhancement (I)
+L14 PAL:0x00226308: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_PAL_226320; }  // enhancement (J)
 L18 PAL:0x0021c0fc: if (advanced_strafe_flip_active()) { approach_f(0x13f350u + 0x458, advanced_strafe_flip_speed(), lwc1(0x0015ed70) * 47.0f); set32(s0, s2.w() + -0xcb0); goto L_PAL_21c190; }  // enhancement (I)
 L18 PAL:0x0021c4fc: if (advanced_rac3_movement()) { fr[12] = v0.w() == 0 ? fr[4] * 8.0f : fr[4] * 11.0f; goto L_PAL_21c514; }  // enhancement (J)

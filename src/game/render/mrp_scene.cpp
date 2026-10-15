@@ -472,37 +472,34 @@ void lod_drop_check(const MrpFrame& real, const MrpFrame& shadow) {
     ++g_drops.frames;
     g_drops.real += real.mobys.size();
     g_drops.shadow += shadow.mobys.size();
-    std::vector<uint32_t> have;
-    have.reserve(shadow.mobys.size());
-    for (const MrpMoby& m : shadow.mobys) have.push_back(m.moby);
-    std::sort(have.begin(), have.end());
-    uint64_t n = 0;
+    static std::vector<std::pair<uint32_t, uint32_t>> at;
+    at.clear();
+    at.reserve(shadow.mobys.size());
     size_t shadow_deferred = 0;
-    for (const MrpMoby& m : shadow.mobys) shadow_deferred += m.deferred ? 1 : 0;
-    for (const MrpMoby& m : real.mobys) {
-        if (std::binary_search(have.begin(), have.end(), m.moby)) continue;
-        ++n;
-        if (log && g_drops.dropped + n <= 40) {
-            const float dx = m.pos[0] - real.cam_pos.x, dy = m.pos[1] - real.cam_pos.y, dz = m.pos[2] - real.cam_pos.z;
-            std::fprintf(stderr, "[lod-drop] frame %d: moby %08x class %d state %d flags %04x far %d deferred %d +0x32 %d +0x72 %d dist %.1f (real %zu, shadow %zu, of them deferred %zu)\n",
-                         g_frame_no, m.moby, m.class_id, m.state, m.flags, m.far_lod ? 1 : 0, m.deferred ? 1 : 0, lh(m.moby + 0x32), lbu(m.moby + 0x72),
-                         std::sqrt(dx * dx + dy * dy + dz * dz), real.mobys.size(), shadow.mobys.size(), shadow_deferred);
-        }
-    }
-    g_drops.dropped += n;
-    g_drops.frames_dropping += n != 0 ? 1 : 0;
-    // the mobys both have: what the renderer needs from them (a pose, parts), and the same pose / matrix when both drew the same model
-    std::map<uint32_t, uint32_t> at;
-    for (uint32_t i = 0; i < shadow.mobys.size(); ++i) at[shadow.mobys[i].moby] = i;
-    for (const MrpMoby& m : shadow.mobys)
+    for (uint32_t i = 0; i < shadow.mobys.size(); ++i) {
+        const MrpMoby& m = shadow.mobys[i];
+        at.emplace_back(m.moby, i);
+        shadow_deferred += m.deferred ? 1 : 0;
         if (m.joint_count == 0 || m.part_count == 0) {
             ++g_drops.incomplete;
             if (log && g_drops.incomplete <= 40)
                 std::fprintf(stderr, "[lod-drop] frame %d: LOD scene moby %08x class %d with %u joints, %u parts\n", g_frame_no, m.moby, m.class_id, m.joint_count, m.part_count);
         }
+    }
+    std::sort(at.begin(), at.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+    uint64_t n = 0;
     for (const MrpMoby& r : real.mobys) {
-        const auto it = at.find(r.moby);
-        if (it == at.end()) continue;
+        const auto it = std::lower_bound(at.begin(), at.end(), r.moby, [](const auto& a, uint32_t k) { return a.first < k; });
+        if (it == at.end() || it->first != r.moby) {
+            ++n;
+            if (log && g_drops.dropped + n <= 40) {
+                const float dx = r.pos[0] - real.cam_pos.x, dy = r.pos[1] - real.cam_pos.y, dz = r.pos[2] - real.cam_pos.z;
+                std::fprintf(stderr, "[lod-drop] frame %d: moby %08x class %d state %d flags %04x far %d deferred %d +0x32 %d +0x72 %d dist %.1f (real %zu, shadow %zu, of them deferred %zu)\n",
+                             g_frame_no, r.moby, r.class_id, r.state, r.flags, r.far_lod ? 1 : 0, r.deferred ? 1 : 0, lh(r.moby + 0x32), lbu(r.moby + 0x72),
+                             std::sqrt(dx * dx + dy * dy + dz * dz), real.mobys.size(), shadow.mobys.size(), shadow_deferred);
+            }
+            continue;
+        }
         const MrpMoby& s = shadow.mobys[it->second];
         if (r.far_lod != s.far_lod) {  // (info: the pose of the other model)
             ++g_drops.other_model;
@@ -523,6 +520,8 @@ void lod_drop_check(const MrpFrame& real, const MrpFrame& shadow) {
                              pose ? "same" : "DIFFERS", r.joint_count, s.joint_count, mtv ? "same" : "DIFFERS", r.part_count, s.part_count);
         }
     }
+    g_drops.dropped += n;
+    g_drops.frames_dropping += n != 0 ? 1 : 0;
     if (log && g_drops.frames % 600 == 0)
         std::fprintf(stderr, "[lod-drop] %llu frames: %llu mobys of the real pass missing from the LOD scene (%llu frames), %.1f real / %.1f LOD mobys a frame\n",
                      static_cast<unsigned long long>(g_drops.frames), static_cast<unsigned long long>(g_drops.dropped), static_cast<unsigned long long>(g_drops.frames_dropping),
@@ -540,7 +539,8 @@ void lod_keep_real(const MrpFrame& real, MrpFrame& draw) {
         return v != nullptr && std::atoi(v) == 0;
     }();
     if (off) return;
-    std::vector<uint32_t> have;
+    static std::vector<uint32_t> have;
+    have.clear();
     have.reserve(draw.mobys.size());
     for (const MrpMoby& m : draw.mobys) have.push_back(m.moby);
     std::sort(have.begin(), have.end());
@@ -564,12 +564,6 @@ void lod_keep_real(const MrpFrame& real, MrpFrame& draw) {
         draw.mobys.push_back(m);
         ++g_drops.kept;
     }
-    // the invariant, checked: no moby of the real pass missing from the drawn scene
-    have.clear();
-    for (const MrpMoby& m : draw.mobys) have.push_back(m.moby);
-    std::sort(have.begin(), have.end());
-    for (const MrpMoby& r : real.mobys)
-        if (!std::binary_search(have.begin(), have.end(), r.moby)) ++g_drops.after_missing;
 }
 }  // namespace
 

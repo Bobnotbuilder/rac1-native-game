@@ -210,6 +210,14 @@ void batch_160();
 void batch_180();
 void batch_190();
 void batch_191();
+void batch_192();
+void batch_200();  // Hoven (level 12): its own code (levels/pokitaru-hoven)
+void batch_202();  // Pokitaru (11) and Hoven (12): their own classes on RAM dumps
+void batch_203();  // the PDA (hero item 0x20) on levels 0, 8, 11, 12
+void batch_220();  // Gemlik Base (level 13)
+void batch_221();  // Oltanis (level 14)
+void batch_222();  // Gemlik Base (level 13): RAM dumps
+void batch_223();  // Oltanis (level 14): RAM dumps
 void batch_260();
 void batch_261();
 void batch_270();

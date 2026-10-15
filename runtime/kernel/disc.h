@@ -2,8 +2,10 @@
 // the IOP's CDVD driver). Sectors are 2048 bytes.
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace rac1 {
 
@@ -32,5 +34,12 @@ bool disc_read_ee(uint32_t ee_dst, uint32_t lba, uint32_t sectors);
 // The host asks its OS to read these sectors ahead (into its page cache, in the background): a load about
 // to read them (a level's files at the level exit's start). Nothing is read into the game's memory.
 void disc_will_need(uint32_t lba, uint32_t sectors);
+// Whether `level` (0..18) has a level header in the disc's table of contents (sector 1500).
+bool disc_has_level(int level);
+// Reads `level`'s sectors straight from the disc into `out`, with the 48-byte level header sector in front
+// (data at +0x10/+0x14, gameplay NTSC at +0x18/+0x1c, PAL at +0x20/+0x24, occlusion at +0x28/+0x2c).
+bool disc_read_level_wad(int level, std::vector<std::byte>& out);
+// Reads only `level`'s data header and overlay executable from the disc into `out`.
+bool disc_read_level_overlay(int level, std::vector<std::byte>& out);
 
 }  // namespace rac1

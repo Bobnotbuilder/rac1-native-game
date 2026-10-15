@@ -33,9 +33,6 @@ add_library(rac1_game STATIC
     ovl/hero_state_l1.cpp
     ovl/hero_state_update.cpp
     ovl/hero_state_update_l1.cpp
-    ovl/hero_state_update_l1.cpp
-    ovl/hero_state_update_l1.cpp
-    ovl/hero_state_update_l1.cpp
     ovl/hero_input.cpp
     ovl/hero_transitions.cpp
     ovl/hero_transitions_l1.cpp
@@ -52,6 +49,9 @@ add_library(rac1_game STATIC
     ovl/variants_l8.cpp
     ovl/variants_l10.cpp
     ovl/variants_l11.cpp
+    ovl/variants_l12.cpp
+    ovl/variants_l13.cpp
+    ovl/variants_l14.cpp
     ovl/variants_l17.cpp
     ovl/variants_l18.cpp
     ovl/eudora_mobys.cpp
@@ -75,6 +75,13 @@ add_library(rac1_game STATIC
     ovl/orxon_hooks.cpp
     ovl/pokitaru_hooks.cpp
     ovl/pokitaru_mobys.cpp
+    ovl/hoven_hooks.cpp
+    ovl/hoven_mobys.cpp
+    ovl/gemlik_mobys.cpp
+    ovl/gemlik_hooks.cpp
+    ovl/oltanis_mobys.cpp
+    ovl/oltanis_hooks.cpp
+    ovl/levels13_14_shared.cpp
     ovl/veldin_orbit_hooks.cpp
     ovl/veldin_orbit_mobys.cpp
     ovl/veldin_finale_hooks.cpp

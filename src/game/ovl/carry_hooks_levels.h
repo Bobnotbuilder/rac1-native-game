@@ -26,7 +26,7 @@ int32_t bat_carry_hookc_l8(uint32_t m, uint32_t pa1, uint32_t pa2, float pf12); 
 int32_t orx_carry_hookc_l10(uint32_t m, uint32_t pa1, uint32_t pa2, float pf12);  // L10:0x002bcc60
 
 // orig: (host) the class hook at the code address `fn` (+0 .. +0xc: moby m, the registers a1 / a2 / f12 passed on; +0x10:
-// moby m, its carry record returned) when it is one of the played level's own class hooks (levels 1..11): the hook's
+// moby m, its carry record returned) when it is one of the played level's own class hooks (levels 1..14): the hook's
 // result in `ret`, true; false for any other address (the caller goes on to Veldin's hooks through the overlay map)
 bool class_hook_call_level(uint32_t fn, uint32_t m, uint32_t a1, uint32_t a2, float f12, int32_t& ret);
 

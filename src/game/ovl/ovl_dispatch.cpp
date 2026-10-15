@@ -15,6 +15,10 @@
 #include <game/ovl/batalia_hooks.h>
 #include <game/ovl/orxon_hooks.h>
 #include <game/ovl/pokitaru_hooks.h>
+#include <game/ovl/hoven_hooks.h>
+#include <game/ovl/gemlik_hooks.h>
+#include <game/ovl/oltanis_hooks.h>
+#include <game/ovl/levels13_14_shared.h>
 #include <game/ovl/veldin_orbit_hooks.h>
 #include <game/ovl/veldin_finale_hooks.h>
 #include <game/ovl/particle_types4_tr.h>
@@ -65,20 +69,15 @@ static std::vector<LevelMobyFnEntry>& level_moby_fns() {
         batalia_moby_fns_register();
         orxon_moby_fns_register();
         pokitaru_moby_fns_register();
+        hoven_moby_fns_register();
+        gemlik_moby_fns_register();
+        oltanis_moby_fns_register();
         veldin_orbit_moby_fns_register();
         veldin_finale_moby_fns_register();
         novalis_level_fns_register();
         novalis_water_fns_register();
     }
     return table;
-}
-static MobyFn level_moby_fn(uint32_t addr) {
-    const int level = ovl_reloc_level();
-    if (level == 0) return nullptr;
-    for (const LevelMobyFnEntry& e : level_moby_fns()) {
-        if (e.level == level && e.addr == addr) return e.fn;
-    }
-    return nullptr;
 }
 static std::vector<MobyFnEntry>& moby_fns() {
     static std::vector<MobyFnEntry> table;
@@ -107,14 +106,66 @@ static std::vector<MobyFnEntry>& moby_fns() {
         empty_class_updates_register();
         veldin_extras_register();
         weapon_classes_register();
+        levels13_14_shared_register();
         particle_types4_register();
     }
     return table;
+}
+static uint32_t g_moby_reg_gen = 1;
+
+struct DispatchCacheSlot {
+    uint32_t addr;
+    MobyFn fn;
+};
+static DispatchCacheSlot g_dispatch_cache[4096];
+static uint32_t g_dispatch_cache_gen = 0xffffffffu;
+
+static inline MobyFn resolve_moby_fn(uint32_t fn) {
+    if (__builtin_expect(fn == 0, 0)) return nullptr;
+    // Ensure registration tables are initialized before checking cur_gen
+    auto& lfns = level_moby_fns();
+    auto& mfns = moby_fns();
+    const uint32_t cur_gen = g_ovl_gen ^ (g_moby_reg_gen << 16);
+    if (__builtin_expect(g_dispatch_cache_gen != cur_gen, 0)) {
+        std::memset(g_dispatch_cache, 0, sizeof(g_dispatch_cache));
+        g_dispatch_cache_gen = cur_gen;
+    }
+    uint32_t idx = ((fn * 0x9e3779b9u) >> 20) & 4095u;
+    for (uint32_t probe = 0; probe < 4096u; ++probe) {
+        const DispatchCacheSlot& s = g_dispatch_cache[idx];
+        if (s.addr == fn) return s.fn;
+        if (s.addr == 0) break;
+        idx = (idx + 1u) & 4095u;
+    }
+    MobyFn resolved = nullptr;
+    const int level = ovl_reloc_level();
+    if (level != 0) {
+        for (const LevelMobyFnEntry& e : lfns) {
+            if (e.level == level && e.addr == fn) {
+                resolved = e.fn;
+                break;
+            }
+        }
+    }
+    if (resolved == nullptr) {
+        const uint32_t v = ovl_code_to_veldin(fn);
+        for (const MobyFnEntry& e : mfns) {
+            if (e.addr == v) {
+                resolved = e.fn;
+                break;
+            }
+        }
+    }
+    if (resolved != nullptr) {
+        g_dispatch_cache[idx] = DispatchCacheSlot{fn, resolved};
+    }
+    return resolved;
 }
 }  // namespace
 
 // orig: (none) — registers the port of the EE function at `addr` for indirect calls.
 void ovl_register_moby_fn(uint32_t addr, MobyFn fn) {
+    ++g_moby_reg_gen;
     for (MobyFnEntry& e : moby_fns()) {
         if (e.addr == addr) {
             e.fn = fn;
@@ -129,6 +180,7 @@ void ovl_register_moby_fn(uint32_t addr, MobyFn fn) {
 
 // orig: (host) see novalis_mobys.h
 void ovl_register_level_moby_fn(int level, uint32_t addr, MobyFn fn) {
+    ++g_moby_reg_gen;
     for (LevelMobyFnEntry& e : level_moby_fns()) {
         if (e.level == level && e.addr == addr) {
             e.fn = fn;
@@ -144,26 +196,14 @@ void ovl_register_level_moby_fn(int level, uint32_t addr, MobyFn fn) {
 
 // orig: (none) — whether the EE function at `addr` has a registered port.
 bool ovl_moby_fn_ported(uint32_t addr) {
-    if (level_moby_fn(addr) != nullptr) return true;  // (the level's own function)
-    const uint32_t v = ovl_code_to_veldin(addr);  // (the registry holds Veldin's addresses)
-    for (const MobyFnEntry& e : moby_fns()) {
-        if (e.addr == v) return true;
-    }
-    return false;
+    return resolve_moby_fn(addr) != nullptr;
 }
 
 // orig: (none) — `jalr fn` with a0 = moby.
 void ovl_call_moby_fn(uint32_t fn, uint32_t moby) {
-    if (const MobyFn own = level_moby_fn(fn); own != nullptr) {  // (a function only the level has)
-        own(moby);
+    if (const MobyFn resolved = resolve_moby_fn(fn); __builtin_expect(resolved != nullptr, 1)) {
+        resolved(moby);
         return;
-    }
-    const uint32_t v = ovl_code_to_veldin(fn);  // (the level's code address as Veldin's: its port)
-    for (const MobyFnEntry& e : moby_fns()) {
-        if (e.addr == v) {
-            e.fn(moby);
-            return;
-        }
     }
     TODO_PORT(fn, "moby callback")(moby);
 }

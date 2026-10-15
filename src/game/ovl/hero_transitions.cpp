@@ -282,6 +282,10 @@ void run_jump() {
         set(advanced_rac3_running_jump() ? 9u : 7u);
         return;
     }
+    if (advanced_strafing()) {  // enhancement: no long running jump while strafing
+        set(7);
+        return;
+    }
     constexpr OvConst<0x0017bdb8u> BAND{};
     if (!(lwc1(BAND + 0xc) < lwc1(P + 0x190))) {
         set(7);
@@ -2478,6 +2482,8 @@ void hero_input_update() {
     if (on_blarg()) { blg_call(blg_hero_input_update_u); return; }  // (level 6's own: L6:0x0023b440)
     if (on_batalia()) { bat_call(bat_hero_input_update_u); return; }  // (level 8's own: L8:0x002370d8)
     if (on_pokitaru()) { pok_call(pok_hero_input_update_u); return; }  // (level 11's own: L11:0x00253a18)
+    if (on_hoven()) { hov_call(hov_hero_input_update_u); return; }  // (level 12's own: L12:0x002461f0)
+    if (on_oltanis()) { olt_call(olt_hero_input_update_u); return; }  // (level 14's own: L14:0x00235600)
     if (on_veldin_finale()) { vf_call(vf_hero_input_update_u); return; }  // (level 18's own: L18:0x0022e8f8)
     if (on_veldin_orbit()) { vo_call(vo_hero_input_update_u); return; }  // (level 17's own: L17:0x002258a8)
     if (on_rilgar()) { ril_call(ril_hero_input_update_u); return; }  // (Rilgar's own: L5:0x00255960)

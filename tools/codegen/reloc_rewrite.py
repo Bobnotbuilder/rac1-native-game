@@ -19,7 +19,7 @@ GP_VALUE = 0x166C00  # $gp: the same on every overlay (gp-relative addresses are
 CODE = (0x1EAA00, 0x2F0CD0)
 SKIP_FILES = {"src/game/ovl/ovl_reloc.h", "src/game/ovl/ovl_reloc.cpp",
               # the per-level variant table (Veldin function -> the level's own): both sides are literal addresses
-              "src/game/ovl/variants_l1.cpp", "src/game/ovl/variants_l2.cpp", "src/game/ovl/variants_l3.cpp", "src/game/ovl/variants_l4.cpp", "src/game/ovl/variants_l5.cpp", "src/game/ovl/variants_l6.cpp", "src/game/ovl/variants_l7.cpp", "src/game/ovl/variants_l8.cpp", "src/game/ovl/variants_l9.cpp", "src/game/ovl/variants_l10.cpp", "src/game/ovl/variants_l11.cpp", "src/game/ovl/variants_l17.cpp", "src/game/ovl/variants_l18.cpp", "src/game/ovl/variants_sky.cpp",
+              "src/game/ovl/variants_l1.cpp", "src/game/ovl/variants_l2.cpp", "src/game/ovl/variants_l3.cpp", "src/game/ovl/variants_l4.cpp", "src/game/ovl/variants_l5.cpp", "src/game/ovl/variants_l6.cpp", "src/game/ovl/variants_l7.cpp", "src/game/ovl/variants_l8.cpp", "src/game/ovl/variants_l9.cpp", "src/game/ovl/variants_l10.cpp", "src/game/ovl/variants_l11.cpp", "src/game/ovl/variants_l12.cpp", "src/game/ovl/variants_l13.cpp", "src/game/ovl/variants_l14.cpp", "src/game/ovl/variants_l17.cpp", "src/game/ovl/variants_l18.cpp", "src/game/ovl/variants_sky.cpp",
               # the boot module's code (its own image in SCUS_971.99, its own addresses; the host
               # runs its loader with no overlay translation)
               "src/game/boot/front_end.cpp", "src/game/boot/front_end.h",
@@ -61,7 +61,7 @@ def rewrite(text):
         if k is None or v == GP_VALUE:
             continue
         before = text[max(0, m.start() - 48):m.start()]
-        if re.search(r"\b(OV|OVF|OvConst<|ov_site<|ovf_site<|NOT_ADDR|L1_ADDR|L2_ADDR|L3_ADDR|L4_ADDR|L5_ADDR|L6_ADDR|L7_ADDR|L8_ADDR|L9_ADDR|L10_ADDR|L11_ADDR|L17_ADDR|L18_ADDR)\s*\(?\s*$", before) or before.rstrip().endswith("OvConst<"):
+        if re.search(r"\b(OV|OVF|OvConst<|ov_site<|ovf_site<|NOT_ADDR|L1_ADDR|L2_ADDR|L3_ADDR|L4_ADDR|L5_ADDR|L6_ADDR|L7_ADDR|L8_ADDR|L9_ADDR|L10_ADDR|L11_ADDR|L12_ADDR|L17_ADDR|L18_ADDR)\s*\(?\s*$", before) or before.rstrip().endswith("OvConst<"):
             continue
         line_end = text.find("\n", m.end())
         if "// lui " in text[m.end():line_end if line_end >= 0 else len(text)]:

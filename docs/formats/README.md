@@ -12,7 +12,7 @@ setup, the host's renderers and the overlay loader.
 flowchart TD
     ISO["The player's ISO (SCUS-97199)"] --> TOC["Table of contents<br/>iso_toc"]
     ISO --> ELF["SCUS_971.99, the executable<br/>(extracted as is)"]
-    TOC --> LW["Each level's data WAD<br/>(extracted as level.wad)"]
+    TOC --> LW["Each level's data WAD<br/>(read from the disc)"]
     LW --> OV["The level's overlay<br/>ratchet_executable"]
     LW --> CORE["The level's core data<br/>level_core, level_textures, sky_model"]
     LW --> MRP["MRP assets, generated<br/>moby_mrp (.mrpm), world_mrp (.mrpw), .mrpt textures"]
@@ -25,7 +25,7 @@ flowchart TD
 **The table of contents.** Beside its ISO 9660 file system, the disc carries Insomniac's own table
 of contents at sector 1500: one entry per level, giving the sectors of everything that level needs
 (its data, its gameplay data for each region, its sound and music, its scenes). Decoder:
-[`iso_toc`](../../src/formats/iso_toc.h). Used by the setup to find each level's data.
+[`iso_toc`](../../src/formats/iso_toc.h). Used by the setup and the runtime to find each level's data.
 
 **The executable**, `SCUS_971.99`, is a normal PS2 ELF. The setup copies it out unchanged; the port
 loads its sections into EE memory as the PS2 would. The boot module (the front end) is a section of
@@ -33,8 +33,8 @@ it.
 
 ## A level's data
 
-**The level data WAD** (extracted to `assets/extracted/level_wads/<n>_<name>/level.wad`) holds the
-level's overlay and its core data.
+**The level data WAD** (read directly from the disc at the sector and size in the table of contents)
+holds the level's overlay and its core data.
 
 **The overlay** is stored as an Insomniac "Ratchet Executable": a sequence of blocks, each with a
 16-byte header (the EE address to copy to, the byte count, the ELF section type it stands for, and
