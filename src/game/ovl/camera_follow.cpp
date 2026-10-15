@@ -14,6 +14,13 @@
 #include <game/ovl/gaspar_hooks.h>
 #include <game/ovl/orxon_hooks.h>
 #include <game/ovl/pokitaru_hooks.h>
+#include <game/ovl/hoven_hooks.h>
+#include <game/ovl/gemlik_hooks.h>
+#include <game/ovl/oltanis_hooks.h>
+#include <game/ovl/quartu_hooks.h>
+#include <game/ovl/kalebo_hooks.h>
+#include <game/ovl/veldin_orbit_hooks.h>
+#include <game/ovl/veldin_finale_hooks.h>
 #include <game/ovl/aridia_classes_tr.h>
 #include <game/ovl/variants_l2.h>
 #include <game/ovl/ovl_common.h>
@@ -513,6 +520,13 @@ void cam0_hook_call(uint32_t fn) {
     }
     if (on_orxon() && orxon_camera_hook_call(fn)) return;  // (level 10's own: 0x2f4b18)
     if (on_pokitaru() && pokitaru_camera_hook_call(fn)) return;  // (level 11's own: 0x327a90)
+    if (on_hoven() && hoven_camera_hook_call(fn)) return;  // (level 12's own: 0x3148f0)
+    if (on_gemlik() && gemlik_camera_hook_call(fn)) return;  // (level 13's own: 0x316b48)
+    if (on_oltanis() && oltanis_camera_hook_call(fn)) return;  // (level 14's own: 0x3131e0)
+    if (on_quartu() && quartu_camera_hook_call(fn)) return;  // (level 15's own: 0x2f6980)
+    if (on_kalebo() && kalebo_camera_hook_call(fn)) return;  // (level 16's own: 0x2f3a88)
+    if (on_veldin_orbit() && veldin_orbit_camera_hook_call(fn)) return;  // (level 17's own: 0x2fff38)
+    if (on_veldin_finale() && veldin_finale_camera_hook_call(fn)) return;  // (level 18's own: 0x305318)
     if (on_gaspar() && gaspar_camera_hook_call(fn)) return;  // (level 9's own: 0x314220)
     if (on_umbris() && umbris_camera_hook_call(fn)) return;  // (level 7's own: 0x328090)
     if (on_blarg() && blarg_camera_hook_call(fn)) return;  // (level 6's own: 0x3147b0)

@@ -1,0 +1,138 @@
+// Oltanis (level 14) own code, transliterated: the level's own moby classes, the sound emitters, the camera types, the class hooks, the draw callbacks, the camera mode hook, the cutscene extras, and their level-only callees. (part 7 of 7)
+// Transliterated instruction by instruction from level 14's own overlay with tools/codegen/mips2cpp.py (tools/codegen/mkall.py:
+// the original's control flow and PS2 float rules by construction), reviewed in the oracle (batch 221, ORACLE_LEVEL=14), not rewritten
+// by hand: the names are the entries', the helpers `olt_<addr>_l14` (uniform ABI: TrRet).
+#include <game/lib/libc.h>
+#include <game/ovl/oltanis_mobys.h>
+#include <game/ovl/quad_draw.h>
+#include <game/ovl/arrival.h>
+#include <game/ovl/camera_types.h>
+#include <game/ovl/carry_hooks.h>
+#include <game/ovl/checkpoint.h>
+#include <game/ovl/cutscene.h>
+#include <game/ovl/doomlet.h>
+#include <game/ovl/enemy_749.h>
+#include <game/ovl/fx1471.h>
+#include <game/ovl/hydro.h>
+#include <game/ovl/level_change.h>
+#include <game/ovl/metal.h>
+#include <game/ovl/nanotech_draw.h>
+#include <game/ovl/ovl.h>
+#include <game/ovl/screen_fade.h>
+#include <game/math/vecmath.h>
+#include <game/ovl/veldin_mobys.h>
+#include <game/ovl/visibomb_ball.h>
+#include <game/ovl/weapons.h>
+#include <game/math/vecmath.h>
+#include <game/ovl/arrival.h>
+#include <game/ovl/checkpoint.h>
+#include <game/ovl/cutscene.h>
+#include <game/ovl/level_change.h>
+#include <game/ovl/movie_mode.h>
+#include <game/ovl/veldin_mobys.h>
+#include <game/ovl/ee_regs.h>
+#include <game/ovl/enemy_749.h>
+#include <game/ovl/hero_l1.h>
+#include <game/ovl/novalis_mobys2.h>
+#include <game/ovl/ovl_reloc.h>
+#include <game/ovl/variants_l14.h>
+#include <game/ovl/vu0_regs.h>
+#include <game/ovl/walker.h>
+#include <game/port_stubs.h>
+
+namespace rac1 {
+
+using namespace eer;
+using namespace vu0m;
+
+//@gen olt_cb_2b3a20_l14
+
+//@gen olt_268b50_l14
+
+//@gen olt_2723e0_l14
+
+//@gen olt_27df78_l14
+
+//@gen olt_27e078_l14
+
+//@gen olt_27e1f8_l14
+
+//@gen olt_27e248_l14
+
+//@gen olt_27e180_l14
+
+//@gen olt_27e298_l14
+
+//@gen olt_27e450_l14
+
+//@gen olt_278390_l14
+
+//@gen olt_27e560_l14
+
+//@gen olt_2e8078_l14
+
+//@gen olt_fn_2e81a0_u
+
+//@gen olt_emitter1_l14
+
+//@gen olt_294348_l14
+
+//@gen olt_emitter3_l14
+
+//@gen olt_emitter4_l14
+
+//@gen olt_26cfd0_l14
+
+//@gen olt_emitter6_l14
+
+//@gen olt_3141c8_l14
+
+//@gen olt_cam_type19_accept_u
+
+//@gen olt_cam_type19_init_l14
+
+//@gen olt_cam_type19_update_l14
+
+//@gen olt_cam_type19_exit_l14
+
+//@gen olt_314e20_l14
+
+//@gen olt_cam_type20_accept_u
+
+//@gen olt_cam_type20_init_l14
+
+//@gen olt_2d6570_l14
+
+//@gen olt_cam_type20_update_l14
+
+//@gen olt_cam_type20_exit_l14
+
+//@gen olt_cam_type21_accept_u
+
+//@gen olt_cam_type21_init_l14
+
+//@gen olt_cam_type21_update_l14
+
+//@gen olt_cam_type21_exit_l14
+
+//@gen olt_hook_2dad60_u
+
+//@gen olt_hook_2dadb0_u
+
+//@gen olt_hook_2dae00_u
+
+//@gen olt_hook_2dae50_u
+
+//@gen olt_hook_2daed8_u
+
+//@gen olt_1fe308_l14
+
+//@gen olt_cam0_hook_l14
+
+//@gen olt_cam_callback_l14
+
+//@gen olt_245e98_l14
+
+//@gen olt_cutscene_level_extras_l14
+
+}  // namespace rac1

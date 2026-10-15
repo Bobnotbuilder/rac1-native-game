@@ -2,6 +2,7 @@
 // loop), the per-frame helpers it calls and the render view setup 0x1f6e48.
 // Callees not ported (or not yet proven with the oracle) are TODO_PORT. The hardware the loop
 // waits on (the RCNT1 counter, vsync, DMA kicks) is the host's: see host_rcnt1().
+#include <game/ovl/credits_tr.h>
 #include <game/ovl/screen_flash.h>
 #include <game/ovl/memory_card.h>
 #include <game/ovl/ovl_reloc.h>
@@ -657,7 +658,7 @@ bool overlay_frame() {
         case 4: pad_read_packet(0x0013c940, g_host_pad_packet, 6); screen_update(); screen_draw_mode4(); break;
         case 5: pad_read_packet(0x0013c940, g_host_pad_packet, 6); vendor_mode_update_tr(0); vendor_mode_draw_tr(0); break;  // (the vendor screens)
         case 6: pad_read_packet(0x0013c940, g_host_pad_packet, 6); ship_sequence_update(); ship_sequence_draw(); break;
-        case 7: pad_read_packet(0x0013c940, g_host_pad_packet, 6); TODO_PORT(0x00299c48, "mode 7 update")(); TODO_PORT(0x001f8f78, "mode 7 draw")(); break;
+        case 7: pad_read_packet(0x0013c940, g_host_pad_packet, 6); credits_update_tr(0); credits_draw_tr(0); break;  // (the credits)
         case -1: pad_read_packet(0x0013c940, g_host_pad_packet, 6); TODO_PORT(0x001f4598, "mode -1 update")(); TODO_PORT(0x001f58e0, "mode -1 draw")(); break;
         default: break;
     }

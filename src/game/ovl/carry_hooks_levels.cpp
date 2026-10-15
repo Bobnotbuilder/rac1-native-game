@@ -10,11 +10,18 @@
 #include <game/ovl/carry_hooks.h>
 #include <game/ovl/eudora_mobys.h>
 #include <game/ovl/gaspar_mobys.h>
+#include <game/ovl/gemlik_hooks.h>
+#include <game/ovl/oltanis_hooks.h>
 #include <game/ovl/novalis_hooks.h>
 #include <game/ovl/orxon_mobys.h>
 #include <game/ovl/ovl_reloc.h>
 #include <game/ovl/pokitaru_mobys.h>
+#include <game/ovl/hoven_mobys.h>
+#include <game/ovl/quartu_mobys.h>
+#include <game/ovl/kalebo_mobys.h>
 #include <game/ovl/rilgar_mobys.h>
+#include <game/ovl/veldin_orbit_mobys.h>
+#include <game/ovl/veldin_finale_mobys.h>
 #include <game/ovl/variants_l2.h>
 #include <game/ovl/variants_l3.h>
 #include <game/ovl/variants_l5.h>
@@ -24,6 +31,11 @@
 #include <game/ovl/variants_l9.h>
 #include <game/ovl/variants_l10.h>
 #include <game/ovl/variants_l11.h>
+#include <game/ovl/variants_l12.h>
+#include <game/ovl/variants_l15.h>
+#include <game/ovl/variants_l16.h>
+#include <game/ovl/variants_l17.h>
+#include <game/ovl/variants_l18.h>
 
 namespace rac1 {
 
@@ -133,6 +145,61 @@ bool class_hook_call_level(uint32_t fn, uint32_t m, uint32_t a1, uint32_t a2, fl
         case L11_CASE(0x00316270): ret = u_call(pok_hook_316270_u, m, a1, a2, f12); return true;
         case L11_CASE(0x003162d0): ret = u_call(pok_hook_3162d0_u, m, a1, a2, f12); return true;
         case L11_CASE(0x003162f0): ret = u_call(pok_hook_3162f0_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 12:  // Hoven: class 0xee (table 0x20d228), class 0x10e's hook +0xc (table 0x20d240: Veldin's 0x2caf10 code, the map pairs it with 0x2d57d0)
+        switch (lvl_key(fn)) {
+        case L12_CASE(0x002e16b8): ret = u_call(hov_hook_2e16b8_u, m, a1, a2, f12); return true;
+        case L12_CASE(0x002e1758): ret = u_call(hov_hook_2e1758_u, m, a1, a2, f12); return true;
+        case L12_CASE(0x002e17a8): ret = u_call(hov_hook_2e17a8_u, m, a1, a2, f12); return true;
+        case L12_CASE(0x002e17f8): ret = u_call(hov_hook_2e17f8_u, m, a1, a2, f12); return true;
+        case L12_CASE(0x002e1848): ret = u_call(hov_hook_2e1848_u, m, a1, a2, f12); return true;
+        case L12_CASE(0x002e6b00): ret = u_call(hov_hook_2e6b00_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 13:  // Gemlik Base: class 0x3f (table 0x1f6174)
+        return gemlik_class_hook_call(fn, m, a1, a2, f12, ret);
+    case 14:  // Oltanis: class 0xfc (table 0x1fd9d0), class 0x10e's hook +0xc (table 0x1fd9e8)
+        return oltanis_class_hook_call(fn, m, a1, a2, f12, ret);
+    case 15:  // Quartu: the 749-type five-hook table 0x1e3e9c (Veldin's class-749 hooks with other constants: 9 -> 7, 5 -> 1, pvars + 0x60)
+        switch (lvl_key(fn)) {
+        case L15_CASE(0x002bc4b0): ret = u_call(qua_hook_2bc4b0_u, m, a1, a2, f12); return true;
+        case L15_CASE(0x002bc500): ret = u_call(qua_hook_2bc500_u, m, a1, a2, f12); return true;
+        case L15_CASE(0x002bc550): ret = u_call(qua_hook_2bc550_u, m, a1, a2, f12); return true;
+        case L15_CASE(0x002bc5a0): ret = u_call(qua_hook_2bc5a0_u, m, a1, a2, f12); return true;
+        case L15_CASE(0x002bc5d0): ret = u_call(qua_hook_2bc5d0_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 16:  // Kalebo III: the 749-type five-hook table 0x1e9050 (Veldin's class-749 hooks with other constants: 9 -> 7, 5 -> 1, pvars + 0x60)
+        switch (lvl_key(fn)) {
+        case L16_CASE(0x002e65d0): ret = u_call(kal_hook_2e65d0_u, m, a1, a2, f12); return true;
+        case L16_CASE(0x002e6620): ret = u_call(kal_hook_2e6620_u, m, a1, a2, f12); return true;
+        case L16_CASE(0x002e6670): ret = u_call(kal_hook_2e6670_u, m, a1, a2, f12); return true;
+        case L16_CASE(0x002e66c0): ret = u_call(kal_hook_2e66c0_u, m, a1, a2, f12); return true;
+        case L16_CASE(0x002e66f0): ret = u_call(kal_hook_2e66f0_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 17:  // Drek's fleet: class 0x566 (table 0x1e7854; +0xc and +0x10 are Veldin's class-749 hooks with other constants: 12 for 9, pvars + 0x60)
+        switch (lvl_key(fn)) {
+        case L17_CASE(0x002efea8): ret = u_call(vo_hook_2efea8_u, m, a1, a2, f12); return true;
+        case L17_CASE(0x002eff30): ret = u_call(vo_hook_2eff30_u, m, a1, a2, f12); return true;
+        case L17_CASE(0x002effb8): ret = u_call(vo_hook_2effb8_u, m, a1, a2, f12); return true;
+        case L17_CASE(0x002f0040): ret = u_call(vo_hook_2f0040_u, m, a1, a2, f12); return true;
+        case L17_CASE(0x002f0070): ret = u_call(vo_hook_2f0070_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 18:  // Veldin, the finale: classes 0x238 (table 0x1f3498) and 0x772 (table 0x1f34c8)
+        switch (lvl_key(fn)) {
+        case L18_CASE(0x002d6108): ret = u_call(vf_hook_2d6108_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002d6190): ret = u_call(vf_hook_2d6190_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002d61e0): ret = u_call(vf_hook_2d61e0_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002d6230): ret = u_call(vf_hook_2d6230_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002d6250): ret = u_call(vf_hook_2d6250_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002fcbb0): ret = u_call(vf_hook_2fcbb0_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002fcc00): ret = u_call(vf_hook_2fcc00_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002fcc50): ret = u_call(vf_hook_2fcc50_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002fcca0): ret = u_call(vf_hook_2fcca0_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002fccd0): ret = u_call(vf_hook_2fccd0_u, m, a1, a2, f12); return true;
         default: return false;
         }
     default:

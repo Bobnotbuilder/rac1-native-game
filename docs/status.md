@@ -66,14 +66,14 @@ nothing, so an object whose class is not ported stands still or does not appear.
 | 8 | Batalia | Ported: its own classes and their draw callbacks (the turret's sights and radars, the Trespasser puzzle, the Sandmouse), the rain, the Metal Detector's HUD element. Its exits (the Commando to Orxon, the deserter to Gaspar, the ship) reached in automated runs. Waiting for a playtest. | The turret challenge has not been won in an automated run. A few of its classes are never placed on the level, so the original could not be compared with them. |
 | 9 | Gaspar | Its own classes ported, with their draw callbacks (the lava's animated texture, the background ships' glows, the Visibomb's static) and the Pilot's Helmet pickup. Ready for playtest; not played through by hand yet. | |
 | 10 | Orxon | Its own classes ported, with their draw callbacks: Clank's section, and Ratchet's part once he has the O2 mask. Ready for playtest; not played through by hand yet. | |
-| 11 | Pokitaru | First part ported. | Weapons and gadgets bought there not ported. |
-| 12 | Hoven | Loads and runs. | Nothing of its own ported. |
-| 13 | Gemlik Base (code: Oltanis Orbit) | Loads and runs. | Nothing of its own ported. |
-| 14 | Oltanis | Loads and runs. | Nothing of its own ported. |
-| 15 | Quartu | Loads and runs. | Nothing of its own ported. |
-| 16 | Kalebo III | Loads and runs. | Nothing of its own ported. |
-| 17 | Drek's fleet (code: Veldin Orbit) | Loads and runs. | Nothing of its own ported. |
-| 18 | Veldin, the finale | Loads and runs. | Nothing of its own ported. |
+| 11 | Pokitaru | Its own classes, hero code, sound emitters and camera hook ported; the weapons and gadgets fire there without unported code; the PDA's call of the vendor screens (hero item 0x20) is no longer a stub there. Ready for playtest; not played through by hand yet. | The Jet Fighter section and the Thruster-Pack lock have not been reached in an automated run. A few of its classes are never placed on the level, so the original could not be compared with them. |
+| 12 | Hoven | Its own classes (with their draw callbacks), its own build of the hero code, sound emitters, camera hook and class hooks ported. No unported code of its own met in automated runs next to each of its classes. Ready for playtest; not played through by hand yet. | A few of its classes are never placed on the level, so the original could not be compared with them. |
+| 13 | Gemlik Base (code: Oltanis Orbit) | Its own code ported: its 60 classes with their draw callbacks, Qwark's space fight (the player's ship, Qwark's ship and his health bar), camera type 0x13, its sound emitter, the camera mode hook, class 63's carry hooks; particle type 0x44 (shared, the ship's engines). Ready for playtest; not played through by hand yet. | Qwark has not been beaten in an automated run (the fight runs; no scripted run aimed the ship's lasers at him). |
+| 14 | Oltanis | Its own code ported: its own build of the hero controller (24 functions, with the RAC 3 movement hook points), its 59 classes with their draw callbacks, camera types 0x13 / 0x14 / 0x15, four sound emitter types, the camera mode hook, class 252's carry hooks, the arrival scene's extras. Ready for playtest; not played through by hand yet. | Not played through end to end in an automated run yet. |
+| 15 | Quartu | Its own code ported: its own build of the hero controller (with the RAC 3 movement options), its classes and the callbacks they install (the draw callbacks among them), its camera types, sound emitters and class hooks,, and particle type 0x47 (shared: the drek-veldin work's port, also proved on Quartu's copy). Giant Clank's section played in automated runs. Ready for playtest; not played through by hand yet. | A few of its classes are not placed on the level (spawned by others or by scenes): proved on mobys the check spawns. |
+| 16 | Kalebo III | Its own code ported: its own build of the hero controller (the hoverboard's, with the RAC 3 movement options), its classes and the callbacks they install, its camera types, sound emitters and class hooks. The hoverboard race and the Gadgetron headquarters reached in automated runs. Ready for playtest; not played through by hand yet. | The race has not been finished in an automated run. |
+| 17 | Drek's fleet (code: Veldin Orbit) | Ported: its own build of the hero's code (12 functions), its own classes (59) with their draw callbacks, its camera type, sound emitter, class hooks and camera hook; generated from the disc; proved by the oracle (batches 260, 261, 271 and the hero batches 44 .. 55). Ready for playtest; not played through by hand yet. | |
+| 18 | Veldin, the finale | Ported: its own build of the hero's code (26 functions), its own classes (51) with their draw callbacks, its camera type, sound emitters, class hooks and camera hook, the final boss (Drek's robot) and its health bar; the end of the game: the credits, the last movie and the menu after them (new game with the weapons and bolts kept, or back to before the fight). Generated from the disc; proved by the oracle (batches 270, 261, 271 and the hero batches 44 .. 55). Ready for playtest; not played through by hand yet. | The fight itself has only been reached by setting the boss's state in automated runs. |
 
 ### Fixed since the first playtest
 
@@ -111,7 +111,7 @@ nothing, so an object whose class is not ported stands still or does not appear.
 
 ## Not done yet
 
-- **The second half of the game.** Levels 8 to 11 have their first part ported; levels 12 to 18
+- **The second half of the game.** Levels 8 to 14 have their own code ported; levels 15 to 18
   have nothing of their own ported yet.
 - **Shared code still stubbed.** Every level still reaches a few `TODO_PORT` stubs that are not its
   own code: some kernel and DMA calls the host does not need. Several weapon and gadget classes are

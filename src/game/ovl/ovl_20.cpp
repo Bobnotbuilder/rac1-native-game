@@ -173,6 +173,11 @@ void hero_footsteps_update() {
 int32_t hero_ledge_check_v(const Vec4& pos, const float* ref_yaw) {
     if (on_batalia()) return bat_ledge_check_call(pos, ref_yaw);  // (level 8's own: L8:0x0021e4c8)
     if (on_pokitaru()) return pok_ledge_check_call(pos, ref_yaw);  // (level 11's own: L11:0x0023d240)
+    if (on_hoven()) return hov_ledge_check_call(pos, ref_yaw);  // (level 12's own: L12:0x0022e870)
+    if (on_oltanis()) return olt_ledge_check_call(pos, ref_yaw);  // (level 14's own: L14:0x0021e770)
+    if (on_quartu()) return qua_ledge_check_call(pos, ref_yaw);  // (level 15's own: L15:0x00205070)
+    if (on_kalebo()) return kal_ledge_check_call(pos, ref_yaw);  // (level 16's own: L16:0x0020a2d8)
+    if (on_veldin_finale()) return vf_ledge_check_call(pos, ref_yaw);  // (level 18's own: L18:0x00214700)
     if (on_l1_family() || on_rilgar()) return hero_ledge_check_v_l1(pos, ref_yaw);
     const uint32_t P = g::PLAYER, OUTB = OV(0x00173e40);
     if (lh(P + 0x308) == 2) return 0;
@@ -257,6 +262,11 @@ int32_t hero_ledge_check(uint32_t pos, const float* ref_yaw) { return hero_ledge
 void hero_ledge_grab_check() {
     if (on_batalia()) { bat_call(bat_hero_ledge_grab_check_u); return; }  // (level 8's own: L8:0x0021dd20)
     if (on_pokitaru()) { pok_call(pok_hero_ledge_grab_check_u); return; }  // (level 11's own: L11:0x0023ca98)
+    if (on_hoven()) { hov_call(hov_hero_ledge_grab_check_u); return; }  // (level 12's own: L12:0x0022e0c8)
+    if (on_oltanis()) { olt_call(olt_hero_ledge_grab_check_u); return; }  // (level 14's own: L14:0x0021dfc8)
+    if (on_quartu()) { qua_call(qua_hero_ledge_grab_check_u); return; }  // (level 15's own: L15:0x002048c8)
+    if (on_kalebo()) { kal_call(kal_hero_ledge_grab_check_u); return; }  // (level 16's own: L16:0x00209b30)
+    if (on_veldin_finale()) { vf_call(vf_hero_ledge_grab_check_u); return; }  // (level 18's own: L18:0x00213f58)
     if (on_l1_family() || on_rilgar()) return hero_ledge_grab_check_l1();
     const uint32_t P = g::PLAYER, OUTB = OV(0x00173e40);
     if (lh(P + 0x308) == 2) return;
@@ -724,6 +734,13 @@ int32_t sub_0020d5d0(int32_t kind, float* out) {
         ee_stack_free(16);
         return r;
     }
+    if (on_kalebo()) {  // (level 16's own: L16:0x0020afa0, Rilgar's build: the float through the EE address in $a1)
+        const uint32_t b = ee_stack_alloc(16);
+        const int32_t r = static_cast<int32_t>(kal_call(kal_sub_0020d5d0_u, static_cast<uint32_t>(kind), b).v0);
+        *out = ee_read<float>(b);
+        ee_stack_free(16);
+        return r;
+    }
     *out = 0.0f;
     switch (kind) {
         case 0x37:
@@ -816,6 +833,12 @@ uint32_t sub_00205000(int32_t flag) {
     if (on_blarg()) return blg_call(blg_sub_205000_u, static_cast<uint32_t>(flag)).v0;  // (level 6's own: L6:0x0021d0a0)
     if (on_batalia()) return bat_call(bat_sub_205000_u, static_cast<uint32_t>(flag)).v0;  // (level 8's own: L8:0x00217b80)
     if (on_pokitaru()) return pok_call(pok_sub_205000_u, static_cast<uint32_t>(flag)).v0;  // (level 11's own: L11:0x00236968)
+    if (on_hoven()) return hov_call(hov_sub_205000_u, static_cast<uint32_t>(flag)).v0;  // (level 12's own: L12:0x00227f10)
+    if (on_oltanis()) return olt_call(olt_sub_00205000_u, static_cast<uint32_t>(flag)).v0;  // (level 14's own: L14:0x00218610)
+    if (on_quartu()) return qua_call(qua_sub_00205000_u, static_cast<uint32_t>(flag)).v0;  // (level 15's own: L15:0x001fe778)
+    if (on_kalebo()) return kal_call(kal_sub_00205000_u, static_cast<uint32_t>(flag)).v0;  // (level 16's own: L16:0x00203868)
+    if (on_veldin_finale()) return vf_call(vf_sub_205000_u, static_cast<uint32_t>(flag)).v0;  // (level 18's own: L18:0x0020dde8)
+    if (on_veldin_orbit()) return vo_call(vo_sub_205000_u, static_cast<uint32_t>(flag)).v0;  // (level 17's own: L17:0x002020a8)
     if (on_l1_family() || on_rilgar()) return sub_00205000_l1(flag);
     const uint32_t mode = lbu(g::PLAYER + 0x20a4);
     if (mode == 2) return 0;
@@ -838,6 +861,9 @@ uint32_t sub_00205000(int32_t flag) {
 void hero_footstep(int32_t a, uint32_t foot, int32_t sound) {
     if (on_batalia()) { bat_call(bat_hero_footstep_u, static_cast<uint32_t>(a), foot, static_cast<uint32_t>(sound)); return; }  // (level 8's own: L8:0x00218ab8)
     if (on_pokitaru()) { pok_call(pok_hero_footstep_u, static_cast<uint32_t>(a), foot, static_cast<uint32_t>(sound)); return; }  // (level 11's own: L11:0x002378a0)
+    if (on_quartu()) { qua_call(qua_hero_footstep_u, static_cast<uint32_t>(a), foot, static_cast<uint32_t>(sound)); return; }  // (level 15's own: L15:0x001ff6c0)
+    if (on_kalebo()) { kal_call(kal_hero_footstep_u, static_cast<uint32_t>(a), foot, static_cast<uint32_t>(sound)); return; }  // (level 16's own: L16:0x002047a0)
+    if (on_veldin_finale()) { vf_call(vf_hero_footstep_u, static_cast<uint32_t>(a), foot, static_cast<uint32_t>(sound)); return; }  // (level 18's own: L18:0x0020ed30)
     if (on_l1_family() || on_rilgar() || on_blarg()) return hero_footstep_l1(a, foot, sound);
     const uint32_t P = g::PLAYER;
     if (sound != 0) {
@@ -964,6 +990,7 @@ void sub_00206c08() {
 
 // orig: 0x002079e8 — in state 0x7f, swing the hero moby (sub_00262b80 on PLAYER+0x6b0/+0x6b4).
 void sub_002079e8() {
+    if (on_quartu()) { qua_call(qua_sub_002079e8_u); return; }  // (level 15's own: L15:0x002008d0)
     if (lw(g::HERO_STATE) != 0x7f) return;
     const float k = lwc1(0x0015ed6c);
     sub_00262b80(lwu(g::PLAYER + 0x2080), g::PLAYER + 0x6b0, g::PLAYER + 0x6b4, u2f(0x3e32b8c2u),
@@ -1104,6 +1131,7 @@ void sub_002090d0(uint32_t pivot, float x, float y, float z) { sub_002090d0_v(V(
 // the attached moby *(PLAYER+0x86c) at the hero's hand offset (0, 0, 0.21) rotated by the hero
 // matrix and the angles 0x17a6c0.
 void sub_002078a8() {
+    if (on_quartu()) { qua_call(qua_sub_002078a8_u); return; }  // (level 15's own: L15:0x002007d8)
     const float k = lwc1(0x0015ed6c);
     if (lw(g::HERO_STATE) == 0x7f)
         sub_00262b00(lwu(g::PLAYER + 0x2080), g::PLAYER + 0x6a8, g::PLAYER + 0x6ac, u2f(0x3e99999au), k * u2f(0x40df66f3u));
@@ -1215,6 +1243,11 @@ void sub_00209848(int32_t n, int32_t limit) {
 void sub_002076a8() {
     if (on_batalia()) { bat_call(bat_sub_2076a8_u); return; }  // (level 8's own: L8:0x00219ab0)
     if (on_pokitaru()) { pok_call(pok_sub_2076a8_u); return; }  // (level 11's own: L11:0x00238890)
+    if (on_hoven()) { hov_call(hov_sub_2076a8_u); return; }  // (level 12's own: L12:0x00229f20)
+    if (on_oltanis()) { olt_call(olt_sub_002076a8_u); return; }  // (level 14's own: L14:0x0021a628)
+    if (on_quartu()) { qua_call(qua_sub_002076a8_u); return; }  // (level 15's own: L15:0x00200788)
+    if (on_kalebo()) { kal_call(kal_sub_002076a8_u); return; }  // (level 16's own: L16:0x00205798)
+    if (on_veldin_finale()) { vf_call(vf_sub_2076a8_u); return; }  // (level 18's own: L18:0x0020fe00)
     if (on_l1_family()) return sub_002076a8_l1();
     if (lw(g::PLAYER + 0x22f4) != 0) {
         const uint32_t v = lwu(g::PLAYER + 0x22f8);
@@ -2709,6 +2742,7 @@ void hero_gadget_glow() {
 // mobys and fire the switch effects. `prev` is the caller's $s1, handed on to use_agents.
 void hero_slot_update(int32_t k, uint32_t prev) {
     if (on_rilgar()) { ril_call(ril_hero_slot_update_u, static_cast<uint32_t>(k), prev); return; }  // (Rilgar's own: L5:0x0023dc88)
+    if (on_kalebo()) { kal_call(kal_hero_slot_update_u, static_cast<uint32_t>(k), prev); return; }  // (level 16's own: L16:0x0020d8b0)
     const uint32_t P = g::PLAYER;
     constexpr uint32_t KIND = 0x00141660, FLAGS = 0x0013c940 + 0x1a4;
     const uint32_t ku = static_cast<uint32_t>(k);
