@@ -15,6 +15,8 @@
 #include <game/ovl/ovl_reloc.h>
 #include <game/ovl/pokitaru_mobys.h>
 #include <game/ovl/rilgar_mobys.h>
+#include <game/ovl/veldin_orbit_mobys.h>
+#include <game/ovl/veldin_finale_mobys.h>
 #include <game/ovl/variants_l2.h>
 #include <game/ovl/variants_l3.h>
 #include <game/ovl/variants_l5.h>
@@ -24,6 +26,8 @@
 #include <game/ovl/variants_l9.h>
 #include <game/ovl/variants_l10.h>
 #include <game/ovl/variants_l11.h>
+#include <game/ovl/variants_l17.h>
+#include <game/ovl/variants_l18.h>
 
 namespace rac1 {
 
@@ -133,6 +137,29 @@ bool class_hook_call_level(uint32_t fn, uint32_t m, uint32_t a1, uint32_t a2, fl
         case L11_CASE(0x00316270): ret = u_call(pok_hook_316270_u, m, a1, a2, f12); return true;
         case L11_CASE(0x003162d0): ret = u_call(pok_hook_3162d0_u, m, a1, a2, f12); return true;
         case L11_CASE(0x003162f0): ret = u_call(pok_hook_3162f0_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 17:  // Drek's fleet: class 0x566 (table 0x1e7854; +0xc and +0x10 are Veldin's class-749 hooks with other constants: 12 for 9, pvars + 0x60)
+        switch (lvl_key(fn)) {
+        case L17_CASE(0x002efea8): ret = u_call(vo_hook_2efea8_u, m, a1, a2, f12); return true;
+        case L17_CASE(0x002eff30): ret = u_call(vo_hook_2eff30_u, m, a1, a2, f12); return true;
+        case L17_CASE(0x002effb8): ret = u_call(vo_hook_2effb8_u, m, a1, a2, f12); return true;
+        case L17_CASE(0x002f0040): ret = u_call(vo_hook_2f0040_u, m, a1, a2, f12); return true;
+        case L17_CASE(0x002f0070): ret = u_call(vo_hook_2f0070_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 18:  // Veldin, the finale: classes 0x238 (table 0x1f3498) and 0x772 (table 0x1f34c8)
+        switch (lvl_key(fn)) {
+        case L18_CASE(0x002d6108): ret = u_call(vf_hook_2d6108_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002d6190): ret = u_call(vf_hook_2d6190_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002d61e0): ret = u_call(vf_hook_2d61e0_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002d6230): ret = u_call(vf_hook_2d6230_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002d6250): ret = u_call(vf_hook_2d6250_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002fcbb0): ret = u_call(vf_hook_2fcbb0_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002fcc00): ret = u_call(vf_hook_2fcc00_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002fcc50): ret = u_call(vf_hook_2fcc50_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002fcca0): ret = u_call(vf_hook_2fcca0_u, m, a1, a2, f12); return true;
+        case L18_CASE(0x002fccd0): ret = u_call(vf_hook_2fccd0_u, m, a1, a2, f12); return true;
         default: return false;
         }
     default:

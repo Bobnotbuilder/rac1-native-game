@@ -72,8 +72,8 @@ nothing, so an object whose class is not ported stands still or does not appear.
 | 14 | Oltanis | Loads and runs. | Nothing of its own ported. |
 | 15 | Quartu | Loads and runs. | Nothing of its own ported. |
 | 16 | Kalebo III | Loads and runs. | Nothing of its own ported. |
-| 17 | Drek's fleet (code: Veldin Orbit) | Loads and runs. | Nothing of its own ported. |
-| 18 | Veldin, the finale | Loads and runs. | Nothing of its own ported. |
+| 17 | Drek's fleet (code: Veldin Orbit) | Ported: its own build of the hero's code (12 functions), its own classes (59) with their draw callbacks, its camera type, sound emitter, class hooks and camera hook; generated from the disc; proved by the oracle (batches 260, 261, 271 and the hero batches 44 .. 55). Ready for playtest; not played through by hand yet. | |
+| 18 | Veldin, the finale | Ported: its own build of the hero's code (26 functions), its own classes (51) with their draw callbacks, its camera type, sound emitters, class hooks and camera hook, the final boss (Drek's robot) and its health bar; the end of the game: the credits, the last movie and the menu after them (new game with the weapons and bolts kept, or back to before the fight). Generated from the disc; proved by the oracle (batches 270, 261, 271 and the hero batches 44 .. 55). Ready for playtest; not played through by hand yet. | The fight itself has only been reached by setting the boss's state in automated runs. |
 
 ### Fixed since the first playtest
 

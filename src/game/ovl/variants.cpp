@@ -11,6 +11,8 @@
 #include <game/ovl/variants_l8.h>
 #include <game/ovl/variants_l10.h>
 #include <game/ovl/variants_l11.h>
+#include <game/ovl/variants_l17.h>
+#include <game/ovl/variants_l18.h>
 
 namespace rac1 {
 
@@ -28,6 +30,8 @@ const VariantRow* ovl_variants(int level, size_t* count) {
     case BATALIA: return ovl_variants_l8(count);
     case ORXON: return ovl_variants_l10(count);
     case POKITARU: return ovl_variants_l11(count);
+    case VELDIN_ORBIT: return ovl_variants_l17(count);
+    case VELDIN_FINALE: return ovl_variants_l18(count);
     default: break;
     }
     *count = 0;

@@ -330,6 +330,7 @@ void sub_00211f38() {
 void sub_00213e68(float dt) {
     if (on_batalia()) { bat_callf(bat_sub_213e68_u, dt); return; }  // (level 8's own: L8:0x002256e8)
     if (on_pokitaru()) { pok_callf(pok_sub_213e68_u, dt); return; }  // (level 11's own: L11:0x00243d78)
+    if (on_veldin_finale()) { vf_callf(vf_sub_213e68_u, dt); return; }  // (level 18's own: L18:0x0021bac8)
     if (on_l1_family() || on_rilgar() || on_blarg()) return sub_00213e68_l1(dt);
     constexpr uint32_t VEL = 0x0013f430;
     const uint32_t mode = lbu(g::PLAYER + 0x20b3);
@@ -593,6 +594,8 @@ void hero_gait_update() {
     if (on_blarg()) { blg_call(blg_hero_gait_update_u); return; }  // (level 6's own: L6:0x00228360)
     if (on_batalia()) { bat_call(bat_hero_gait_update_u); return; }  // (level 8's own: L8:0x00222d80)
     if (on_pokitaru()) { pok_call(pok_hero_gait_update_u); return; }  // (level 11's own: L11:0x002414e8)
+    if (on_veldin_finale()) { vf_call(vf_hero_gait_update_u); return; }  // (level 18's own: L18:0x002190f0)
+    if (on_veldin_orbit()) { vo_call(vo_hero_gait_update_u); return; }  // (level 17's own: L17:0x0020e1c0)
     if (on_l1_family() || on_rilgar()) return hero_gait_update_l1();
     const uint32_t P = g::PLAYER;
     switch (lbu(P + 0x20a4)) {
@@ -992,6 +995,7 @@ void hero_horizontal_velocity() {
     if (on_blarg()) { blg_call(blg_hero_horizontal_velocity_u); return; }  // (level 6's own: L6:0x0022b438)
     if (on_batalia()) { bat_call(bat_hero_horizontal_velocity_u); return; }  // (level 8's own: L8:0x00225ed0)
     if (on_pokitaru()) { pok_call(pok_hero_horizontal_velocity_u); return; }  // (level 11's own: L11:0x00244560)
+    if (on_veldin_finale()) { vf_call(vf_hero_horizontal_velocity_u); return; }  // (level 18's own: L18:0x0021c2b0)
     if (on_rilgar()) { ril_call(ril_hero_horizontal_velocity_u); return; }  // (Rilgar's own: L5:0x00242258)
     if (on_l1_family()) return hero_horizontal_velocity_l1();
     const uint32_t P = g::PLAYER;
@@ -1411,6 +1415,8 @@ void hero_wall_slide(int32_t facing) {
     if (on_blarg()) { blg_call(blg_hero_wall_slide_u, static_cast<uint32_t>(facing)); return; }  // (level 6's own: L6:0x002291d0)
     if (on_batalia()) { bat_call(bat_hero_wall_slide_u, static_cast<uint32_t>(facing)); return; }  // (level 8's own: L8:0x00223c60)
     if (on_pokitaru()) { pok_call(pok_hero_wall_slide_u, static_cast<uint32_t>(facing)); return; }  // (level 11's own: L11:0x00242380)
+    if (on_veldin_finale()) { vf_call(vf_hero_wall_slide_u, static_cast<uint32_t>(facing)); return; }  // (level 18's own: L18:0x0021a010)
+    if (on_veldin_orbit()) { vo_call(vo_hero_wall_slide_u, static_cast<uint32_t>(facing)); return; }  // (level 17's own: L17:0x0020f128)
     if (on_l1_family() || on_rilgar()) return hero_wall_slide_l1(facing);
     const uint32_t P = g::PLAYER, OUTB = OV(0x00173e40);
     if (lh(P + 0x308) != 0) return;
@@ -1668,6 +1674,7 @@ void hero_ground_update() {
     if (on_blarg()) { blg_call(blg_hero_ground_update_u); return; }  // (level 6's own: L6:0x00229650)
     if (on_batalia()) { bat_call(bat_hero_ground_update_u); return; }  // (level 8's own: L8:0x002240a8)
     if (on_pokitaru()) { pok_call(pok_hero_ground_update_u); return; }  // (level 11's own: L11:0x002427c8)
+    if (on_veldin_finale()) { vf_call(vf_hero_ground_update_u); return; }  // (level 18's own: L18:0x0021a488)
     if (on_rilgar()) { ril_call(ril_hero_ground_update_u); return; }  // (Rilgar's own: L5:0x002402a8)
     if (on_l1_family()) return hero_ground_update_l1();
     const uint32_t P = g::PLAYER, OUTB = OV(0x00173e40);

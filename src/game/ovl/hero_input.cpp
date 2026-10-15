@@ -149,6 +149,7 @@ void hero_land() {
     if (on_blarg()) { blg_call(blg_hero_land_u); return; }  // (level 6's own: L6:0x0023aca8)
     if (on_batalia()) { bat_call(bat_hero_land_u); return; }  // (level 8's own: L8:0x00236940)
     if (on_pokitaru()) { pok_call(pok_hero_land_u); return; }  // (level 11's own: L11:0x00253280)
+    if (on_veldin_finale()) { vf_call(vf_hero_land_u); return; }  // (level 18's own: L18:0x0022e160)
     if (on_l1_family() || on_rilgar()) return hero_land_l1();
     sw(P + 0x2284, 0);
     if (lbu(P + 0x12e2) != 0 && fs6c() * 0.5f < lwc1(P + 0x164)) {
@@ -243,6 +244,8 @@ int32_t hero_hurt(int32_t knock) {
     if (on_blarg()) return static_cast<int32_t>(blg_call(blg_hero_hurt_u, static_cast<uint32_t>(knock)).v0);  // (level 6's own: L6:0x00227e78)
     if (on_batalia()) return static_cast<int32_t>(bat_call(bat_hero_hurt_u, static_cast<uint32_t>(knock)).v0);  // (level 8's own: L8:0x00222800)
     if (on_pokitaru()) return static_cast<int32_t>(pok_call(pok_hero_hurt_u, static_cast<uint32_t>(knock)).v0);  // (level 11's own: L11:0x00240f88)
+    if (on_veldin_finale()) return static_cast<int32_t>(vf_call(vf_hero_hurt_u, static_cast<uint32_t>(knock)).v0);  // (level 18's own: L18:0x00218a90)
+    if (on_veldin_orbit()) return static_cast<int32_t>(vo_call(vo_hero_hurt_u, static_cast<uint32_t>(knock)).v0);  // (level 17's own: L17:0x0020dbe8)
     if (on_l1_family() || on_rilgar()) return hero_hurt_l1(knock);
     if (lw(P + 0x208c) == 0x14 || lw(P + 0x208c) == 7) return 0;
     if (lw(P + 0x2084) == 0x32) return 0;
@@ -532,6 +535,7 @@ int32_t hero_item_use() {
     if (on_blarg()) return static_cast<int32_t>(blg_call(blg_hero_item_use_u).v0);  // (level 6's own: L6:0x002398b8)
     if (on_batalia()) return static_cast<int32_t>(bat_call(bat_hero_item_use_u).v0);  // (level 8's own: L8:0x00235550)
     if (on_pokitaru()) return static_cast<int32_t>(pok_call(pok_hero_item_use_u).v0);  // (level 11's own: L11:0x00251e90)
+    if (on_veldin_finale()) return static_cast<int32_t>(vf_call(vf_hero_item_use_u).v0);  // (level 18's own: L18:0x0022cd70)
     if (on_rilgar()) return static_cast<int32_t>(ril_call(ril_hero_item_use_u).v0);  // (Rilgar's own: L5:0x00251be8)
     if (on_novalis() || on_aridia()) return hero_item_use_l1();
     if (lbu(P + 0x20ac) != 0 && (lw(P + 0x10b8) != 8 || lh(P + 0x308) != 1)) return 0;

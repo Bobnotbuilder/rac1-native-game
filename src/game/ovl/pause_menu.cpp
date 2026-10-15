@@ -7,6 +7,7 @@
 #include <game/enhance/graphics.h>
 #include <game/enhance/update_notice.h>
 #include <game/boot/title_menu.h>
+#include <game/ovl/credits_tr.h>
 #include <game/ovl/memory_card.h>
 #include <game/ovl/ovl_reloc.h>
 #include <game/lib/snd989.h>
@@ -677,7 +678,7 @@ void menu_update() {
             cutscene_start(lw(MS + 0xe4));
         } else if (kind == 7) {
             to_screen(0);
-            TODO_PORT(0x00299a68, "menu: screen 7")();
+            credits_start_tr(0);  // (the credits)
         } else {
             sw(OV(0x0015f5c4), 0);
         }

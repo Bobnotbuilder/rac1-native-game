@@ -40,6 +40,8 @@ void hero_timers_update() {
     if (on_blarg()) { blg_call(blg_hero_timers_update_u); return; }  // (level 6's own: L6:0x002348d0)
     if (on_batalia()) { bat_call(bat_hero_timers_update_u); return; }  // (level 8's own: L8:0x0022fd98)
     if (on_pokitaru()) { pok_call(pok_hero_timers_update_u); return; }  // (level 11's own: L11:0x0024cdb0)
+    if (on_veldin_finale()) { vf_call(vf_hero_timers_update_u); return; }  // (level 18's own: L18:0x00226ff0)
+    if (on_veldin_orbit()) { vo_call(vo_hero_timers_update_u); return; }  // (level 17's own: L17:0x0021d760)
     if (on_l1_family() || on_rilgar()) return hero_timers_update_l1();
     if (lbu(P + 0x20ad) == 0) hero_tilt_update();
     sw(P + 0x198, lwu(P + 0x198) + 1);
@@ -199,6 +201,7 @@ void hero_surface_update() {
     if (on_blarg()) { blg_call(blg_hero_surface_update_u); return; }  // (level 6's own: L6:0x00222fb8)
     if (on_batalia()) { bat_call(bat_hero_surface_update_u); return; }  // (level 8's own: L8:0x0021d9c0)
     if (on_pokitaru()) { pok_call(pok_hero_surface_update_u); return; }  // (level 11's own: L11:0x0023c7a0)
+    if (on_veldin_finale()) { vf_call(vf_hero_surface_update_u); return; }  // (level 18's own: L18:0x00213b40)
     if (on_rilgar()) { ril_call(ril_hero_surface_update_u); return; }  // (Rilgar's own: L5:0x00239fc0)
     if (on_novalis() || on_kerwan()) return hero_surface_update_l1();
     if (on_aridia()) return hero_surface_update_l2();
@@ -467,6 +470,7 @@ void hero_frame_update() {
     if (on_blarg()) { blg_call(blg_hero_frame_update_u); return; }  // (level 6's own: L6:0x0021ef38)
     if (on_batalia()) { bat_call(bat_hero_frame_update_u); return; }  // (level 8's own: L8:0x002194e0)
     if (on_pokitaru()) { pok_call(pok_hero_frame_update_u); return; }  // (level 11's own: L11:0x002382c8)
+    if (on_veldin_finale()) { vf_call(vf_hero_frame_update_u); return; }  // (level 18's own: L18:0x0020f898)
     if (on_l1_family() || on_rilgar()) return hero_frame_update_l1();
     const float x = lwc1(P + 0x80);
     const float y = lwc1(P + 0x84);
@@ -479,6 +483,7 @@ void hero_frame_update() {
     sh(P + 0x1eb0, 0);
     if (lbu(P + 0x20a4) != 0) {
         // (the same code on Veldin, Eudora, Umbris, Gaspar and Orxon: one transliteration, OV addresses; Novalis's family, Blarg and Batalia dispatched above)
+        if (on_veldin_orbit()) { vo_call(vo_hero_move_mode_u); return; }  // (level 17's own: L17:0x00203290, 0x8d0 bytes as Blarg's)
         hero_move_mode_u(0, 0, 0, 0, 0, 0, 0, 0, 0.0f, 0.0f, 0.0f, 0.0f);
         return;
     }

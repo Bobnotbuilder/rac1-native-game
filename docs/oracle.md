@@ -138,6 +138,8 @@ shared code every level runs:
 | 0 and 3 | 180 |
 | 0, 1, 3 and 5 | 190 (it proves a fix of the code generator, `tools/codegen/mips2cpp.py`) |
 | 3, 6 and 10 | 191 |
+| 17 | 260, 261, 271 (and the hero batches 44 .. 55) |
+| 18 | 270, 261, 271 (and the hero batches 44 .. 55) |
 
 For a quick check after a small change, level 0's 63, 79, 118 and 141 are the usual minimum.
 
@@ -188,6 +190,7 @@ missing skips those checks and says which set it wanted; it does not fail.
 | `gaspar_orxon/` | 170, 171 | the command lines in the batches' headers |
 | `weapons_dumps/` | 180, 190 | the command lines in batch 180's header |
 | `kerwan_heli/`, `kerwan_heli_jump/`, `orxon_clank/` | 191 | the command lines in batch 191's header (also `clank_0415/`) |
+| `drek_veldin/` | 271 | `tools/oracle/drek_veldin_tour.sh dumps` |
 
 A dump is written by a headless run of the game: `RAC1_RAMDUMP=<frame>,<file>` writes the 32 MB of
 EE RAM and the 16 KB scratchpad at that frame ([Environment variables](env-vars.md)). The scripts

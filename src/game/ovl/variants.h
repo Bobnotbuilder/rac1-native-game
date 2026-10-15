@@ -50,6 +50,8 @@ const VariantRow* ovl_variants_l9(size_t* count);  // Gaspar (variants_l9.cpp)
 const VariantRow* ovl_variants_l8(size_t* count);  // Batalia (variants_l8.cpp)
 const VariantRow* ovl_variants_l10(size_t* count);  // Orxon (variants_l10.cpp)
 const VariantRow* ovl_variants_l11(size_t* count);  // Pokitaru (variants_l11.cpp)
+const VariantRow* ovl_variants_l17(size_t* count);  // Drek's fleet (variants_l17.cpp)
+const VariantRow* ovl_variants_l18(size_t* count);  // Veldin, the finale (variants_l18.cpp)
 
 }  // namespace rac1
 
