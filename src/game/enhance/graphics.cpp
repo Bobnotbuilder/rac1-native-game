@@ -99,8 +99,9 @@ constexpr int FOVS[] = {75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 130, 140, 1
 constexpr int LODS[] = {0, 25, 50, 75, 100};  // Original, Low, Medium, High, Maximum: the LOD slider (mrp_lod.h)
 constexpr int CAPS[] = {30, 60, 120, 144, 240, 0};
 struct Size { int w, h; };
-constexpr Size SIZES[] = {{960, 720}, {1280, 720}, {1280, 960}, {1366, 768}, {1600, 900}, {1600, 1200}, {1920, 1080},
-                          {2560, 1080}, {2560, 1440}, {3440, 1440}, {3840, 2160}};
+// (from the original's own 640 x 480, for a CRT or a small screen: 4:3 and 16:9 sizes)
+constexpr Size SIZES[] = {{640, 480}, {854, 480}, {800, 600}, {1024, 576}, {960, 720}, {1024, 768}, {1280, 720}, {1280, 960},
+                          {1366, 768}, {1600, 900}, {1600, 1200}, {1920, 1080}, {2560, 1080}, {2560, 1440}, {3440, 1440}, {3840, 2160}};
 constexpr uint32_t SIZE_COUNT = sizeof(SIZES) / sizeof(Size);
 
 // The texts. Ids from TEXT_FIRST (after the Advanced page's 0x7f00..); per language (0x15ed88: 0

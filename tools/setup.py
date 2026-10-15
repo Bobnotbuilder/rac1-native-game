@@ -107,6 +107,29 @@ def enable_windows_colors():
 USE_COLOR = sys.stdout.isatty() and (not WINDOWS or enable_windows_colors())
 
 
+def disable_windows_quick_edit():
+    """The console's QuickEdit mode off while the setup works, back on when it ends (atexit): with it, a click in the
+    window starts a text selection and every program writing to the console (this script, the build, the game's
+    --setup) waits until the selection ends - the setup looks frozen. At the end it is back, to copy a message."""
+    try:
+        import atexit
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetStdHandle(-10)  # STD_INPUT_HANDLE
+        mode = ctypes.c_uint32()
+        if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            return
+        # ENABLE_EXTENDED_FLAGS (0x80) set for ENABLE_QUICK_EDIT_MODE's bit (0x40) to be taken
+        if kernel32.SetConsoleMode(handle, (mode.value | 0x0080) & ~0x0040):
+            atexit.register(lambda: kernel32.SetConsoleMode(handle, mode.value | 0x0080))
+    except (AttributeError, OSError):
+        pass
+
+
+if WINDOWS:
+    disable_windows_quick_edit()
+
+
 def color(code, text):
     return f"\033[{code}m{text}\033[0m" if USE_COLOR else text
 
