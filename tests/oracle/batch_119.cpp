@@ -97,6 +97,12 @@ void batch_119() {
         uint8_t* ram = ee_get_ram_base();
         if (snap.empty()) {
             veldin_boot();
+            if (std::getenv("B119_REVISIT") != nullptr) {  // (batch 310's question: the level finished and every moby broken / collected
+                w8(0x0013dd58 + 7, 2);                       // once, every checkpoint passed: a return to Umbris after the end)
+                w8(0x0013dd48, 1);
+                for (uint32_t w = 0; w < 0x40; ++w) w32(0x0014c190 + 7 * 0x100 + w * 4, 0xffffffffu);
+                for (uint32_t c = 0; c < 0x10; ++c) w8(0x0014c050 + 7 * 0x10 + c, 0xff);
+            }
             level_setup_body(1, 0);
             w32(OV(0x0016c060), 0xf);
             gameplay_frame();
