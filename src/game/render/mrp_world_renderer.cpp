@@ -1071,7 +1071,7 @@ struct GsFront {
             }
             k.bucket = r->bucket;
             k.layer = r->layer;
-            k.word |= (std::min(r->mips, 4u) - 1) << 22;
+            k.word |= (std::min(std::min(r->mips, mxl + 1), 4u) - 1) << 22;  // (the GS samples levels 0..MXL only, as the mobys')
             ++g_st.tex_ok;
             return k;
         }
@@ -1109,7 +1109,7 @@ struct GsFront {
         const TexRef& r = L.ref[table][ti];
         k.bucket = r.bucket;
         k.layer = r.layer;
-        k.word |= (std::min(r.mips, 4u) - 1) << 22;
+        k.word |= (std::min(std::min(r.mips, mxl + 1), 4u) - 1) << 22;  // (the GS samples levels 0..MXL only, as the mobys')
         ++g_st.tex_ok;
         return k;
     }

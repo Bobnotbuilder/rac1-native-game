@@ -66,7 +66,9 @@ uniform sampler2D uMip1, uMip2, uMip3;
 uniform int uMipN, uMipLo, uMipLcm, uMipMxl;
 uniform float uMipK, uMipL;
 uniform vec4 uScrMap;
-out vec4 FragColor;
+layout(location = 0, index = 0) out vec4 FragColor;
+// the blend's source alpha, the GS's 0x80 = 1.0 (a render target keeps the raw alpha in FragColor: its blend reads this one)
+layout(location = 0, index = 1) out vec4 FragFactor;
 void main() {
     if (uDate != 0) {
         bool b7 = texelFetch(uScreen, ivec2(gl_FragCoord.xy), 0).a > 254.0 / 255.0;
@@ -118,6 +120,7 @@ void main() {
     }
     // a render target keeps the GS's raw alpha (0x80 = 1), as the textures read from its memory
     FragColor = uRt != 0 ? o : vec4(o.rgb, min(o.a * (255.0 / 128.0), 1.0));
+    FragFactor = vec4(min(o.a * (255.0 / 128.0), 1.0));
 }
 )";
 
@@ -830,7 +833,16 @@ void draw(const Gs& gs, int win_w, int win_h, float FB_W, float FB_H, const Dept
                     GLint srgb = 0, drgb = 0;
                     glGetIntegerv(GL_BLEND_SRC_RGB, &srgb);
                     glGetIntegerv(GL_BLEND_DST_RGB, &drgb);
-                    glBlendFuncSeparate(static_cast<GLenum>(srgb), static_cast<GLenum>(drgb), GL_ONE, GL_ZERO);
+                    // the colour blended by As as the GS reads it (0x80 = 1.0): the render target's FragColor holds the raw alpha
+                    // (0x80 = 0.5), the blend's factor is FragFactor's. With the raw alpha a layer blended at As 0x80 into a
+                    // render target was drawn at half strength: the ship's planet menu, the planet's picture (three layers, the
+                    // last one painting the background round the planet's disc) showed the square of its layers (issue #18)
+                    auto as_gs = [](GLint f) -> GLenum {
+                        if (f == GL_SRC_ALPHA) return GL_SRC1_ALPHA;
+                        if (f == GL_ONE_MINUS_SRC_ALPHA) return GL_ONE_MINUS_SRC1_ALPHA;
+                        return static_cast<GLenum>(f);
+                    };
+                    glBlendFuncSeparate(as_gs(srgb), as_gs(drgb), GL_ONE, GL_ZERO);
                 }
             }
             if (chg(&Key::ztest) || chg(&Key::ztst) || chg(&Key::zwrite)) {
