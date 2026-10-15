@@ -1117,6 +1117,7 @@ struct ForwardFrame {      // the run's real frames, kept while the reverse ones
     uint32_t moby = 0;
     uint8_t f0 = 0, f1 = 0;
     float pos = 0.0f;
+    uint8_t shown0 = 0, shown1 = 0, clip = 0;  // the reverse frames written, and the clip they belong to
 } g_forward;
 
 // orig: (none) — enhancement: the lower body's turn and the backpedal for this frame
@@ -1147,16 +1148,23 @@ void backpedal_show() {
     if (!g_backpedal || m == 0 || lbu(m + 0x52) != lbu(m + 0x53)) return;
     const uint32_t n = lbu(m + 0x7e);  // the clip's frame count
     if (n < 2) return;
-    g_forward = {true, m, static_cast<uint8_t>(lbu(m + 0x50)), static_cast<uint8_t>(lbu(m + 0x51)), lwc1(m + 0x54)};
-    sb(m + 0x50, (n - 1 - g_forward.f0 % n) & 0xff);
-    sb(m + 0x51, (n - 1 - g_forward.f1 % n) & 0xff);
+    g_forward = {true, m, static_cast<uint8_t>(lbu(m + 0x50)), static_cast<uint8_t>(lbu(m + 0x51)), lwc1(m + 0x54), 0, 0, static_cast<uint8_t>(lbu(m + 0x53))};
+    g_forward.shown0 = static_cast<uint8_t>((n - 1 - g_forward.f0 % n) & 0xff);
+    g_forward.shown1 = static_cast<uint8_t>((n - 1 - g_forward.f1 % n) & 0xff);
+    sb(m + 0x50, g_forward.shown0);
+    sb(m + 0x51, g_forward.shown1);
 }
 
-// orig: (none) — enhancement: the run's real frames back before the hero's update
+// orig: (none) — enhancement: the run's real frames back before the hero's update. Only while the
+// moby still shows the reverse frames of the same clip: a scene that started in between (game
+// mode 2: no hero update ran, the scene poses him) has changed them, and the frames kept from
+// before it are stale (putting them back would change the game's state)
 void backpedal_restore() {
     if (!g_forward.saved) return;
     g_forward.saved = false;
     if (lwu(HERO + 0x2080) != g_forward.moby) return;
+    const uint32_t m = g_forward.moby;
+    if (lbu(m + 0x53) != g_forward.clip || lbu(m + 0x50) != g_forward.shown0 || lbu(m + 0x51) != g_forward.shown1) return;
     sb(g_forward.moby + 0x50, g_forward.f0);
     sb(g_forward.moby + 0x51, g_forward.f1);
     swc1(g_forward.moby + 0x54, g_forward.pos);
@@ -1165,6 +1173,14 @@ void backpedal_restore() {
 
 // orig: (none) — enhancement (advanced.h)
 void advanced_pose_hook(uint32_t rec) {
+    // the turn is eased by legs_update, after the hero's update: only in gameplay (game mode 0). In
+    // a scene, a menu or the ship the hero is posed by them and the turn is dropped (issue #40: a
+    // scene started while strafing kept Ratchet's lower body turned, frozen, for the whole scene)
+    if (lw(OV(0x0015f5c4)) != 0) {
+        g_leg_twist = 0.0f;
+        g_backpedal = false;
+        return;
+    }
     if (abs_f(g_leg_twist) < 0.01f || lhu(rec + 0x10) != 111) return;  // Ratchet: 111 joints
     // the joint matrices on the scratchpad (0x40 each): the pelvis 1, the legs 92..103 and the tail
     // 104..110 turned about the moby's vertical axis
