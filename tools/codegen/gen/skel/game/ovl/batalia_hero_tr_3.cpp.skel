@@ -4,6 +4,7 @@
 // by hand: the names are the entries', the helpers `bah_<addr>_l8` (uniform ABI: TrRet).
 #include <game/lib/libc.h>
 #include <game/ovl/batalia_hero.h>
+#include <game/ovl/vendor_tr.h>
 #include <game/ovl/ovl.h>
 #include <game/ovl/screen_fade.h>
 #include <game/math/vecmath.h>

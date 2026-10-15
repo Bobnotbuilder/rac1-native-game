@@ -1,6 +1,7 @@
 // Particle types 0x43's (Veldin's 0x274518), 0x30's (0x271c88) and 0x32's (0x271df8) updates, 0x33's (0x271ec8), 0x3d's
 // (0x273448), 0x41's (0x273ee0) and 0x3a's (0x272bc0) (met on Umbris), 0x31's (0x271d20: the bullets of Kerwan's helicopter, issue
-// #26), transliterated: the declarations of particle_types_tr.cpp (regen group veldin_particles).
+// #26), 0x0a's (0x26a880), 0x0e's (0x26ba68), 0x27's (0x26fc38) and 0x49's (0x275320) (spawned by ported level code: see
+// veldin_extras.cpp), transliterated: the declarations of particle_types_tr.cpp (regen group veldin_particles).
 #ifndef RAC1_GAME_OVL_PARTICLE_TYPES_TR_H
 #define RAC1_GAME_OVL_PARTICLE_TYPES_TR_H
 
@@ -20,6 +21,10 @@ void particle_3d_update(uint32_t a0);  // 0x00273448
 void particle_41_update(uint32_t a0);  // 0x00273ee0
 void particle_3a_update(uint32_t a0);  // 0x00272bc0
 void particle_31_update(uint32_t a0);  // 0x00271d20
+void particle_0a_update(uint32_t a0);  // 0x0026a880
+void particle_0e_update(uint32_t a0);  // 0x0026ba68
+void particle_27_update(uint32_t a0);  // 0x0026fc38
+void particle_49_update(uint32_t a0);  // 0x00275320
 
 }  // namespace rac1
 

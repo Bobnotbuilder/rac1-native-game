@@ -33,9 +33,6 @@ add_library(rac1_game STATIC
     ovl/hero_state_l1.cpp
     ovl/hero_state_update.cpp
     ovl/hero_state_update_l1.cpp
-    ovl/hero_state_update_l1.cpp
-    ovl/hero_state_update_l1.cpp
-    ovl/hero_state_update_l1.cpp
     ovl/hero_input.cpp
     ovl/hero_transitions.cpp
     ovl/hero_transitions_l1.cpp
@@ -76,7 +73,6 @@ add_library(rac1_game STATIC
     ovl/pokitaru_mobys.cpp
     ovl/hoven_hooks.cpp
     ovl/hoven_mobys.cpp
-    ovl/hoven_shared.cpp
     ovl/variants.cpp
     ovl/novalis_mobys.cpp
     ovl/aridia_mobys.cpp

@@ -888,15 +888,6 @@ void gs_memory_and_draw_envs() {
     }
 }
 
-// The host's copy of each level's files (laid out by the setup tool as <index>_<level name>).
-// orig: (host) the level WADs on the host's disk
-const char* level_dir(int level) {
-    static const char* const dirs[19] = {"0_veldin_tutorial", "1_novalis", "2_aridia", "3_kerwan", "4_eudora", "5_rilgar", "6_nebula_g34",
-                                         "7_umbris", "8_batalia", "9_gaspar", "10_orxon", "11_pokitaru", "12_hoven", "13_oltanis_orbit",
-                                         "14_oltanis", "15_quartu", "16_kalebo_iii", "17_veldin_orbit", "18_veldin_finale"};
-    return level >= 0 && level < 19 ? dirs[level] : nullptr;
-}
-
 // The overlay image the ported code runs on. On the PS2 the base ELF's overlay load (0x12d8f8,
 // after the level's files are read) copies the level's own overlay executable out of its level
 // data: every level has its own build of the engine, linked at its own addresses
@@ -914,7 +905,7 @@ void engine_image_load(int played) {
         return e == nullptr || std::strcmp(e, "0") != 0;
     }();
     const int level = own ? played : 0;
-    LevelLoader::load_level_overlay(std::string("assets/extracted/level_wads/") + level_dir(level) + "/level.wad");
+    LevelLoader::load_level_overlay(level);  // (after the level's files, as the PS2: their load writes into the overlay's data, which this copy restores)
     ovl_reloc_set_level(level);
 }
 
@@ -937,11 +928,8 @@ auto boot_loader_run(F f) {
 // class models), then the overlay image (the overlay load, 0x12d8f8, as above).
 // orig: (host) the level's assets for the host renderers, the overlay load
 bool level_host_load(int level) {
-    const char* dir = level_dir(level);
-    if (dir == nullptr) return false;
-    const std::string wad = std::string("assets/extracted/level_wads/") + dir + "/level.wad";
-    if (!std::filesystem::exists(wad)) {
-        std::fprintf(stderr, "rac1-native: level %d has no host data (%s): run setup.sh\n", level, wad.c_str());
+    if (!disc_has_level(level)) {
+        std::fprintf(stderr, "rac1-native: level %d is not on the disc image\n", level);
         return false;
     }
     LoadProf prof_all("level_host_load");
@@ -949,12 +937,10 @@ bool level_host_load(int level) {
     gs_texture_cache_clear();
     moby_models_release();
     prof.reset();
-    LevelLoader::load_level_wad(wad);
+    LevelLoader::load_level_wad(level);
     prof.emplace("  engine_image_load");
     engine_image_load(level);
     g_moby_glb_dir = "assets/generated/moby_glb/level" + std::to_string(level);
-    prof.emplace("  texture_loader");
-    texture_loader(wad);
     return true;
 }
 
@@ -964,9 +950,8 @@ bool level_host_load(int level) {
 // reads still happen at its load's steps, in its order; they find the disc's sectors in the host's cache.
 // orig: (host) a read ahead of the level's files
 void level_prefetch(int level) {
-    const char* dir = level_dir(level);
-    if (dir == nullptr) return;
-    LevelLoader::prefetch(std::string("assets/extracted/level_wads/") + dir + "/level.wad");
+    if (!disc_has_level(level)) return;
+    LevelLoader::prefetch(level);
     const uint32_t header_lba = lwu(0x0013a448 + static_cast<uint32_t>(level) * 8);  // (the table of contents, read at the start: toc_read)
     if (header_lba == 0) return;
     std::thread([header_lba] {
@@ -1619,14 +1604,12 @@ int main(int argc, char** argv) {
         else continue;
         level_asked = true;
     }
-    const char* dir = level_dir(level);
-    if (dir == nullptr) {
+    if (level < 0 || level >= 19) {
         std::fprintf(stderr, "rac1-native: level %d has no host assets yet\n", level);
         return 1;
     }
-    const std::string wad = std::string("assets/extracted/level_wads/") + dir + "/level.wad";
     const bool have_disc = std::filesystem::exists(disc_path());
-    if (!std::filesystem::exists(wad) || !std::filesystem::exists(disc_boot_elf_path()) || !have_disc) {
+    if (!have_disc || !std::filesystem::exists(disc_boot_elf_path()) || !disc_has_level(level)) {
         std::fprintf(stderr, "\nrac1-native: %s\n"
                              "Run the setup from the repository's root, with your disc image:\n"
                              "  ./setup.sh --iso <path-to-your-iso>\n"
@@ -1653,8 +1636,8 @@ int main(int argc, char** argv) {
     // deterministic, the enhancements off; RAC1_ADVANCED=1 keeps them (testing an enhancement)
     if (headless && std::getenv("RAC1_ADVANCED") == nullptr) rac1::g_advanced_disabled = true;
     std::printf("[orig] rac1-native %s\n", rac1::update_check::version_text().c_str());
-    // the update check (Options > Advanced > Update Check): one anonymous request to GitHub in the background, never
-    // in a headless run; what it finds is shown at the main menu (the update notice)
+    // the update check (Updates > Update Check): started when the main menu opens on the title screen (or on demand
+    // via Check Now), never in a headless run; what it finds is shown as the update notice
     rac1::update_check::start(headless);
     if (const char* ck = std::getenv("RAC1_CLOCK")) g_host_clock_fixed = static_cast<std::time_t>(std::strtoll(ck, nullptr, 0));
     const uint64_t max_frames = std::getenv("RAC1_FRAMES") ? std::strtoull(std::getenv("RAC1_FRAMES"), nullptr, 10) : (headless ? 300 : 0);
@@ -2014,6 +1997,7 @@ int main(int argc, char** argv) {
     FrozenFrame frozen;
     FrozenFrame displayed;  // the last picture drawn, the GS display buffer a blocking loop's frames draw over
     FrozenFrame last_shown;  // the last frame of the game drawn (not a menu's, a fade's, a movie's): the frame buffer a store reads
+    bool displayed_is_last_shown = false;
     MoviePicture movie_picture;
     auto last = std::chrono::steady_clock::now();
     auto next = last;
@@ -2233,6 +2217,7 @@ int main(int argc, char** argv) {
                     }
                 }
             });
+            if (rac1::update_check::update_requested()) running = false;
 #ifdef RAC1_DEVTOOLS
             if (!headless) dt::dev_menu_game_frame();
             else dt::dev_kill_apply();
@@ -2796,7 +2781,8 @@ int main(int argc, char** argv) {
             if (movie_pic != nullptr) {  // a movie plays: its picture is the whole frame
                 movie_picture.draw(*movie_pic, mw, mh, vx, vy, vw, vh);
             } else if (fd.fade) {  // a frame of the screen fade (ADR 0012): the display buffer, the picture shown, its packets drawn over it
-                if (displayed.fbo != 0 && displayed.w == w && displayed.h == h) displayed.blit_to_screen();
+                const FrozenFrame& disp = displayed_is_last_shown ? last_shown : displayed;
+                if (disp.fbo != 0 && disp.w == w && disp.h == h) disp.blit_to_screen();
             } else if (title && !fd.flight) {  // the boot's title level (its menu over it): its sky, ties and shrubs (its mobys: the original pass)
                 if (mrp_world_active()) {  // its own passes' chain, drawn by the MRP world
                     rac1::gs::Viewport wv;
@@ -2823,6 +2809,7 @@ int main(int argc, char** argv) {
                     if (const float rs = rac1::graphics_render_scale(); rs != 1.0f && !g_render_wireframe) {
                         g_scaled_scene.begin(w, h, rs);
                         wv = g_scaled_scene.scaled(wv);
+                        glViewport(wv.x, wv.y, wv.w, wv.h);
                     }
                     if (mrp_moby_active()) mrp_moby_prepare(&fd.gv);  // (the modern lighting: the mobys cast too)
                     mrp_lighting_shadow_pass();
@@ -2942,17 +2929,20 @@ int main(int argc, char** argv) {
                 glViewport(0, 0, w, h);
                 fprof.mark(6);
             }
-            displayed.capture(w, h);  // (the picture shown: what a screen fade darkens)
             if (!menu_mode && !fd.fade && !title && movie_pic == nullptr && !fd.exiting) {
                 // the last frame of the game shown: what the frame buffer holds when the pause menu's start stores it (the
                 // frame drawn when the menu opens is the gameplay chain drawn as a menu frame here: not that one)
                 last_shown.capture(w, h);
+                displayed_is_last_shown = true;
                 g_scene_pic.prefetch(last_shown, vx, vy, vw, vh);
                 g_scene_pic.shown = &last_shown;
                 g_scene_pic.shown_view[0] = vx;
                 g_scene_pic.shown_view[1] = vy;
                 g_scene_pic.shown_view[2] = vw;
                 g_scene_pic.shown_view[3] = vh;
+            } else {
+                displayed.capture(w, h);  // (the picture shown: what a screen fade darkens)
+                displayed_is_last_shown = false;
             }
             if (fd.scene) g_scene_pic.keep(w, h, vx, vy, vw, vh);  // (the picture the game stores after this frame)
 #ifdef RAC1_DEVTOOLS
@@ -3099,5 +3089,6 @@ int main(int argc, char** argv) {
     rac1::vu0::fallback_report();  // (testing: RAC1_VU_FALLBACK)
     rac1::vu1::fallback_report();
     if (std::getenv("RAC1_VU0_CHAIN") != nullptr) std::fprintf(stderr, "[vu0-chain] %016llx\n", static_cast<unsigned long long>(rac1::vu0::chain_hash()));
+    rac1::update_check::run_update();
     std::_Exit(0);  // the renderers' static GL objects would be freed after the context is gone
 }

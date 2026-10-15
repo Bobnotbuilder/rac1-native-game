@@ -31,6 +31,5 @@ IsoValidation validate_iso(const std::string& iso_path);
 // the disc's boot executable (SCUS_971.99 on the NTSC-U disc, SCES_509.16 on the PAL one)
 bool extract_boot_elf(std::span<const std::byte> iso, const std::string& out_path, bool force = false,
                       const std::string& boot_file = "SCUS_971.99");
-bool extract_level_wads(std::span<const std::byte> iso, const std::string& out_dir, bool force = false);
 
 } // namespace rac1::setup

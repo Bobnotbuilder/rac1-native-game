@@ -110,7 +110,9 @@ def main():
     ap.add_argument("--out", required=True, help="the result's file")
     ap.add_argument("--channel", choices=("stable", "development"), default="stable")
     ap.add_argument("--installed", default="", help="stable: the installed version (x.y.z)")
-    ap.add_argument("--commit", default="", help="development: the installed commit (full hash)")
+    ap.add_argument("--describe", default="", help="stable: git describe of the installed build (detects switching from main to stable)")
+    ap.add_argument("--branch", default="", help="stable: git branch of the installed build")
+    ap.add_argument("--commit", default="", help="development: the installed commit or v<version> tag")
     ap.add_argument("--max-age", type=int, default=6 * 3600, help="seconds a result is kept without asking again")
     ap.add_argument("--force", action="store_true", help="ask GitHub even when the result is recent")
     ap.add_argument("--api", default=API, help="testing: another API's address")
@@ -127,10 +129,10 @@ def main():
     except ValueError:
         age = -1
     if (not args.force and old.get("status") == "ok" and old.get("channel") == args.channel and
-            old.get("installed") == installed and 0 <= age < args.max_age):
+            old.get("installed") == installed and old.get("describe", "") == args.describe and 0 <= age < args.max_age):
         return 0  # (recent: GitHub not asked)
 
-    lines = [f"checked {now}", f"channel {args.channel}", f"installed {installed}", "status ok"]
+    lines = [f"checked {now}", f"channel {args.channel}", f"installed {installed}", f"describe {args.describe}", "status ok"]
     try:
         if args.channel == "stable":
             rel = get_json(args.api, f"/repos/{REPO}/releases/latest")
@@ -138,11 +140,14 @@ def main():
             latest = version_tuple(tag)
             if latest is None:
                 return 1
-            newer = latest > version_tuple(installed)
+            # switching from Development (main, ahead of the release tag) to Stable also offers the latest release
+            on_dev_main = (args.branch == "main" and bool(args.describe) and
+                           args.describe != tag and args.describe != f"{tag}-dirty")
+            newer = latest > version_tuple(installed) or on_dev_main
             lines += [f"newer {int(newer)}", f"id {plain_ascii(tag)}", "version " + ".".join(map(str, latest)),
                       "notes " + notes_short(str(rel.get("name") or ""), str(rel.get("body") or ""))]
         else:
-            if not re.fullmatch(r"[0-9a-f]{7,40}", installed):
+            if not (re.fullmatch(r"[0-9a-f]{7,40}", installed) or re.fullmatch(r"v\d+(?:\.\d+)*", installed)):
                 return 1
             cmp = get_json(args.api, f"/repos/{REPO}/compare/{installed}...main")
             ahead = int(cmp.get("ahead_by", 0))  # (main's commits the installed build lacks)

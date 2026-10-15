@@ -136,6 +136,17 @@ int run_quiet(const std::vector<std::string>& args) {
     return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 }
 
+void launch_updater(const std::vector<std::string>& args, const std::filesystem::path& cwd) {
+    if (args.empty()) return;
+    if (!cwd.empty()) {
+        if (::chdir(cwd.c_str()) != 0) return;
+    }
+    std::vector<char*> argv;
+    for (const auto& a : args) argv.push_back(const_cast<char*>(a.c_str()));
+    argv.push_back(nullptr);
+    ::execvp(argv[0], argv.data());
+}
+
 std::string python_program() { return "python3"; }
 
 std::vector<std::string> environment_names(const char* prefix) {

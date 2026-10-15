@@ -216,8 +216,8 @@ bool mrp_moby_caster_rect(const float* light_vp, float rect[4], const float* wit
     "vec3 sh_n = vec3(0.0, 0.0, 1.0);\n"                                                                \
     "void sh_prepare() {\n" /* (in uniform control flow: the derivatives) */                           \
     "    sh_state = vec4(1.0, 0.0, -1.0, 0.0);\n"                                                       \
+    "    if (uShPass != 0 || uShOn == 0) return;\n"                                                     \
     "    vec3 dx = dFdx(vShWorld), dy = dFdy(vShWorld);\n"                                              \
-    "    if (uShOn == 0) return;\n"                                                                     \
     "    vec3 n = cross(dx, dy);\n"                                                                     \
     "    float nl = length(n);\n"                                                                       \
     "    n = nl > 0.0 ? n / nl : vec3(0.0, 0.0, 1.0);\n"                                                \
@@ -225,6 +225,12 @@ bool mrp_moby_caster_rect(const float* light_vp, float rect[4], const float* wit
     "    sh_n = n;\n"                                                                                   \
     "    float ndl = dot(n, uShSun);\n"                                                                 \
     "    float facing = smoothstep(0.0, 0.25, ndl);\n"                                                  \
+    "#ifdef SH_POINTS\n"                                                                                \
+    "    if (facing <= 0.0 && uShDebug == 0) {\n" /* back-facing world surfaces receive no sun shadow */ \
+    "        sh_state = vec4(1.0, 0.0, -1.0, 1.0);\n"                                                   \
+    "        return;\n"                                                                                 \
+    "    }\n"                                                                                           \
+    "#endif\n"                                                                                          \
     "    int count = int(uShParam.y);\n"                                                                \
     "    float vis = 1.0;\n"                                                                            \
     "    int casc = -1;\n"                                                                              \
@@ -243,16 +249,16 @@ bool mrp_moby_caster_rect(const float* light_vp, float rect[4], const float* wit
     "        break;\n"                                                                                  \
     "    }\n"                                                                                           \
     "#if defined(SH_POINTS) || defined(SH_SPLIT)\n"                                                    \
-    "    if (uShFade.w > 0.0 && casc >= 0 && vis < 1.0) {\n" /* a far caster's shadow lighter: the blockers' mean depth */ \
+    "    if (uShFade.w > 0.0 && casc >= 0 && vis < 1.0) {\n" /* a far caster's shadow lighter: 5-tap cross blocker depth */ \
     "        vec3 p = vShWorld + n * (uShTexel[casc] * 1.5) + uShSun * uShTexel[casc];\n"              \
     "        vec4 q = uShCasc[casc] * vec4(p, 1.0);\n"                                                 \
     "        float r = 3.0 / float(textureSize(uShDepth, 0).x) / uShPart[casc];\n"                    \
     "        float sum = 0.0, cnt = 0.0;\n"                                                             \
-    "        for (int y = -1; y <= 1; ++y)\n"                                                          \
-    "            for (int x = -1; x <= 1; ++x) {\n"                                                    \
-    "                float b = texture(uShDepth, vec3((q.xy + vec2(x, y) * r) * uShPart[casc], float(casc))).r;\n" \
-    "                if (b < q.z - 0.0005) { sum += b; cnt += 1.0; }\n"                                \
-    "            }\n"                                                                                   \
+    "        const vec2 offs[5] = vec2[5](vec2(0.0, 0.0), vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0), vec2(1.0, 1.0));\n" \
+    "        for (int i = 0; i < 5; ++i) {\n"                                                           \
+    "            float b = texture(uShDepth, vec3((q.xy + offs[i] * r) * uShPart[casc], float(casc))).r;\n" \
+    "            if (b < q.z - 0.0005) { sum += b; cnt += 1.0; }\n"                                    \
+    "        }\n"                                                                                       \
     "        if (cnt > 0.0) {\n"                                                                        \
     "            float d = (q.z - sum / cnt) * uShRange[casc];\n"                                       \
     "            float keep = mix(1.0, uShFade.z, smoothstep(uShFade.x, uShFade.y, d));\n"              \
@@ -277,14 +283,17 @@ bool mrp_moby_caster_rect(const float* light_vp, float rect[4], const float* wit
     "        else { i = 64 + findLSB(m.z); m.z &= m.z - 1u; }\n"                                         \
     "        if (i >= uPtN) break;\n"                                                                     \
     "        vec3 L = uPtPos[i].xyz - vShWorld;\n"                                                      \
-    "        float d = length(L);\n"                                                                    \
-    "        if (d >= uPtPos[i].w || d <= 0.0) continue;\n"                                             \
-    "        float att = 1.0 - d / uPtPos[i].w;\n"                                                      \
+    "        float r = uPtPos[i].w, d2 = dot(L, L);\n"                                                  \
+    "        if (d2 >= r * r || d2 <= 0.0) continue;\n"                                                 \
+    "        float inv_d = inversesqrt(d2), d = d2 * inv_d;\n"                                          \
+    "        float ndl_p = dot(sh_n, L) * inv_d;\n"                                                     \
+    "        if (ndl_p <= 0.0) continue;\n"                                                             \
+    "        float att = 1.0 - d / r;\n"                                                                \
     "        float sv = 1.0;\n"                                                                         \
     "        if (uPtCol[i].w >= 0.0) {\n" /* the cube (the integer part) and its shadow's weight (0.05..0.95: fading in or out) */ \
     "            float layer = floor(uPtCol[i].w), kw = clamp((fract(uPtCol[i].w) - 0.05) / 0.9, 0.0, 1.0);\n" \
     "            vec3 v = vShWorld + sh_n * 0.04 - uPtPos[i].xyz;\n"                                    \
-    "            float f = uPtPos[i].w, nn = uPtNear;\n"                                                \
+    "            float f = r, nn = uPtNear;\n"                                                          \
     "            vec3 a = abs(v);\n"                                                                    \
     "            float z = max(max(a.x, a.y), a.z);\n"                                                  \
     "            float ref = 0.5 * ((f + nn) / (f - nn) - (2.0 * f * nn) / ((f - nn) * z)) + 0.5 - 0.0002;\n" \
@@ -295,7 +304,7 @@ bool mrp_moby_caster_rect(const float* light_vp, float rect[4], const float* wit
     "                 + texture(uPtMap, vec4(v + vec3(o, -o, o), layer), ref));\n"                \
     "            sv = mix(1.0, sv, kw);\n"                                                              \
     "        }\n"                                                                                       \
-    "        add += uPtCol[i].rgb * (max(dot(sh_n, L / d), 0.0) * att * 0.5 * sv);\n"                   \
+    "        add += uPtCol[i].rgb * (ndl_p * att * 0.5 * sv);\n"                                        \
     "    }\n"                                                                                           \
     "    if (uShDebug == 3) return add;\n"                                                              \
     "    return c + add;\n"                                                                             \

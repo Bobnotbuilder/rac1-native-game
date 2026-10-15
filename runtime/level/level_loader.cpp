@@ -1,5 +1,6 @@
 #include <runtime/level/level_loader.h>
 #include <runtime/level/host_layout.h>
+#include <runtime/kernel/disc.h>
 #include <runtime/kernel/ee_memory.h>
 #include <runtime/kernel/load_prof.h>
 #include <formats/level_core.h>
@@ -42,8 +43,9 @@ int g_pending_level_id = -1;
 
 namespace {
 std::filesystem::path g_legacy_pending;  // the level whose legacy copy is not built yet
+int g_legacy_pending_level = -1;
 
-// a level's file and its core, read ahead by LevelLoader::prefetch
+// a level's sectors and its core, read ahead by LevelLoader::prefetch
 struct Prefetched {
     std::vector<std::byte> file;
     std::vector<std::uint8_t> core_index, core_data;
@@ -51,6 +53,7 @@ struct Prefetched {
 };
 std::mutex g_pf_lock;
 std::filesystem::path g_pf_path;
+int g_pf_level = -1;
 std::shared_future<std::shared_ptr<Prefetched>> g_pf;
 
 // orig: (host) the file read whole
@@ -72,6 +75,21 @@ std::shared_ptr<Prefetched> take_prefetched(const std::filesystem::path& path) {
         f = g_pf;
         g_pf = {};
         g_pf_path.clear();
+        g_pf_level = -1;
+    }
+    LoadProf prof("  the prefetch waited for");
+    return f.get();
+}
+
+std::shared_ptr<Prefetched> take_prefetched_level(int level) {
+    std::shared_future<std::shared_ptr<Prefetched>> f;
+    {
+        std::scoped_lock lock(g_pf_lock);
+        if (!g_pf.valid() || g_pf_level != level) return nullptr;
+        f = g_pf;
+        g_pf = {};
+        g_pf_path.clear();
+        g_pf_level = -1;
     }
     LoadProf prof("  the prefetch waited for");
     return f.get();
@@ -79,10 +97,25 @@ std::shared_ptr<Prefetched> take_prefetched(const std::filesystem::path& path) {
 }  // namespace
 
 // orig: (host) see level_loader.h
+void LevelLoader::prefetch(int level) {
+    std::scoped_lock lock(g_pf_lock);
+    if (g_pf.valid() && g_pf_level == level) return;
+    g_pf_path.clear();
+    g_pf_level = level;
+    g_pf = std::async(std::launch::async, [level] {
+               auto p = std::make_shared<Prefetched>();
+               LoadProf prof("(worker) the level's sectors read from the disc and its core decompressed ahead");
+               if (disc_read_level_wad(level, p->file))
+                   p->ok = extract_core_from_level_wad(std::span<const std::byte>(p->file.data(), p->file.size()), p->core_index, p->core_data);
+               return p;
+           }).share();
+}
+
 void LevelLoader::prefetch(const std::filesystem::path& level_wad_path) {
     std::scoped_lock lock(g_pf_lock);
     if (g_pf.valid() && g_pf_path == level_wad_path) return;
     g_pf_path = level_wad_path;
+    g_pf_level = -1;
     g_pf = std::async(std::launch::async, [level_wad_path] {
                auto p = std::make_shared<Prefetched>();
                LoadProf prof("(worker) the level's file read and its core decompressed ahead");
@@ -92,6 +125,89 @@ void LevelLoader::prefetch(const std::filesystem::path& level_wad_path) {
            }).share();
 }
 void build_legacy(std::span<const std::byte> level_wad_span);
+
+namespace {
+void finish_level_wad_load(std::span<const std::byte> level_wad_span,
+                           const std::vector<std::uint8_t>& core_index,
+                           const std::vector<std::uint8_t>& core_data_decompressed,
+                           std::optional<LoadProf>& prof,
+                           int level,
+                           const std::filesystem::path& level_wad_path) {
+    // 3. Check memory boundary constraints
+    const u32 core_base_addr = host_layout::CORE;
+    const std::size_t total_payload_size = core_index.size() + core_data_decompressed.size();
+    if (!ee_is_valid_addr(core_base_addr, static_cast<u32>(total_payload_size))) {
+        throw std::runtime_error("LevelLoader: level core payload exceeds virtual EE RAM bounds");
+    }
+
+    // 4. Copy decompressed payload into EE virtual RAM at 0x004d4000
+    void* dest = ee_ram_ptr(core_base_addr);
+    if (!dest) {
+        throw std::runtime_error("LevelLoader: failed to map virtual RAM at address host_layout::CORE");
+    }
+
+    std::memcpy(dest, core_index.data(), core_index.size());
+    std::memcpy(static_cast<char*>(dest) + core_index.size(), core_data_decompressed.data(), core_data_decompressed.size());
+
+    prof.emplace("  the core copied, the overlay");
+    // 5. Load level overlay
+    LevelLoader::load_level_overlay(level_wad_span);
+
+    // 6. Write hardcoded layout pointers to virtual RAM
+    if (g_legacy_host_writes) {  // the legacy host only: the game sets these itself
+        ee_write<u32>(0x001940cc, host_layout::LOADER_ANCHOR); // Base Level Loader Anchor
+        ee_write<u32>(0x001940d0, host_layout::CORE_TEMP); // Core asset temporary buffer
+        ee_write<u32>(0x001940d4, host_layout::CORE); // Level core WAD base
+    }
+
+    prof.emplace("  register_level_textures");
+    // 7. Register level textures
+    LevelLoader::register_level_textures(level_wad_span);
+
+    prof.emplace("  sky_init");
+    // 8. Initialize sky asset
+    if (g_sky_init_callback) {
+        AssetIndexHeader core_header = ee_read<AssetIndexHeader>(host_layout::CORE);
+        g_sky_init_callback(core_header.sky_block, core_header.tfrag_textures.offset);
+    }
+    prof.reset();
+
+    // 9. The legacy host renderers' copy: now if one of them is in use, else when one is chosen
+    g_legacy_pending.clear();
+    g_legacy_pending_level = -1;
+    if (g_legacy_level_needed == nullptr || g_legacy_level_needed()) {
+        build_legacy(level_wad_span);
+    } else {
+        g_legacy_pending = level_wad_path;
+        g_legacy_pending_level = level;
+        if (load_prof_on()) std::printf("[load]   the legacy host renderers' copy of the level: not in use, left\n");
+    }
+}
+}  // namespace
+
+void LevelLoader::load_level_wad(int level) {
+    LoadProf prof_all("load_level_wad");
+    std::vector<std::byte> file_data;
+    std::vector<std::uint8_t> core_index;
+    std::vector<std::uint8_t> core_data_decompressed;
+    std::optional<LoadProf> prof;
+    if (std::shared_ptr<Prefetched> pf = take_prefetched_level(level); pf != nullptr && pf->ok) {
+        file_data = std::move(pf->file);
+        core_index = std::move(pf->core_index);
+        core_data_decompressed = std::move(pf->core_data);
+    } else {
+        prof.emplace("  the WAD read");
+        if (!disc_read_level_wad(level, file_data)) {
+            throw std::runtime_error("LevelLoader: failed to read level " + std::to_string(level) + " from disc image");
+        }
+        prof.emplace("  the core decompressed");
+        if (!extract_core_from_level_wad(std::span<const std::byte>(file_data.data(), file_data.size()), core_index, core_data_decompressed)) {
+            throw std::runtime_error("LevelLoader: failed to extract/decompress level core WAD for level " + std::to_string(level));
+        }
+    }
+    finish_level_wad_load(std::span<const std::byte>(file_data.data(), file_data.size()),
+                          core_index, core_data_decompressed, prof, level, {});
+}
 
 void LevelLoader::load_level_wad(const std::filesystem::path& level_wad_path) {
     LoadProf prof_all("load_level_wad");
@@ -117,55 +233,8 @@ void LevelLoader::load_level_wad(const std::filesystem::path& level_wad_path) {
             throw std::runtime_error("LevelLoader: failed to extract/decompress level core WAD: " + level_wad_path.string());
         }
     }
-    std::span<const std::byte> level_wad_span(file_data.data(), file_data.size());
-
-    // 3. Check memory boundary constraints
-    const u32 core_base_addr = host_layout::CORE;
-    const std::size_t total_payload_size = core_index.size() + core_data_decompressed.size();
-    if (!ee_is_valid_addr(core_base_addr, static_cast<u32>(total_payload_size))) {
-        throw std::runtime_error("LevelLoader: level core payload exceeds virtual EE RAM bounds");
-    }
-
-    // 4. Copy decompressed payload into EE virtual RAM at 0x004d4000
-    void* dest = ee_ram_ptr(core_base_addr);
-    if (!dest) {
-        throw std::runtime_error("LevelLoader: failed to map virtual RAM at address host_layout::CORE");
-    }
-
-    std::memcpy(dest, core_index.data(), core_index.size());
-    std::memcpy(static_cast<char*>(dest) + core_index.size(), core_data_decompressed.data(), core_data_decompressed.size());
-
-    prof.emplace("  the core copied, the overlay");
-    // 5. Load level overlay
-    load_level_overlay(level_wad_path);
-
-    // 6. Write hardcoded layout pointers to virtual RAM
-    if (g_legacy_host_writes) {  // the legacy host only: the game sets these itself
-        ee_write<u32>(0x001940cc, host_layout::LOADER_ANCHOR); // Base Level Loader Anchor
-        ee_write<u32>(0x001940d0, host_layout::CORE_TEMP); // Core asset temporary buffer
-        ee_write<u32>(0x001940d4, host_layout::CORE); // Level core WAD base
-    }
-
-    prof.emplace("  register_level_textures");
-    // 7. Register level textures
-    register_level_textures(level_wad_path);
-
-    prof.emplace("  sky_init");
-    // 8. Initialize sky asset
-    if (g_sky_init_callback) {
-        AssetIndexHeader core_header = ee_read<AssetIndexHeader>(host_layout::CORE);
-        g_sky_init_callback(core_header.sky_block, core_header.tfrag_textures.offset);
-    }
-    prof.reset();
-
-    // 9. The legacy host renderers' copy: now if one of them is in use, else when one is chosen
-    g_legacy_pending.clear();
-    if (g_legacy_level_needed == nullptr || g_legacy_level_needed()) {
-        build_legacy(level_wad_span);
-    } else {
-        g_legacy_pending = level_wad_path;
-        if (load_prof_on()) std::printf("[load]   the legacy host renderers' copy of the level: not in use, left\n");
-    }
+    finish_level_wad_load(std::span<const std::byte>(file_data.data(), file_data.size()),
+                          core_index, core_data_decompressed, prof, -1, level_wad_path);
 }
 
 // orig: (host) the legacy host renderers' copy of a level (see level_loader.h)
@@ -206,36 +275,33 @@ void build_legacy(std::span<const std::byte> level_wad_span) {
 }
 
 // orig: (host) the legacy copy built when a legacy renderer is chosen after the level's load (the debug menu): from the
-// level's file and the EE's memory as they are now (the texture tables and the core the legacy decoders read)
+// level's sectors on the disc and the EE's memory as they are now (the texture tables and the core the legacy decoders read)
 void LevelLoader::legacy_level_ensure() {
-    if (g_legacy_pending.empty() || (g_legacy_level_needed != nullptr && !g_legacy_level_needed())) return;
+    if ((g_legacy_pending.empty() && g_legacy_pending_level < 0) ||
+        (g_legacy_level_needed != nullptr && !g_legacy_level_needed()))
+        return;
     const std::filesystem::path path = g_legacy_pending;
+    const int level = g_legacy_pending_level;
     g_legacy_pending.clear();
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) return;
-    const std::streamsize file_size = file.tellg();
-    file.seekg(0, std::ios::beg);
-    std::vector<std::byte> file_data(static_cast<std::size_t>(file_size));
-    if (!file.read(reinterpret_cast<char*>(file_data.data()), file_size)) return;
+    g_legacy_pending_level = -1;
+    std::vector<std::byte> file_data;
+    if (level >= 0) {
+        if (!disc_read_level_wad(level, file_data)) return;
+    } else {
+        if (!read_file(path, file_data)) return;
+    }
     build_legacy(std::span<const std::byte>(file_data.data(), file_data.size()));
 }
 
 void LevelLoader::register_level_textures(const std::filesystem::path& level_wad_path) {
-    // 1. Read level WAD file from the host filesystem
-    std::ifstream file(level_wad_path, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) {
+    std::vector<std::byte> file_data;
+    if (!read_file(level_wad_path, file_data)) {
         throw std::runtime_error("LevelLoader: failed to open level WAD file for texture registration: " + level_wad_path.string());
     }
+    register_level_textures(std::span<const std::byte>(file_data.data(), file_data.size()));
+}
 
-    const std::streamsize file_size = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    std::vector<std::byte> file_data(file_size);
-    if (!file.read(reinterpret_cast<char*>(file_data.data()), file_size)) {
-        throw std::runtime_error("LevelLoader: failed to read level WAD file: " + level_wad_path.string());
-    }
-    file.close();
-
+void LevelLoader::register_level_textures(std::span<const std::byte> file_data) {
     // 2. Locate the inner WAD block (level_data)
     std::span<const std::byte> level_data(file_data.data(), file_data.size());
     if (file_data.size() >= 48) {
@@ -452,22 +518,23 @@ void LevelLoader::register_level_textures(const std::filesystem::path& level_wad
     }
 }
 
+std::uint32_t LevelLoader::load_level_overlay(int level) {
+    std::vector<std::byte> file_data;
+    if (!disc_read_level_overlay(level, file_data)) {
+        throw std::runtime_error("LevelLoader: failed to read level " + std::to_string(level) + " overlay from disc image");
+    }
+    return load_level_overlay(std::span<const std::byte>(file_data.data(), file_data.size()));
+}
+
 std::uint32_t LevelLoader::load_level_overlay(const std::filesystem::path& level_wad_path) {
-    // 1. Read level WAD file from the host filesystem
-    std::ifstream file(level_wad_path, std::ios::binary | std::ios::ate);
-    if (!file.is_open()) {
+    std::vector<std::byte> file_data;
+    if (!read_file(level_wad_path, file_data)) {
         throw std::runtime_error("LevelLoader: failed to open level WAD file for overlay loading: " + level_wad_path.string());
     }
+    return load_level_overlay(std::span<const std::byte>(file_data.data(), file_data.size()));
+}
 
-    const std::streamsize file_size = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    std::vector<std::byte> file_data(file_size);
-    if (!file.read(reinterpret_cast<char*>(file_data.data()), file_size)) {
-        throw std::runtime_error("LevelLoader: failed to read level WAD file for overlay loading: " + level_wad_path.string());
-    }
-    file.close();
-
+std::uint32_t LevelLoader::load_level_overlay(std::span<const std::byte> file_data) {
     // 2. Locate the inner WAD block (level_data)
     std::span<const std::byte> level_data(file_data.data(), file_data.size());
     if (file_data.size() >= 48) {

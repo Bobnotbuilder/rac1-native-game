@@ -1400,10 +1400,11 @@ void build_frame() {
         CachedMoby* cm = nullptr;
         if (caching) {
             cm = &g_mcache[m.moby];
-            *cm = CachedMoby{};
             cm->class_id = m.class_id;
             std::memcpy(cm->pos, m.pos, sizeof cm->pos);
             cm->seen = g_mcache_frame;
+            cm->joints.clear();
+            cm->parts.clear();
             for (uint32_t j = 0; j < m.joint_count && m.joint_first + j < f.joints.size(); ++j) cm->joints.push_back(f.joints[m.joint_first + j]);
         }
         ClassGpu* cg = class_of(m.class_ptr, m.class_id);
@@ -1860,23 +1861,55 @@ GLuint g_indirect_near = 0;
 void draw_casters(const float* light_vp, const float* sphere, const float* within) {
     Frame& F = g_frame;
     if (F.mode != 0 || F.batches.empty()) return;
-    std::vector<std::pair<uint32_t, uint32_t>> ranges;  // (per batch: first / count in the near buffer)
+    static std::vector<std::pair<uint32_t, uint32_t>> ranges;  // (per batch: first / count in the near buffer)
+    static std::vector<DrawCmd> near;
+    static std::vector<uint8_t> part_vis;
+    ranges.clear();
     const bool filter = sphere != nullptr || within != nullptr;
     if (filter) {
         const glm::vec3 c = sphere != nullptr ? glm::vec3(sphere[0], sphere[1], sphere[2]) : glm::vec3(0.0f);
-        const float lim = sphere != nullptr ? sphere[3] + 8.0f : 1e30f;
+        const float lim = sphere != nullptr ? sphere[3] + 6.0f : 1e30f;
+        const float lim2 = sphere != nullptr ? lim * lim : 1e30f;
         // the shadows' distance: the parts within it of the camera
         const glm::vec3 wc = within != nullptr ? glm::vec3(within[0], within[1], within[2]) : glm::vec3(0.0f);
         const float wd = within != nullptr ? within[3] : 1e30f;
-        std::vector<DrawCmd> near;
+        const float wd2 = within != nullptr ? wd * wd : 1e30f;
+        const glm::mat4 vp = (sphere != nullptr && light_vp != nullptr) ? glm::make_mat4(light_vp) : glm::mat4(1.0f);
+        const size_t nparts = F.part_pos.size();
+        part_vis.assign(nparts, 0);
+        uint32_t any_vis = 0;
+        for (size_t p = 0; p < nparts; ++p) {
+            const glm::vec3 pos = F.part_pos[p];
+            if (sphere != nullptr) {
+                const glm::vec3 d = pos - c;
+                if (glm::dot(d, d) > lim2) continue;
+                if (light_vp != nullptr) {
+                    const glm::vec4 clip = vp * glm::vec4(pos, 1.0f);
+                    // Reject parts behind the cube face or well outside its 90-degree frustum (with 6.0u margin for part size)
+                    if (clip.w < -6.0f || std::abs(clip.x) > clip.w + 8.5f || std::abs(clip.y) > clip.w + 8.5f) continue;
+                }
+            }
+            if (within != nullptr) {
+                const glm::vec3 dw = pos - wc;
+                if (glm::dot(dw, dw) > wd2) continue;
+            }
+            part_vis[p] = 1;
+            ++any_vis;
+        }
+        if (any_vis == 0) return;
+        near.clear();
+        ranges.reserve(F.batches.size());
         for (const Batch& b : F.batches) {
             const uint32_t first = static_cast<uint32_t>(near.size());
-            for (uint32_t i = b.first; i < b.first + b.count && i < F.draws.size(); ++i) {
-                const uint32_t ci = F.draws[i].base_instance;
-                const uint32_t part = 4 * ci < F.cmds.size() ? F.cmds[4 * ci] : 0xffffffffu;
-                if (part >= F.part_pos.size() || (sphere != nullptr && glm::length(F.part_pos[part] - c) > lim)) continue;
-                if (within != nullptr && glm::length(F.part_pos[part] - wc) > wd) continue;
-                near.push_back(F.draws[i]);
+            const uint32_t kztst = gs::field(b.key.test, 17, 2);
+            const bool zwrite = gs::field(b.key.test, 16, 1) != 0 && kztst != 1 && gs::field(b.key.zbuf, 32, 1) == 0;
+            if (zwrite) {
+                for (uint32_t i = b.first; i < b.first + b.count && i < F.draws.size(); ++i) {
+                    const uint32_t ci = F.draws[i].base_instance;
+                    const uint32_t part = 4 * ci < F.cmds.size() ? F.cmds[4 * ci] : 0xffffffffu;
+                    if (part >= nparts || !part_vis[part]) continue;
+                    near.push_back(F.draws[i]);
+                }
             }
             ranges.push_back({first, static_cast<uint32_t>(near.size()) - first});
         }

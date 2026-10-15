@@ -17,12 +17,17 @@ namespace rac1::vu0m {
 using Vf = VUVector;
 // orig: (helper) LQC2 / SQC2
 inline Vf lqc2(uint32_t a) {
+    if (__builtin_expect((a & 0xfffu) <= 0xff0u, 1)) return ee_read<Vf>(a);
     Vf r;
     for (int i = 0; i < 4; ++i) r.v[i] = lwc1(a + 4 * static_cast<uint32_t>(i));
     return r;
 }
 // orig: (helper) SQC2
 inline void sqc2(uint32_t a, const Vf& r) {
+    if (__builtin_expect((a & 0xfffu) <= 0xff0u, 1)) {
+        ee_write<Vf>(a, r);
+        return;
+    }
     for (int i = 0; i < 4; ++i) swc1(a + 4 * static_cast<uint32_t>(i), r.v[i]);
 }
 // orig: (helper) the lane ops: a op b by the VU rules

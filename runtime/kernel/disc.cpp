@@ -4,18 +4,84 @@
 
 #include <platform/platform.h>
 
+#include <algorithm>
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <vector>
 
 namespace rac1 {
 
 namespace {
 std::FILE* g_iso = nullptr;
+
+struct DiscLevel {
+    int state = 0;  // 0: unknown, 1: valid, -1: missing
+    std::array<std::pair<uint32_t, uint32_t>, 4> ranges{};  // (lba, sectors): data, gameplay NTSC, gameplay PAL, occlusion
+};
+std::mutex g_toc_lock;
+std::vector<uint8_t> g_toc;
+std::array<DiscLevel, 19> g_levels{};
+
+bool parse_level_header(uint32_t lsn, int want_level, DiscLevel& out) {
+    if (lsn == 0) return false;
+    uint8_t h[2048];
+    if (!disc_read(lsn, 1, h)) return false;
+    int32_t lid = 0, hsize = 0;
+    std::memcpy(&lid, h, 4);
+    std::memcpy(&hsize, h + 4, 4);
+    if (lid != want_level || hsize != 0x2434) return false;
+    for (int k = 0; k < 4; ++k) {
+        uint32_t o = 0, n = 0;
+        std::memcpy(&o, h + 8 + 8 * k, 4);
+        std::memcpy(&n, h + 12 + 8 * k, 4);
+        out.ranges[k] = {o, n};
+    }
+    out.state = 1;
+    return true;
 }
+
+const DiscLevel* get_disc_level(int level) {
+    if (level < 0 || level >= 19) return nullptr;
+    std::scoped_lock lock(g_toc_lock);
+    DiscLevel& dl = g_levels[static_cast<size_t>(level)];
+    if (dl.state != 0) return dl.state > 0 ? &dl : nullptr;
+    if (g_toc.empty()) {
+        g_toc.resize(6 * 2048);
+        int32_t magic = 0, toc_size = 0;
+        if (!disc_read(1500, 6, g_toc.data())) {
+            g_toc.clear();
+            return nullptr;
+        }
+        std::memcpy(&magic, g_toc.data(), 4);
+        std::memcpy(&toc_size, g_toc.data() + 4, 4);
+        if (magic != 1 || toc_size < 8 || static_cast<size_t>(toc_size) > g_toc.size()) {
+            g_toc.clear();
+            dl.state = -1;
+            return nullptr;
+        }
+        g_toc.resize(static_cast<size_t>(toc_size));
+    }
+    // 0x13a448 - 0x137b80 = 0x28c8: the level table in the disc's table of contents (level_read.cpp)
+    const size_t std_ofs = 0x28c8 + static_cast<size_t>(level) * 8;
+    if (std_ofs + 4 <= g_toc.size()) {
+        uint32_t lsn = 0;
+        std::memcpy(&lsn, g_toc.data() + std_ofs, 4);
+        if (parse_level_header(lsn, level, dl)) return &dl;
+    }
+    for (size_t ofs = 8; ofs + 8 <= g_toc.size(); ofs += 8) {
+        uint32_t lsn = 0;
+        std::memcpy(&lsn, g_toc.data() + ofs, 4);
+        if (parse_level_header(lsn, level, dl)) return &dl;
+    }
+    dl.state = -1;
+    return nullptr;
+}
+}  // namespace
 
 std::string disc_path() {
     const char* env = std::getenv("RAC1_ISO");
@@ -131,6 +197,58 @@ bool disc_read_ee(uint32_t ee_dst, uint32_t lba, uint32_t sectors) {
     std::vector<uint8_t> buf(static_cast<size_t>(sectors) * 2048);
     if (!disc_read(lba, sectors, buf.data())) return false;
     for (size_t i = 0; i < buf.size(); ++i) ee_write<uint8_t>(ee_dst + static_cast<uint32_t>(i), buf[i]);
+    return true;
+}
+
+bool disc_has_level(int level) { return get_disc_level(level) != nullptr; }
+
+bool disc_read_level_wad(int level, std::vector<std::byte>& out) {
+    const DiscLevel* lv = get_disc_level(level);
+    if (lv == nullptr) return false;
+    uint32_t low = UINT32_MAX, high = 0;
+    for (const auto& r : lv->ranges) {
+        if (r.second == 0) continue;
+        low = std::min(low, r.first);
+        high = std::max(high, r.first + r.second);
+    }
+    if (low == UINT32_MAX || high <= low || low == 0) return false;
+    const uint32_t adjust = low - 1;  // one header sector in front
+    const size_t total_sectors = high - adjust;
+    out.assign(total_sectors * 2048, std::byte{0});
+    if (!disc_read(low, high - low, out.data() + 2048)) {
+        out.clear();
+        return false;
+    }
+    const int32_t hdr_prefix[4] = {0x30, 0, level, 0};
+    std::memcpy(out.data(), hdr_prefix, 16);
+    for (int k = 0; k < 4; ++k) {
+        const uint32_t rel_o = lv->ranges[k].second != 0 ? lv->ranges[k].first - adjust : 0;
+        const uint32_t rel_n = lv->ranges[k].second;
+        std::memcpy(out.data() + 16 + 8 * k, &rel_o, 4);
+        std::memcpy(out.data() + 20 + 8 * k, &rel_n, 4);
+    }
+    return true;
+}
+
+bool disc_read_level_overlay(int level, std::vector<std::byte>& out) {
+    const DiscLevel* lv = get_disc_level(level);
+    if (lv == nullptr || lv->ranges[0].second == 0) return false;
+    const uint32_t data_lba = lv->ranges[0].first, data_sectors = lv->ranges[0].second;
+    std::byte head[2048];
+    if (!disc_read(data_lba, 1, head)) return false;
+    int32_t ovl_off = 0, ovl_size = 0;
+    std::memcpy(&ovl_off, head, 4);
+    std::memcpy(&ovl_size, head + 4, 4);
+    if (ovl_off < 0 || ovl_size <= 0) return false;
+    const uint64_t end = static_cast<uint64_t>(ovl_off) + static_cast<uint64_t>(ovl_size);
+    const uint64_t need_sectors = (end + 2047) / 2048;
+    if (need_sectors > data_sectors) return false;
+    out.resize(static_cast<size_t>(need_sectors) * 2048);
+    std::memcpy(out.data(), head, 2048);
+    if (need_sectors > 1 && !disc_read(data_lba + 1, static_cast<uint32_t>(need_sectors - 1), out.data() + 2048)) {
+        out.clear();
+        return false;
+    }
     return true;
 }
 
