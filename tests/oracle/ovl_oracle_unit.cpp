@@ -4,6 +4,7 @@
 #include "ovl_oracle.h"
 
 #include <game/ovl/ovl_reloc.h>
+#include <runtime/kernel/disc.h>
 namespace rac1::oracle {
 
 void batches_unit() {
@@ -6105,19 +6106,13 @@ void batches_unit() {
     }, [](A a) { sub_00241788(a.i[0], static_cast<int32_t>(a.i[1])); return uint64_t{0}; });
 
     check("wad_decompress", 0x0024d8d0, 6, Ret::Int32, [] {  // real compressed blocks of the Veldin level file
-        static std::vector<uint8_t> wad;
-        if (wad.empty()) {
-            if (FILE* f = std::fopen("assets/extracted/level_wads/0_veldin_tutorial/level.wad", "rb")) {
-                std::fseek(f, 0, SEEK_END); wad.resize(static_cast<size_t>(std::ftell(f))); std::fseek(f, 0, SEEK_SET);
-                if (std::fread(wad.data(), 1, wad.size(), f) != wad.size()) wad.clear();
-                std::fclose(f);
-            }
-        }
+        static std::vector<std::byte> wad;
+        if (wad.empty()) disc_read_level_wad(0, wad);
         static const uint32_t blocks[] = {0x382b40, 0x3b9540};
         const uint32_t off = blocks[ri(0, 1)];
         uint32_t size = 0; std::memcpy(&size, wad.data() + off + 3, 4);
         constexpr uint32_t SRC = 0x01800000, DST = 0x01a00000;
-        for (uint32_t i = 0; i < size + 0x4000; ++i) w8(SRC + i, off + i < wad.size() ? wad[off + i] : 0);
+        for (uint32_t i = 0; i < size + 0x4000; ++i) w8(SRC + i, off + i < wad.size() ? static_cast<uint8_t>(wad[off + i]) : 0);
         wrand(0x70000000, 0x1000);
         return Args{{SRC, DST}, {}};
     }, [](A a) { return ri32(wad_decompress(a.i[0], a.i[1])); });

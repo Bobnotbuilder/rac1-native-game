@@ -16,6 +16,7 @@
 #include <game/ovl/orxon_mobys.h>
 #include <game/ovl/ovl_reloc.h>
 #include <game/ovl/pokitaru_mobys.h>
+#include <game/ovl/hoven_mobys.h>
 #include <game/ovl/rilgar_mobys.h>
 #include <game/ovl/variants_l2.h>
 #include <game/ovl/variants_l3.h>
@@ -26,6 +27,7 @@
 #include <game/ovl/variants_l9.h>
 #include <game/ovl/variants_l10.h>
 #include <game/ovl/variants_l11.h>
+#include <game/ovl/variants_l12.h>
 
 namespace rac1 {
 
@@ -135,6 +137,16 @@ bool class_hook_call_level(uint32_t fn, uint32_t m, uint32_t a1, uint32_t a2, fl
         case L11_CASE(0x00316270): ret = u_call(pok_hook_316270_u, m, a1, a2, f12); return true;
         case L11_CASE(0x003162d0): ret = u_call(pok_hook_3162d0_u, m, a1, a2, f12); return true;
         case L11_CASE(0x003162f0): ret = u_call(pok_hook_3162f0_u, m, a1, a2, f12); return true;
+        default: return false;
+        }
+    case 12:  // Hoven: class 0xee (table 0x20d228), class 0x10e's hook +0xc (table 0x20d240: Veldin's 0x2caf10 code, the map pairs it with 0x2d57d0)
+        switch (lvl_key(fn)) {
+        case L12_CASE(0x002e16b8): ret = u_call(hov_hook_2e16b8_u, m, a1, a2, f12); return true;
+        case L12_CASE(0x002e1758): ret = u_call(hov_hook_2e1758_u, m, a1, a2, f12); return true;
+        case L12_CASE(0x002e17a8): ret = u_call(hov_hook_2e17a8_u, m, a1, a2, f12); return true;
+        case L12_CASE(0x002e17f8): ret = u_call(hov_hook_2e17f8_u, m, a1, a2, f12); return true;
+        case L12_CASE(0x002e1848): ret = u_call(hov_hook_2e1848_u, m, a1, a2, f12); return true;
+        case L12_CASE(0x002e6b00): ret = u_call(hov_hook_2e6b00_u, m, a1, a2, f12); return true;
         default: return false;
         }
     case 13:  // Gemlik Base: class 0x3f (table 0x1f6174)

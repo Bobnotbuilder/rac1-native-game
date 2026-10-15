@@ -64,6 +64,10 @@ std::string system_language();
 // Runs a program (looked up in PATH) with `args` (args[0] the program), its standard output
 // discarded, and waits for it. Its exit code; -1 when it could not be started or did not exit.
 int run_quiet(const std::vector<std::string>& args);
+// Starts the setup in update mode (`args`, in `cwd`) as the game quits: on Linux, replaces this
+// process (execvp); on Windows, starts a new console process so this executable can exit before the
+// setup replaces it.
+void launch_updater(const std::vector<std::string>& args, const std::filesystem::path& cwd);
 // The Python interpreter's name for run_quiet: python3; Windows: $RAC1_PYTHON (the setup sets it), else python.
 std::string python_program();
 // The names of the environment's variables that start with `prefix`.

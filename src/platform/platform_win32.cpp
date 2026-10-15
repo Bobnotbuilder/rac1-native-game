@@ -215,6 +215,23 @@ int run_quiet(const std::vector<std::string>& args) {
     return ok ? static_cast<int>(code) : -1;
 }
 
+void launch_updater(const std::vector<std::string>& args, const std::filesystem::path& cwd) {
+    if (args.empty()) return;
+    std::wstring cmd;
+    for (const auto& a : args) {
+        if (!cmd.empty()) cmd.push_back(L' ');
+        cmd += quote_arg(widen(a));
+    }
+    STARTUPINFOW si{};
+    si.cb = sizeof si;
+    PROCESS_INFORMATION pi{};
+    const wchar_t* dir = cwd.empty() ? nullptr : cwd.c_str();
+    if (CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, CREATE_NEW_CONSOLE, nullptr, dir, &si, &pi)) {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
+}
+
 std::string python_program() {
     if (const char* p = std::getenv("RAC1_PYTHON"); p != nullptr && *p != 0) return p;
     return "python";

@@ -60,4 +60,18 @@ void particle_31_update(uint32_t a0_in);
 
 //@gen particle_31_update
 
+//@gen ovl_263468_tr
+
+//@gen ovl_268f10_tr
+
+//@gen ovl_2634f8_tr
+
+//@gen particle_0a_update
+
+//@gen particle_0e_update
+
+//@gen particle_27_update
+
+//@gen particle_49_update
+
 }  // namespace rac1

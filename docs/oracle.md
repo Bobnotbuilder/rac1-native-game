@@ -135,11 +135,14 @@ shared code every level runs:
 | 9 | 121, 150, 170 |
 | 10 | 122, 123, 171 |
 | 11 | 124, 146 |
+| 12 | 192, 200, 202 |
+| 0, 8, 11, 12, 13 and 14 | 203 (the PDA, hero item 0x20) |
 | 13 | 123, 220, 222 |
 | 14 | 44 .. 55, 221, 223 |
 | 0 and 3 | 180 |
 | 0, 1, 3 and 5 | 190 (it proves a fix of the code generator, `tools/codegen/mips2cpp.py`) |
 | 3, 6 and 10 | 191 |
+| 0, 1, 3, 4, 6, 8 and 9 | 192 (the particle types 0x0a, 0x0e, 0x27, 0x49; no dumps: states built from the level) |
 
 For a quick check after a small change, level 0's 63, 79, 118 and 141 are the usual minimum.
 

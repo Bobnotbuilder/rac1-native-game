@@ -52,6 +52,7 @@ void sub_00232628() {
 void hero_mobys_set_flag1() {
     if (on_batalia()) { bat_call(bat_hero_mobys_set_flag1_u); return; }  // (level 8's own: L8:0x0023e4c0)
     if (on_pokitaru()) { pok_call(pok_hero_mobys_set_flag1_u); return; }  // (level 11's own: L11:0x00259c80)
+    if (on_hoven()) { hov_call(hov_hero_mobys_set_flag1_u); return; }  // (level 12's own: L12:0x0024cac0)
     if (on_oltanis()) { olt_call(olt_hero_mobys_set_flag1_u); return; }  // (level 14's own: L14:0x0023c550)
     if (on_l1_family() || on_rilgar()) return hero_mobys_set_flag1_l1();
     const uint32_t m = lwu(g::PLAYER + 0x2080);
@@ -64,6 +65,7 @@ void hero_mobys_set_flag1() {
 void hero_mobys_clear_flag1() {
     if (on_batalia()) { bat_call(bat_hero_mobys_clear_flag1_u); return; }  // (level 8's own: L8:0x0023e4d8)
     if (on_pokitaru()) { pok_call(pok_hero_mobys_clear_flag1_u); return; }  // (level 11's own: L11:0x00259c98)
+    if (on_hoven()) { hov_call(hov_hero_mobys_clear_flag1_u); return; }  // (level 12's own: L12:0x0024cad8)
     if (on_oltanis()) { olt_call(olt_hero_mobys_clear_flag1_u); return; }  // (level 14's own: L14:0x0023c568)
     if (on_l1_family() || on_rilgar()) return hero_mobys_clear_flag1_l1();
     const uint32_t m = lwu(g::PLAYER + 0x2080);

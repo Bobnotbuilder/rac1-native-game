@@ -309,6 +309,49 @@ void probe(int kind) {
 
 std::vector<uint8_t> g_verify_ram, g_verify_spr;
 
+struct Vu0Save {
+    std::array<VUVector, 32> vf;
+    std::array<int16_t, 16> vi;
+    VUVector acc;
+    float q, i, r, p;
+    uint32_t macflag, statusflag, clipflag, mac_visible, status_visible, clip_visible, xtop;
+    alignas(16) uint8_t mem[4096];
+    std::array<uint64_t, 512> micro;
+    VuMicroRun run;
+    uint32_t cmsar0 = 0;
+    bool full = false;
+    explicit Vu0Save(bool save_mem_and_micro) : full(save_mem_and_micro) {
+        const vu0::Vu0& v = vu0::global();
+        const VUState& s = v.st;
+        vf = s.vf; vi = s.vi; acc = s.acc;
+        q = s.q; i = s.i; r = s.r; p = s.p;
+        macflag = s.macflag; statusflag = s.statusflag; clipflag = s.clipflag;
+        mac_visible = s.mac_visible; status_visible = s.status_visible; clip_visible = s.clip_visible;
+        xtop = s.xtop;
+        if (full) {
+            std::memcpy(mem, s.mem.data(), 4096);
+            micro = v.micro;
+            run = v.run;
+            cmsar0 = v.cmsar0;
+        }
+    }
+    void restore() const {
+        vu0::Vu0& v = vu0::global();
+        VUState& s = v.st;
+        s.vf = vf; s.vi = vi; s.acc = acc;
+        s.q = q; s.i = i; s.r = r; s.p = p;
+        s.macflag = macflag; s.statusflag = statusflag; s.clipflag = clipflag;
+        s.mac_visible = mac_visible; s.status_visible = status_visible; s.clip_visible = clip_visible;
+        s.xtop = xtop;
+        if (full) {
+            std::memcpy(s.mem.data(), mem, 4096);
+            v.micro = micro;
+            v.run = run;
+            v.cmsar0 = cmsar0;
+        }
+    }
+};
+
 }  // namespace
 
 // The shadow chain of the pass being run (kept until the real pass has run: its end, the self-test's comparison).
@@ -343,14 +386,14 @@ void mrp_lod_world_shadow(int kind, void (*pass)(), uint32_t cur) {
         if (kind == 0) {
             const bool host = asked && !selftest && mrp_world_tfrag_lod();
             if (w_req > 1.0f && mrpw::tfrag_gpu_enabled() && !vu0::running()) {  // (the widened view's values, as the shadow run's patch_widen makes them, read in a journal)
-                const VUState vu0_saved = vu0::global().st;
+                const Vu0Save vu0_saved(false);
                 const auto hw_saved = eer::hwregs();
                 ee_journal_begin();
                 patch_widen(w_req, 0);
                 mrpw::tfrag_note_pass(host, s_req, w_req);
                 patch_clear();
                 g_st.pages += ee_journal_restore();
-                vu0::global().st = vu0_saved;
+                vu0_saved.restore();
                 eer::hwregs() = hw_saved;
             } else {
                 mrpw::tfrag_note_pass(host && w_req <= 1.0f, s_req, 1.0f);  // (a VU0 program running: the shadow run instead, below)
@@ -379,7 +422,7 @@ void mrp_lod_world_shadow(int kind, void (*pass)(), uint32_t cur) {
     }
     // the host state the pass changes besides EE memory: the VU0 registers (macro mode), the DMA registers its scratchpad
     // transfers go through, the visible lists the passes note
-    const VUState vu0_saved = vu0::global().st;
+    const Vu0Save vu0_saved(true);
     const auto hw_saved = eer::hwregs();
     const WorldVisible vis_saved = world_visible();
     ee_journal_begin();
@@ -410,7 +453,7 @@ void mrp_lod_world_shadow(int kind, void (*pass)(), uint32_t cur) {
         }
     }
     g_st.pages += ee_journal_restore();
-    vu0::global().st = vu0_saved;
+    vu0_saved.restore();
     eer::hwregs() = hw_saved;
     world_visible_restore(vis_saved);
     if (verify) {
@@ -541,7 +584,7 @@ void mrp_lod_effects_shadow(void (*pass)(), uint32_t cur) {
         return;
     }
     const auto t0 = std::chrono::steady_clock::now();
-    const vu0::Vu0 vu0_saved = vu0::global();  // (the block's VU0 macro / micro work)
+    const Vu0Save vu0_saved(true);  // (the block's VU0 macro / micro work)
     const auto hw_saved = eer::hwregs();
     ee_journal_begin();
     if (!selftest) patch_cull(widen);  // (the particles' sphere test: vf26 / vf27)
@@ -560,7 +603,7 @@ void mrp_lod_effects_shadow(void (*pass)(), uint32_t cur) {
         std::memcpy(g_ps.bytes.data(), ee_ram_ptr(cur), g_ps.bytes.size());
     }
     g_st.pages += ee_journal_restore();
-    vu0::global() = vu0_saved;
+    vu0_saved.restore();
     eer::hwregs() = hw_saved;
     g_ps.ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
     if (!ok) {
@@ -621,7 +664,7 @@ void shadow_packet_room() {
     }();
     if (off) return;
     const uint32_t work = lwu(OV(0x0015f5fcu));
-    for (uint32_t i = 0; i < 0x2000; i += 4) sw(kShadowWork + i, lwu(work + i));
+    std::memcpy(ee_ram_ptr_write(kShadowWork, 0x2000), ee_ram_ptr_read(work), 0x2000);
     sw(OV(0x0015f5fcu), kShadowWork);
     sw(OV(0x001611c0u), kShadowPackets);
 }
@@ -665,7 +708,7 @@ void mrp_lod_moby_shadow(void (*pass)()) {
     }
     // the host state the pass changes besides EE memory: the whole VU0 (the pass uploads its micro programs, the drop shadows run
     // them), the DMA registers, the pass's host notes and timers; the drop shadows' observer off (the MRP's are the real pass's)
-    const vu0::Vu0 vu0_saved = vu0::global();
+    const Vu0Save vu0_saved(true);
     const auto hw_saved = eer::hwregs();
     const uint32_t up_first = g_moby_upload_chain_first, up_last = g_moby_upload_chain_last;
     const double t_skin = g_prof_moby_skin_ms, t_fill = g_prof_moby_fill_ms, t_tex = g_prof_moby_tex_ms, t_slots = g_prof_moby_slots_ms;
@@ -693,7 +736,7 @@ void mrp_lod_moby_shadow(void (*pass)()) {
         g_ps.drawn_valid = true;
     }
     g_st.pages += ee_journal_restore();
-    vu0::global() = vu0_saved;
+    vu0_saved.restore();
     eer::hwregs() = hw_saved;
     g_moby_upload_chain_first = up_first;
     g_moby_upload_chain_last = up_last;

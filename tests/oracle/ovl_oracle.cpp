@@ -213,6 +213,10 @@ int main(int argc, char** argv) {
     batch_180();
     batch_190();
     batch_191();
+    batch_192();
+    batch_200();
+    batch_202();
+    batch_203();
     batch_220();
     batch_221();
     batch_222();

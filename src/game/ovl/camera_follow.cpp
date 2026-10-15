@@ -14,6 +14,7 @@
 #include <game/ovl/gaspar_hooks.h>
 #include <game/ovl/orxon_hooks.h>
 #include <game/ovl/pokitaru_hooks.h>
+#include <game/ovl/hoven_hooks.h>
 #include <game/ovl/gemlik_hooks.h>
 #include <game/ovl/oltanis_hooks.h>
 #include <game/ovl/aridia_classes_tr.h>
@@ -515,6 +516,7 @@ void cam0_hook_call(uint32_t fn) {
     }
     if (on_orxon() && orxon_camera_hook_call(fn)) return;  // (level 10's own: 0x2f4b18)
     if (on_pokitaru() && pokitaru_camera_hook_call(fn)) return;  // (level 11's own: 0x327a90)
+    if (on_hoven() && hoven_camera_hook_call(fn)) return;  // (level 12's own: 0x3148f0)
     if (on_gemlik() && gemlik_camera_hook_call(fn)) return;  // (level 13's own: 0x316b48)
     if (on_oltanis() && oltanis_camera_hook_call(fn)) return;  // (level 14's own: 0x3131e0)
     if (on_gaspar() && gaspar_camera_hook_call(fn)) return;  // (level 9's own: 0x314220)
