@@ -3,6 +3,44 @@
 What changed in each release. Releases are source only: you build the game with `./setup.sh`
 (`setup.cmd` on Windows) from your own disc. Issue numbers refer to this repository's issues.
 
+## 0.3.0
+
+**Every planet of the game is ported**, up to the final fight with Drek, the credits and the end
+menu. The planets after Orxon are new and **not fully tested yet**: expect bugs and glitches; some
+polishing work is still to do. Tested on Linux only so far.
+
+### New planets
+- **Pokitaru** (finished), **Hoven**, **Gemlik Base** (Qwark's space fight), **Oltanis**, **Quartu**
+  (Giant Clank), **Kalebo III** (Gadgetron's headquarters, the hoverboard race), **Drek's fleet** and
+  **the Veldin finale**, each with its own build of the hero's code, its classes, effects, cameras
+  and sounds, ported from the game's code and proved against the original.
+- **The end of the game:** the credits, the last movie and the end menu (a new game keeping your
+  weapons and bolts, or back to before the fight with Drek).
+- The PDA now opens the Vendor on every level.
+
+### Performance
+- Faster vector math (SSE2), a faster dispatch of the game's callbacks and lighter renderer passes;
+  the experimental lighting is faster too. The game's own state is unchanged.
+- The levels are read straight from the disc image: the setup no longer copies them (335 MB less).
+
+### The updater
+- **Update now** from the update notice: the game closes, updates its sources (git, or the release's
+  source zip), runs the setup again and restarts. Source only, as always; local changes are never
+  overwritten (#13).
+- A dedicated **Updates** page on the title's main menu: the check on / off, the channel (Stable /
+  Development) and **Check now**.
+
+### Also new
+- **Strafing movement** (Advanced): R&C 1's movement with the strafe and the strafe flips (#34).
+
+### Fixes
+- Batalia's cutscenes out of sync: the pause menu now pauses the dialogue and music as on the PS2 (#23).
+- Particles that froze in place on several planets (smoke, debris, effects), as the helicopter
+  bullets did before.
+- Kalebo III's race HUD showed its text in the wrong colour.
+- Experimental lighting: the sun's shadow no longer flips when entering buildings (#3).
+- The black bars of the 4:3 view were missing (#39).
+
 ## 0.2.1
 
 Windows fixes, confirmed by a player on a laptop with an NVIDIA GPU (#35):

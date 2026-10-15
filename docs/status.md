@@ -2,9 +2,12 @@
 
 *State as of October 2026.*
 
-**Milestone 1 is reached: the game is complete up to Umbris** (Veldin, Novalis, Aridia, Kerwan,
-Eudora, Rilgar, Blarg / Nebula G34 and Umbris; see [Roadmap](roadmap.md)). The port as a whole is
-still in progress: the planets after Umbris are only partly ported or not yet.
+**Every planet of the game is ported (0.3.0).** Milestone 1, the game complete up to Umbris, was
+reached first (Veldin, Novalis, Aridia, Kerwan, Eudora, Rilgar, Blarg / Nebula G34 and Umbris; see
+[Roadmap](roadmap.md)); Batalia, Gaspar and Orxon followed in 0.2.0, and the rest of the game, from
+Pokitaru to the Veldin finale, the credits and the end menu, in 0.3.0. The planets after Orxon are
+new: their code is ported and proved against the original, but they have not been fully played by
+hand yet. Expect bugs and glitches there; the port as a whole still needs polishing.
 
 Every planet of the milestone has its own classes ported and proved against the original code, and
 runs on its own overlay. The gaps that remain on them are listed below as **known issues**; they are
@@ -43,9 +46,9 @@ The rest of this page uses the in-game name first and the code's name in bracket
 
 ## The planets
 
-Levels 0 to 7 are Milestone 1, and the whole milestone has been played through from Veldin to Umbris (included): apart from a few small bugs and glitches it plays without major problems. After Umbris the game takes the player to Batalia, which runs but is only partly ported, as are the planets after it: they are not playable end to end yet.
+Levels 0 to 7 are Milestone 1, and the whole milestone has been played through from Veldin to Umbris (included): apart from a few small bugs and glitches it plays without major problems. Batalia, Gaspar and Orxon (0.2.0) have been played through too.
 
-> **The planets after Umbris:** they all load and run, and some may already be largely playable. Batalia, for example, should now be playable end to end, but it has not been played through yet. But part of the code that covers them, or that may cover some of their sections, is not ported yet, so expect missing effects, objects that don't react, or sections that can't be finished. They have not been tested in depth yet. Bug reports are welcome.
+> **The planets after Orxon (0.3.0):** Pokitaru, Hoven, Gemlik Base, Oltanis, Quartu, Kalebo III, Drek's fleet and the Veldin finale have their own code ported and proved against the original, and automated runs on each of them reach no unported code of the level. But they have not been fully played by hand yet: some sections were never reached in automated runs (Qwark's fight won, the hoverboard race on Kalebo III finished, some ship departures), so expect bugs and glitches. Bug reports are welcome.
 
 Every one of the game's 19 levels (0 to 18) loads and runs on its own overlay (the level's own build of the
 engine, see [Architecture](architecture.md#per-level-overlays-and-the-ov-macros)), without crashing,
@@ -111,11 +114,11 @@ nothing, so an object whose class is not ported stands still or does not appear.
 
 ## Not done yet
 
-- **The second half of the game.** Levels 8 to 14 have their own code ported; levels 15 to 18
-  have nothing of their own ported yet.
+- **Playtesting and polishing the second half of the game.** Every level's own code is ported, but
+  the planets after Orxon have not been fully played by hand yet.
 - **Shared code still stubbed.** Every level still reaches a few `TODO_PORT` stubs that are not its
-  own code: some kernel and DMA calls the host does not need. Several weapon and gadget classes are
-  not ported on any level yet.
+  own code: some kernel and DMA calls the host does not need. A few shared functions may remain that
+  no automated run has reached; they log a `TODO_PORT` line when met.
 - **Not everything is native in the renderer.** The HUD, menus and some effects are still drawn
   through the GS replica, and the mobys' flattened shadow meshes are not drawn yet (see
   [Rendering](rendering.md#limits)).

@@ -1,9 +1,9 @@
 # rac1-native
 
-> **Current state (0.2.0):** apart from a few small bugs and glitches, the game is playable up to
-> **Umbris**, and now also **Batalia**, **Gaspar** and **Orxon**. The planets after them all load, but
-> they are only partly ported: expect missing effects or sections that can't be finished. Everything
-> after Orxon is work in progress.
+> **Current state (0.3.0):** every planet of the game is now ported, from Veldin to the final fight
+> with Drek, the credits and the end menu. Up to Orxon the game has been played through; the planets
+> after it (Pokitaru to the Veldin finale) are new and have **not been fully tested yet**: expect bugs
+> and glitches, and some polishing work is still to do. So far it has been tested on Linux only.
 > See [Status](docs/status.md).
 
 A native PC port of **Ratchet & Clank** (PlayStation 2, 2002), for Linux, and experimentally for Windows.
@@ -20,13 +20,14 @@ changing how the game behaves.
 
 ## Status
 
-**Milestone 1 is reached: the game is playable up to Umbris.** Veldin, Novalis, Aridia, Kerwan,
-Eudora, Rilgar, Blarg / Nebula G34 and Umbris, the eight planets, have been played through, apart from a few small bugs
-and glitches. Since 0.2.0, Batalia, Gaspar and Orxon are ported too and have been played through.
-Pokitaru and the planets after it are only partly ported or not yet, so they are not playable end to
-end yet. The port as a whole is still in progress. See [Status](docs/status.md) (which also maps the names
-the code uses for the levels to the names in the game), the [Roadmap](docs/roadmap.md) and the
-[History](docs/history.md).
+**Every planet of the game is ported (0.3.0).** Veldin, Novalis, Aridia, Kerwan, Eudora, Rilgar,
+Blarg / Nebula G34 and Umbris (Milestone 1) and then Batalia, Gaspar and Orxon have been played
+through, apart from a few small bugs and glitches. Pokitaru, Hoven, Gemlik Base, Oltanis, Quartu,
+Kalebo III, Drek's fleet and the Veldin finale, with the credits and the end menu, are ported and
+proved against the original code, and checked in automated runs, but have not been fully played by
+hand yet. The port as a whole still needs polishing. See [Status](docs/status.md) (which also maps
+the names the code uses for the levels to the names in the game), the [Roadmap](docs/roadmap.md) and
+the [History](docs/history.md).
 
 ### Tested on
 

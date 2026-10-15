@@ -127,6 +127,13 @@ the background, and a proposed second copy of the sound system so music keeps pl
 level's own hero code as well, which found and fixed one last difference. Known issues remain and are
 listed in [Status](status.md).
 
+**12 to 15 October: public repository and the rest of the game.** This repository started on 12
+October with Milestone 1 (0.1.0). In the next days came the European PAL disc on its own, Windows
+(experimental), the proof tests (the oracle) moved into this repository, Batalia, Gaspar and Orxon
+(0.2.0, then 0.2.1 with Windows fixes), and by 15 October every remaining planet, from Pokitaru to the
+Veldin finale with the credits and the end menu (0.3.0), together with a large performance update and
+an in-game updater. The new planets still await a full playtest.
+
 ## What came of it
 
 - Five months of trying became one rule: nothing is invented, and every port is checked against the

@@ -63,10 +63,10 @@ to build and play, plus the documentation.
 
 ## After Milestone 1
 
-No later milestone has been defined in detail yet. The planned work, in no fixed order:
+**The rest of the game is ported (0.3.0):** levels 8 to 18, up to the final fight, the credits and
+the end menu. What comes next, in no fixed order:
 
-- **The rest of the game:** levels 8 to 18, the remaining weapons and gadgets, cutscenes and
-  minigames, up to the ending.
+- **Playtesting and polishing** the planets after Orxon, and the fixes that come from it.
 - **Shared stubs:** the remaining `TODO_PORT` stubs every level reaches.
 - **The renderer:** the HUD, menus and remaining effects drawn natively, the mobys' shadow meshes.
 
