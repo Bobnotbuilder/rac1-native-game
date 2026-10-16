@@ -1,6 +1,7 @@
 #include <runtime/kernel/ee_memory.h>
 #include <runtime/kernel/ee_journal.h>
 #include <runtime/kernel/disc.h>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <platform/platform.h>
@@ -215,7 +216,9 @@ void* ee_ram_ptr_slow(u32 vaddr, bool journal, u32 size) {
         return dummy + 0x8000;
     }
     ee_debug_backtrace();
-    throw std::out_of_range("Pointer resolution out of bounds: 0x" + std::to_string(vaddr));
+    char hex[16];
+    std::snprintf(hex, sizeof(hex), "%08x", vaddr);
+    throw std::out_of_range(std::string("Pointer resolution out of bounds: 0x") + hex);
 }
 
 const void* ee_ram_ptr_const(u32 vaddr) {

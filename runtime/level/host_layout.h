@@ -14,10 +14,12 @@ inline constexpr std::uint32_t LOADER_ANCHOR = 0x02440000;  // written to 0x1940
 inline constexpr std::uint32_t CORE_TEMP = 0x024a4000;      // written to 0x1940d0 by the host loader
 inline constexpr std::uint32_t STAGING = 0x028d4000;        // the level WAD read for a transition
 inline constexpr std::uint32_t TEX_HEAP = 0x03500000;       // decoded texture headers / pixels
-// 0x03c00000..0x03f00000: the legacy host's GS packet ring (runtime/gs/dma_ring.h)
+// 0x03c00000..0x03f00000: the moby pass's shadow run's packets and work area (the legacy host's GS packet ring before;
+// src/game/render/mrp_lod.cpp shadow_packet_room)
 inline constexpr std::uint32_t TEX_TABLE_TFRAG = 0x03f00000;
 inline constexpr std::uint32_t TEX_TABLE_MOBY = 0x03f10000;
 inline constexpr std::uint32_t TEX_TABLE_TIE = 0x03f20000;
 inline constexpr std::uint32_t TEX_TABLE_SHRUB = 0x03f30000;
+// 0x03f40000..0x04000000: the moby pass's shadow run's skinning records (mrp_lod.cpp shadow_packet_room)
 
 }  // namespace rac1::host_layout
