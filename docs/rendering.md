@@ -258,6 +258,11 @@ side bands are culled by the same shadow-run mechanism as the level of detail, w
 horizontally by the widescreen and the field of view, vertically by the field of view (the sky too).
 Before the vertical part, a Field of View above x1.00 lost the sky and the objects in bands at the
 top and bottom of the screen.
+The levels' water, lava and sand-sea surfaces (Novalis's pond, Aridia's sand sea, Gaspar's lava, the
+water grids of Rilgar, Umbris and other levels) are drawn by draw-list callbacks that cull their tiles
+against the game's 4:3 clip matrix; those draw lists run as shadow blocks too, with that matrix
+widened, and the GS replica walks each shadow's chain in place of the real block's (several
+substitutes a frame). Before this, tiles at the sides of a widened view were missing.
 Before this, the game's state diverged on most frames of the Veldin intro when the view was widened;
 after it, its state is identical at 4:3 and at 5120x1440.
 

@@ -230,7 +230,42 @@ void widen_projection(float w, float wy) {
     render_view_setup();
 }
 
+// The shadow block running (mrp_lod_shadow_slot: -1 none) and the widening its draw lists' clip matrix gets
+int g_slot = -1;
+float g_slot_w = 1.0f, g_slot_wy = 1.0f;
+// The draw lists' clip matrix 0x166d80 widened (mrp_lod_draw_list_widen): its x / y columns (the matrix is applied to a row vector,
+// clip = (x y z 1) M: element [r][0] of each row makes clip x) divided by the widening, so that |x| <= w and |y| <= w hold over the
+// widened view; `saved` the matrix as it was
+struct ClipWiden {
+    bool on = false;
+    float saved[16] = {};
+} g_clip;
+void clip_widen_apply() {
+    for (uint32_t i = 0; i < 16; ++i) g_clip.saved[i] = lwc1(OV(0x00166d80u) + 4 * i);
+    for (uint32_t r = 0; r < 4; ++r) {
+        swc1(OV(0x00166d80u) + 0x10 * r, g_clip.saved[4 * r] / g_slot_w);
+        swc1(OV(0x00166d84u) + 0x10 * r, g_clip.saved[4 * r + 1] / g_slot_wy);
+    }
+}
+
 }  // namespace
+
+// orig: (host) see mrp_lod.h
+int mrp_lod_shadow_slot() { return g_slot; }
+
+// orig: (host) see mrp_lod.h
+void mrp_lod_draw_list_widen(bool begin) {
+    if (begin) {
+        if (g_slot < 0 || g_clip.on || !(g_slot_w > 1.0f || g_slot_wy > 1.0f)) return;
+        static const bool off = std::getenv("RAC1_MRP_WIDEN_LISTS") != nullptr && std::atoi(std::getenv("RAC1_MRP_WIDEN_LISTS")) == 0;  // (testing)
+        if (off) return;
+        g_clip.on = true;
+        clip_widen_apply();
+    } else if (g_clip.on) {  // (the rest of the block - the HUD, the menus' 3D - sees the game's own; the journal puts it back too)
+        for (uint32_t i = 0; i < 16; ++i) swc1(OV(0x00166d80u) + 4 * i, g_clip.saved[i]);
+        g_clip.on = false;
+    }
+}
 
 // orig: (host) see mrp_lod.h
 MrpLodSetupScope::MrpLodSetupScope(bool view) : view_(view) {
@@ -266,6 +301,7 @@ MrpLodSetupScope::~MrpLodSetupScope() {
         std::memcpy(ee_ram_ptr(OV(0x00166cc0u)), a, sizeof a);
         g_patch = ShadowPatch{kPatchWiden, w, wy, t, lwc1(OV(0x0016caf0u))};
     }  // (kPatchCull: the projection stays the game's own, render_view_setup's output too)
+    if (view_ && g_clip.on) clip_widen_apply();  // (a draw list's callback rebuilt the view: its clip matrix widened again)
     --g_patch_host;
 }
 
@@ -530,7 +566,7 @@ struct EffectsShadow {
     uint64_t runs = 0, overflow = 0, bytes_total = 0, real_total = 0, same = 0;  // (same: the shadow's chain the real block's byte for byte)
     // the frames the shadow was not run because nothing in it could differ from the real block (mrp_lod_effects_shadow); with
     // RAC1_MRP_EFFECTS_SKIP=2 (testing) run anyway: `predicted` of them, `missed` those whose chain then differed from the real block's
-    uint64_t skipped = 0, predicted = 0, missed = 0, need_glows = 0, need_particles = 0;
+    uint64_t skipped = 0, predicted = 0, missed = 0, need_glows = 0, need_particles = 0, need_lists = 0;
     bool predicted_now = false;
     double ms = 0;
     bool running = false;  // the shadow's block runs
@@ -583,9 +619,14 @@ void mrp_lod_effects_shadow(void (*pass)(), uint32_t cur) {
         }
     }
     const bool particles = !selftest && mrp_fx_particles_widen_needed(widen);
+    // the draw lists' callbacks cull against the clip matrix (mrp_lod_draw_list_widen) or the sphere test: one queued may draw
+    // more in the widened view (Novalis's water tiles L1:0x2b91c8, the levels' water grids); nothing tells which without running them
+    static const bool no_lists = std::getenv("RAC1_MRP_WIDEN_LISTS") != nullptr && std::atoi(std::getenv("RAC1_MRP_WIDEN_LISTS")) == 0;  // (testing)
+    const bool lists = !selftest && !no_lists && (lw(OV(0x0015f424u)) > 0 || lw(OV(0x0015f428u)) > 0);
     g_ps.need_glows += glows ? 1u : 0u;
     g_ps.need_particles += particles ? 1u : 0u;
-    g_ps.predicted_now = !glows && !particles && !selftest;
+    g_ps.need_lists += lists ? 1u : 0u;
+    g_ps.predicted_now = !glows && !particles && !lists && !selftest;
     if (g_ps.predicted_now && skip_mode == 1) {
         ++g_ps.skipped;
         return;
@@ -600,7 +641,12 @@ void mrp_lod_effects_shadow(void (*pass)(), uint32_t cur) {
     const uint32_t buf_b = lwu(OV(0x00173e08u)), limit = (cur >= buf_b ? buf_b : lwu(OV(0x00173e04u))) + lwu(OV(0x001611ccu));
     g_ps.running = true;
     g_ps.widen = selftest ? 1.0f : widen;
+    g_slot = kMrpLodSlotEffects;
+    g_slot_w = g_ps.widen;
+    g_slot_wy = selftest ? 1.0f : fill_widen_y();
     pass();
+    mrp_lod_draw_list_widen(false);
+    g_slot = -1;
     patch_clear();
     g_ps.running = false;
     const uint32_t end = lwu(OV(0x001611c0u));
@@ -641,15 +687,87 @@ void mrp_lod_effects_after(uint32_t cur, uint32_t real_end) {
     g_ps.real_total += real_end - cur;
 }
 
+// The draw lists' shadows (see mrp_lod.h mrp_lod_list_shadow)
+namespace {
+struct ListShadow {
+    bool pending = false, ready = false;
+    uint32_t cur = 0, end = 0;
+    std::vector<uint8_t> bytes;
+    uint64_t runs = 0, overflow = 0, same = 0, bytes_total = 0, real_total = 0;
+    double ms = 0;
+} g_ls[2];
+}  // namespace
+
 // orig: (host) see mrp_lod.h
-bool mrp_lod_effects_substitute(uint32_t& first, uint32_t& end, std::vector<uint8_t>& bytes) {
-    if (!g_ps.ready) return false;
-    g_ps.ready = false;
-    first = g_ps.cur;
-    end = g_ps.end;
-    bytes = std::move(g_ps.bytes);
-    g_ps.bytes.clear();
-    return true;
+void mrp_lod_list_shadow(int list, void (*block)(), uint32_t cur) {
+    if (list < 0 || list > 1) return;
+    ListShadow& L = g_ls[list];
+    L.pending = false;
+    if (g_mrp_lod_frame_drawn) L.ready = false;  // (a drawn frame: its own chain only)
+    if (!g_world_mrp || g_mrp_lod_widen_off || !g_mrp_lod_frame_drawn) return;
+    static const bool off = std::getenv("RAC1_MRP_WIDEN_LISTS") != nullptr && std::atoi(std::getenv("RAC1_MRP_WIDEN_LISTS")) == 0;  // (testing)
+    const float widen = fill_widen(), widen_y = fill_widen_y();
+    if (off || !(widen > 1.0f || widen_y > 1.0f) || vu0::running()) return;
+    const auto t0 = std::chrono::steady_clock::now();
+    const Vu0Save vu0_saved(true);  // (the callbacks' VU0 macro / micro work)
+    const auto hw_saved = eer::hwregs();
+    ee_journal_begin();
+    if (widen > 1.0f) patch_cull(widen);  // (the sphere tests: vf26 / vf27)
+    const uint32_t buf_b = lwu(OV(0x00173e08u)), limit = (cur >= buf_b ? buf_b : lwu(OV(0x00173e04u))) + lwu(OV(0x001611ccu));
+    g_slot = list;
+    g_slot_w = widen;
+    g_slot_wy = widen_y;
+    block();
+    mrp_lod_draw_list_widen(false);
+    g_slot = -1;
+    patch_clear();
+    const uint32_t end = lwu(OV(0x001611c0u));
+    const bool ok = end > cur && end <= limit;
+    if (ok) {
+        L.bytes.resize(end - cur);
+        std::memcpy(L.bytes.data(), ee_ram_ptr(cur), L.bytes.size());
+    }
+    g_st.pages += ee_journal_restore();
+    vu0_saved.restore();
+    eer::hwregs() = hw_saved;
+    L.ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    if (!ok) {
+        if (end != cur && L.overflow++ < 3) std::fprintf(stderr, "[lod] list %d: shadow chain %08x..%08x past the buffer's limit %08x\n", list, cur, end, limit);
+        return;
+    }
+    L.pending = true;
+    L.cur = cur;
+}
+
+// orig: (host) see mrp_lod.h
+void mrp_lod_list_after(int list, uint32_t cur, uint32_t real_end) {
+    if (list < 0 || list > 1) return;
+    ListShadow& L = g_ls[list];
+    if (!L.pending || L.cur != cur) return;
+    L.pending = false;
+    L.ready = true;
+    L.end = real_end;
+    ++L.runs;
+    L.bytes_total += L.bytes.size();
+    L.real_total += real_end - cur;
+    L.same += real_end - cur == L.bytes.size() && std::memcmp(ee_ram_ptr(cur), L.bytes.data(), L.bytes.size()) == 0 ? 1u : 0u;
+}
+
+// orig: (host) see mrp_lod.h
+void mrp_lod_substitutes(std::vector<MrpLodSubstitute>& out) {
+    out.clear();
+    for (int k = 0; k < 2; ++k) {
+        ListShadow& L = g_ls[k];
+        if (!L.ready) continue;
+        L.ready = false;
+        out.push_back(MrpLodSubstitute{k, L.cur, L.end, std::move(L.bytes)});
+        L.bytes.clear();
+    }
+    if (g_ps.ready) {
+        g_ps.ready = false;
+        out.push_back(MrpLodSubstitute{kMrpLodSlotEffects, g_ps.cur, g_ps.end, std::move(g_ps.bytes)});
+        g_ps.bytes.clear();
+    }
 }
 
 namespace {
@@ -780,10 +898,19 @@ void mrp_lod_report() {
     if (g_ps.runs + g_ps.skipped != 0) {
         const double n = static_cast<double>(std::max<uint64_t>(1, g_ps.runs));
         std::printf("[lod] effects: %llu shadow runs (%llu with the real block's chain byte for byte), %.3f ms each, chain %.0f bytes (the real pass's %.0f); "
-                    "%llu not run (nothing to widen); needed for glows (+0x31) %llu, particles %llu; predicted %llu, missed %llu\n",
+                    "%llu not run (nothing to widen); needed for glows (+0x31) %llu, particles %llu, draw lists %llu; predicted %llu, missed %llu\n",
                     static_cast<unsigned long long>(g_ps.runs), static_cast<unsigned long long>(g_ps.same), g_ps.ms / n, static_cast<double>(g_ps.bytes_total) / n,
                     static_cast<double>(g_ps.real_total) / n, static_cast<unsigned long long>(g_ps.skipped), static_cast<unsigned long long>(g_ps.need_glows),
-                    static_cast<unsigned long long>(g_ps.need_particles), static_cast<unsigned long long>(g_ps.predicted), static_cast<unsigned long long>(g_ps.missed));
+                    static_cast<unsigned long long>(g_ps.need_particles), static_cast<unsigned long long>(g_ps.need_lists), static_cast<unsigned long long>(g_ps.predicted),
+                    static_cast<unsigned long long>(g_ps.missed));
+    }
+    for (int k = 0; k < 2; ++k) {
+        const ListShadow& L = g_ls[k];
+        if (L.runs + L.overflow == 0) continue;
+        const double n = static_cast<double>(std::max<uint64_t>(1, L.runs));
+        std::printf("[lod] draw list %s: %llu shadow runs (%llu with the real block's chain byte for byte, %llu overflowed), %.3f ms each, chain %.0f bytes (the real block's %.0f)\n",
+                    k == 0 ? "0x16dc80" : "0x16de80", static_cast<unsigned long long>(L.runs), static_cast<unsigned long long>(L.same), static_cast<unsigned long long>(L.overflow), L.ms / n,
+                    static_cast<double>(L.bytes_total) / n, static_cast<double>(L.real_total) / n);
     }
     if (g_st.runs[0] + g_st.runs[1] + g_st.runs[2] + g_st.runs[3] + g_st.skipped_vu0 == 0) return;
     static const char* names[4] = {"tfrag", "tie", "shrub", "sky"};
