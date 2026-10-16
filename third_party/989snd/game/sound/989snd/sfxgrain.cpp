@@ -179,6 +179,9 @@ s32 Grain::snd_SFX_GRAIN_TYPE_STOPCHILDSOUND(BlockSoundHandler& handler) {
   auto& block = static_cast<SFXBlock&>(handler.m_bank);
 
   if (psp.sound_id >= 0) {
+    if (!block.ValidSound(static_cast<u32>(psp.sound_id), "stop_child_sound")) {  // rac1
+      return 0;
+    }
     for (auto it = handler.m_children.begin(); it != handler.m_children.end();) {
       auto* sound = static_cast<BlockSoundHandler*>(it->get());
       // TODO VERIFY that this works
@@ -224,6 +227,9 @@ s32 Grain::snd_SFX_GRAIN_TYPE_BRANCH(BlockSoundHandler& handler) {
   }
 
   auto& block = static_cast<SFXBlock&>(handler.m_bank);
+  if (!block.ValidSound(static_cast<u32>(index), "branch") || block.Sounds[index].Grains.empty()) {  // rac1
+    return 0;
+  }
   auto* new_sfx = &block.Sounds[index];
   if (new_sfx->Flags.has_instlimit()) {
     // TODO: not entirely straightforward.
