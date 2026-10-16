@@ -147,6 +147,9 @@ shared code every level runs:
 | 0, 1, 3, 4, 6, 8 and 9 | 192 (the particle types 0x0a, 0x0e, 0x27, 0x49; no dumps: states built from the level) |
 | 17 | 260, 261, 271 (and the hero batches 44 .. 55) |
 | 18 | 270, 261, 271 (and the hero batches 44 .. 55) |
+| 15, 17 and 18 | 370 (the particle types 0x1f and 0x50: Giant Clank's streaks, Drek's fleet's laser beams) |
+| 16 | 371 (Kalebo III's classes on the race's dumps, the racers finished) |
+| 18 | 372 (the hero's frame in level 18's water) |
 
 For a quick check after a small change, level 0's 63, 79, 118 and 141 are the usual minimum.
 
@@ -200,6 +203,7 @@ missing skips those checks and says which set it wanted; it does not fail.
 | `gemlik_oltanis/` | 222, 223 | `tools/oracle/gemlik_oltanis_tour.sh dumps` |
 | `drek_veldin/` | 271 | `tools/oracle/drek_veldin_tour.sh dumps` |
 | `levels_15_16/` | 241, 242 | the command lines in the batches' headers |
+| `gamebreaking/` | 370, 371, 372 | the command lines in the batches' headers |
 
 A dump is written by a headless run of the game: `RAC1_RAMDUMP=<frame>,<file>` writes the 32 MB of
 EE RAM and the 16 KB scratchpad at that frame ([Environment variables](env-vars.md)). The scripts

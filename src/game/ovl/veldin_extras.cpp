@@ -40,6 +40,8 @@ void veldin_extras_register() {
     ovl_register_moby_fn(0x0026ba68, particle_0e_update);  // (particle type 0x0e: class 156, L1:0x280970, L6:0x27a850, L8:0x275bd8, L9:0x28a428)
     ovl_register_moby_fn(0x0026fc38, particle_27_update);  // (particle type 0x27: Batalia L8:0x279f00, from bat_2b8228_l8)
     ovl_register_moby_fn(0x00275320, particle_49_update);  // (particle type 0x49: Batalia's class 1400, L8:0x27f5f0)
+    ovl_register_moby_fn(0x0026eb88, particle_1f_update);  // (particle type 0x1f: Giant Clank's streaks, L15:0x25e2c0; L18:0x270af0)
+    ovl_register_moby_fn(0x00275eb0, particle_50_update);  // (particle type 0x50: Drek's fleet's laser beams, L17:0x26fdd0 from class 1368)
     ovl_register_moby_fn(0x002b4198, class167_update_tr);  // (class 167, the Thruster-Pack's jets)
     ovl_register_moby_fn(0x002b3628, class167_draw_tr);    // (its draw-list callback)
     ovl_register_moby_fn(0x002e03a0, helmet_update_tr);    // (class 1290, the Pilot's Helmet pickup: Gaspar)

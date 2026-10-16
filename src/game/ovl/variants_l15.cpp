@@ -17,6 +17,7 @@ constexpr VariantRow kQuartu[] = {
     {0x00262840, 0x00251c10, 0x80},   // retire_children
     {0x002655d8, 0x00254b70, 0xe0},   // music2_start
     {0x00274de0, 0x00264790, 0x60},
+    {0x0026eb88, 0x0025e3c8, 0x19c},  // particle type 0x1f's update (the matcher placed none of Veldin's 0x26e200..0x26ed28 here)
     {0x0028dfc8, 0x0027bea0, 0x78},   // sound_emitters_update
     {0x002a99b0, 0x0029e9f8, 0xd8},
     {0x002e8648, 0x002f2888, 0x30},   // cam0_set_flag116
