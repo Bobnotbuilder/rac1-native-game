@@ -3,6 +3,7 @@
 
 #include <game/ovl/ovl_common.h>
 #include <game/ovl/ovl_reloc.h>
+#include <game/ovl/vu0_regs.h>
 #include <game/render/mrp_world_assets.h>
 #include <runtime/kernel/ee_memory.h>
 
@@ -146,6 +147,16 @@ void static_note_pass(int kind, bool handle, float scale, float widen, float wid
     S.tie_max = ru(OV(0x00160fe0u));
     S.shrub_max = ru(OV(0x001604a4u));
     S.shrub_data = ru(OV(0x0016049cu));
+    if (kind == 2) {  // (the shrub far variants' inputs, 0x287c04..: vf28..vf31 from 0x166c80 + 0x40.., vf21..vf23 from 0x16ca40 + 0x220 / 0x210 / 0x1a0)
+        auto rw = [](uint32_t a) { return std::array<uint32_t, 4>{ru(a), ru(a + 4), ru(a + 8), ru(a + 12)}; };
+        for (uint32_t r = 0; r < 4; ++r) S.vm[r] = rq(OV(0x00166cc0u) + 0x10 * r);
+        S.vf22 = rq(OV(0x0016cc50u));
+        S.vf23 = rq(OV(0x0016cbe0u));
+        for (uint32_t q = 0; q < 4; ++q) S.vhdr[q] = rw(OV(0x001c2c10u) + 0x10 * q);
+        for (uint32_t q = 0; q < 3; ++q) S.vhdr2[q] = rw(OV(0x001c2be0u) + 0x10 * q);
+        for (uint32_t q = 0; q < 4; ++q) S.vtpl[q] = rw(OV(0x00160b80u) + 0x10 * q);
+        for (uint32_t q = 0; q < 8; ++q) S.vcorner[q] = rq(OV(0x001c2cb0u) + 0x10 * q);
+    }
     S.valid = true;
 }
 
@@ -365,6 +376,78 @@ void instance_rows(const StaticSnapshot& S, uint32_t data, uint32_t sway, bool s
 }
 }  // namespace
 
+namespace {
+// orig: (host) the shrub far variants' quads as the shrub pass writes them into its chain (0x287c04..0x288010, world_render.md 18.4): the
+// header (0x1c2c10), the opaque ones (alpha 0x80) per class, then the fading ones' header (0x1c2be0) and those (alpha & 0x7f) per class;
+// before a class's first quad its transfer (0x160b90 and the variant record's +0x10..+0x30: TEX1 / TEX0 / MIPTBP1), per quad 0x160bb0
+// (the GIF tag) and its four corners (STQ, RGBA, XYZF2). The corners as 0x287df4..0x287f4c computes them on VU0 (macro mode): d = position
+// - camera, n = d / |d|, the basis (n.x, n.y, 0), (n.y, -n.x, 0), (0, 0, 1), d x 1024 through the matrix 0x166cc0; the unit corner's y / z
+// scaled by the variant record's +4 / +8 and the instance's +0x2c halfwords / 4096 (z offset by +0xc of it) and the position's w; then
+// Q = vf22.x / w, F = clamp(w + vf23.w), X / Y / Z = xyz Q + vf23, FTOI4. The pass's DMA tags / VIF DIRECT codes are left out (the
+// walker takes the DIRECT data alone). The list's PS2 capacity (0x300 entries, SPR 0x2000..0x2c00) is not kept.
+void variant_stream(const StaticSnapshot& S, const StaticLevel& L, const std::vector<std::vector<std::pair<uint32_t, uint32_t>>>& variants, StaticFrame& f) {
+    using namespace vu0m;
+    auto& out = f.variant_gif;
+    auto f2w = [](float v) { uint32_t u; std::memcpy(&u, &v, 4); return u; };
+    auto rw = [](uint32_t a) { return std::array<uint32_t, 4>{ru(a), ru(a + 4), ru(a + 8), ru(a + 12)}; };
+    for (uint32_t q = 1; q < 4; ++q) out.push_back(S.vhdr[q]);
+    for (const uint32_t sec : {0x80u, 0x7fu}) {
+        if (sec == 0x7fu)
+            for (uint32_t q = 1; q < 3; ++q) out.push_back(S.vhdr2[q]);
+        for (size_t c = 0; c < L.shrubs.size() && c < variants.size(); ++c) {
+            if (variants[c].empty()) continue;
+            const uint32_t vrec = ru(L.shrubs[c].rec + 0x1c);
+            const std::array<float, 4> v16 = rq(vrec);
+            bool first = vrec != 0;
+            for (const auto& [idx, alpha] : variants[c]) {
+                if ((alpha & sec) == 0) continue;
+                if (first) {
+                    out.push_back(S.vtpl[1]);
+                    for (uint32_t q = 1; q < 4; ++q) out.push_back(rw(vrec + 0x10 * q));
+                    first = false;
+                }
+                out.push_back(S.vtpl[3]);
+                ++f.variants;
+                const uint32_t data = S.shrub_data + 0x40 * idx;
+                const std::array<float, 4> pos = rq(data + 0x30);
+                const uint32_t col = ru(data + 0x1c) | (alpha << 24), hw = ru(data + 0x2c);
+                const std::array<uint32_t, 4> rgba{col & 0xff, (col >> 8) & 0xff, (col >> 16) & 0xff, col >> 24};
+                const float d[3] = {sub(pos[0], S.cam[0]), sub(pos[1], S.cam[1]), sub(pos[2], S.cam[2])};
+                const float v3x = static_cast<float>(static_cast<int32_t>(hw & 0xffff)) * (1.0f / 4096.0f);
+                const float v3y = static_cast<float>(static_cast<int32_t>(hw >> 16)) * (1.0f / 4096.0f);
+                const float n2 = madd(add(mul(d[0], d[0]), mul(d[1], d[1])), 1.0f, mul(d[2], d[2]));
+                const float q = vrsqrt(1.0f, n2);
+                const float v15y = mul(mul(v16[1], v3x), pos[3]), v15z = mul(mul(v16[2], v3y), pos[3]), v15w = mul(mul(v16[3], v3y), pos[3]);
+                const float nx = mul(d[0], q), ny = mul(d[1], q);
+                Vf m[4];
+                for (int r = 0; r < 4; ++r)
+                    for (int l = 0; l < 4; ++l) m[r].v[l] = S.vm[static_cast<size_t>(r)][static_cast<size_t>(l)];
+                Vf b[4];
+                b[0] = transform(m, add(0.0f, nx), add(0.0f, ny), 0.0f, 0.0f);
+                b[1] = transform(m, add(0.0f, ny), sub(0.0f, nx), 0.0f, 0.0f);
+                b[2] = transform(m, 0.0f, 0.0f, 1.0f, 0.0f);
+                b[3] = transform(m, mul(d[0], 1024.0f), mul(d[1], 1024.0f), mul(d[2], 1024.0f), 1.0f);
+                for (uint32_t k = 0; k < 4; ++k) {
+                    const std::array<float, 4>& cn = S.vcorner[k];
+                    std::array<float, 4> st = S.vcorner[4 + k];
+                    const float cy = mul(cn[1], v15y), cz = add(mul(cn[2], v15z), v15w);
+                    Vf p = transform(b, cn[0], cy, cz, 1.0f);
+                    const float qq = div(S.vf22[0], p.v[3]);
+                    p.v[3] = vmini(vmax(add(p.v[3], S.vf23[3]), S.fog[3]), S.fog[2]);
+                    for (int l = 0; l < 3; ++l) {
+                        p.v[l] = add(mul(p.v[l], qq), S.vf23[static_cast<size_t>(l)]);
+                        st[static_cast<size_t>(l)] = mul(st[static_cast<size_t>(l)], qq);
+                    }
+                    out.push_back({f2w(st[0]), f2w(st[1]), f2w(st[2]), f2w(st[3])});
+                    out.push_back(rgba);
+                    out.push_back({vu0m::ftoi(p.v[0], 16.0f), vu0m::ftoi(p.v[1], 16.0f), vu0m::ftoi(p.v[2], 16.0f), vu0m::ftoi(p.v[3], 16.0f)});
+                }
+            }
+        }
+    }
+}
+}  // namespace
+
 // orig: (host) see mrp_world_static.h
 void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticFrame& f, bool check) {
     const StaticSnapshot& S = g_snap;
@@ -373,6 +456,8 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
     f.draws[1].clear();
     f.on[0] = f.on[1] = false;
     f.tested[0] = f.tested[1] = f.visible[0] = f.visible[1] = 0;
+    f.variant_gif.clear();
+    f.variants = 0;
     if (!L.ok || !S.valid) return;
     f.on[0] = check || S.on[0];
     f.on[1] = check || S.on[1];
@@ -465,6 +550,8 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
     // >> 8); the opaque ones per class, the faded ones after all the classes
     if (f.on[1]) {
         std::vector<std::vector<uint32_t>> faded(L.shrubs.size());
+        // (per class its far variants' entries in the pass's order: the instance's index, the variant's alpha; SPR 0x2000 / 0x3600)
+        std::vector<std::vector<std::pair<uint32_t, uint32_t>>> variants(L.shrubs.size());
         for (const StaticShrubClass& c : L.shrubs) {
             if (c.packets.empty()) continue;
             const uint32_t flags = rh(c.rec + 0x14);
@@ -516,14 +603,12 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
                     }
                 }
                 ++f.visible[1];
+                if (valpha >= 0) variants[static_cast<size_t>(&c - L.shrubs.data())].push_back({idx, static_cast<uint32_t>(valpha)});
                 const int64_t slot = rc.shrub_slot(rc.src.shrub_cols + kShrubColourStride * idx);
                 if (slot < 0) continue;
                 StaticInst si;
                 si.slot = static_cast<uint32_t>(slot);
                 instance_rows(S, S.shrub_data + 0x40 * idx, sway, true, si.rows);
-                // (the far variant itself is a camera-facing quad the pass builds on the EE from the record +0x1c names (0x287d58..,
-                // its GIF data in the shrub range's chain): the MRP's walker draws no such stream either; noted for a later task)
-                (void)valpha;
                 if (src < 0) continue;
                 si.alpha = static_cast<uint32_t>(std::min<int64_t>(src, 0x8000)) >> 8;
                 const uint32_t at = static_cast<uint32_t>(f.insts.size());
@@ -538,6 +623,7 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
         for (size_t k = 0; k < L.shrubs.size(); ++k)
             for (const StaticPacket& pk : L.shrubs[k].packets)
                 for (uint32_t at : faded[k]) f.draws[1].push_back({&pk, at});
+        variant_stream(S, L, variants, f);
     }
 }
 
