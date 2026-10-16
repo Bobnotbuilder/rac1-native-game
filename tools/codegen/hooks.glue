@@ -31,7 +31,7 @@
 #   K  after each call of the level's own hero_stick_speed (Blarg, Pokitaru): advanced_move_speed, as hero_stick_speed (ovl_21.cpp)
 #   L  0x227fa0  hero_item_use, after its +0x1090 test: no item input while the thrown wrench is out (advanced_rac3_wrench_out; to the return 0)
 #   M  0x22c45c  crouch_input (state 4): the crouch throw 0x15 skipped while the thrown wrench is out (to the instruction after the call)
-#   N  0x22b348  swing_input: the jump press's look-back (a1, from the combo row's +0xc) fixed at 8 frames in R&C 3's throw (advanced_rac3_swing_jump_back; the address by the copies' alignment, 0x48 before H in each)
+#   N  0x22b348  swing_input: the jump press's look-back (a1, from the combo row's +0xc) 8 frames (at 60 Hz, frame-scaled) in R&C 3's throw (advanced_rac3_swing_jump_back; the address by the copies' alignment, 0x48 before H in each)
 
 # ---- Rilgar (level 5): hero_state_update 0x244a70, hero_set_state 0x24cee8, hero_input_update 0x255960, hero_horizontal_velocity 0x242258
 L5 0x00249b10: if (advanced_rac3_movement()) { advanced_rac3_along_stick(); set32(s0, s5.w() + -0xcb0); goto L_249bb4; }  // enhancement (A)

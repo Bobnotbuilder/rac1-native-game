@@ -142,7 +142,7 @@ bool advanced_rac3_running_jump();
 // R&C 3's rule; true when it did (`step`: the combo table's row)
 bool advanced_rac3_swing_exit(uint32_t step);
 // orig: (none) — enhancement: swing_input's look-back for the jump press (`back`, from the combo
-// row's +0xc); R&C 3's throw (state 0x15) looks back a fixed 8 frames
+// row's +0xc); R&C 3's throw (state 0x15) looks back 8 frames at 60 Hz (frame-scaled)
 int32_t advanced_rac3_swing_jump_back(int32_t back);
 // orig: (none) — enhancement: R&C 3's guard while the thrown wrench is out (thrown flag +0x10aa
 // set): no item input, no crouch throw, no new throw start
