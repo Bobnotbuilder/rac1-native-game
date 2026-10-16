@@ -593,7 +593,10 @@ uint32_t advanced_pad_remap(uint32_t pad, uint32_t held) {
 
 // orig: (none) — enhancement (advanced.h)
 bool advanced_strafing() {
-    return g_aim_button && lbu(MOVEMENT) != 0 && lw(OV(0x0015f5c4)) == 0 && aim_state(lw(HERO + 0x2084));
+    const int32_t st = lw(HERO + 0x2084);
+    // (with the modern aim also the gloves' standing throw 0x23: the aim held through it, so the
+    // gloves' camera aim and its pitch are those of the reticle when the throw leaves the hand)
+    return g_aim_button && lbu(MOVEMENT) != 0 && lw(OV(0x0015f5c4)) == 0 && (aim_state(st) || (st == 0x23 && modern_aim()));
 }
 
 // orig: (none) — enhancement (advanced.h)
@@ -884,16 +887,17 @@ void advanced_aim_after_hero() {
 // orig: (none) — enhancement (advanced.h)
 bool advanced_camera_aim(uint32_t pad_held) { return (pad_held & 5u) != 0 || advanced_aiming(); }
 
-// orig: (none) — enhancement (advanced.h)
-void advanced_aim_direction(uint32_t from, uint32_t dir, float speed) {
+namespace {
+// orig: (none) — enhancement: the shot from `from` toward the point under the screen's centre (the
+// first thing the screen's centre ray meets within AIM_DISTANCE, not the hero; else that far), of
+// length `speed`
+Vec4 aim_shot(const Vec4& from, float speed) {
     // the camera's forward (the view matrix 0x166c80 transposed, as the blaster's first-person aim)
     Mat4 t;
     mat3_transpose(t, M(OV(0x00166c80)));
     Vec4 f = Vec4{0.0f, 0.0f, 1.0f, 0.0f};
     mat4_transform(f, f, t);
     vec3_set_length(f, f, 1.0f);
-    // the point under the screen's centre: the first thing the screen's centre ray meets within
-    // AIM_DISTANCE (not the hero), else that far; the shot from `from` toward it
     const Vec4 eye = V(OV(0x00166dc0));
     Vec4 aim;
     vec3_scale(aim, f, AIM_DISTANCE);
@@ -905,9 +909,54 @@ void advanced_aim_direction(uint32_t from, uint32_t dir, float speed) {
         if (2.0f < vec3_length(to)) aim = hit;  // (a hit right at the camera: ignored)
     }
     Vec4 d;
-    vec3_sub(d, aim, V(from));
+    vec3_sub(d, aim, from);
     vec3_set_length(d, d, speed);
-    V(dir) = d;
+    return d;
+}
+}  // namespace
+
+// orig: (none) — enhancement (advanced.h)
+void advanced_aim_direction(uint32_t from, uint32_t dir, float speed) { V(dir) = aim_shot(V(from), speed); }
+
+// orig: (none) — enhancement (advanced.h)
+void advanced_aim_shot(uint32_t from, uint32_t dir) {
+    if (!advanced_aiming()) return;
+    V(dir) = aim_shot(V(from), vec3_length(V(dir)));
+}
+
+// orig: (none) — enhancement (advanced.h)
+void advanced_aim_shot_hand(uint32_t hand, uint32_t dir) {
+    if (!advanced_aiming()) return;
+    Vec4 from;
+    moby_chain_point_v(hand, 0, from);
+    V(dir) = aim_shot(from, vec3_length(V(dir)));
+}
+
+// orig: (none) — enhancement (advanced.h)
+void advanced_aim_frame_hand(uint32_t hand, uint32_t rows) {
+    if (!advanced_aiming() || lh(HERO + 0x22c8) == 1) return;  // (leaning on a wall: the hand's own frame, as the original)
+    Vec4 from;
+    moby_chain_point_v(hand, 0, from);
+    const Vec4 f = aim_shot(from, 1.0f);  // forward (row 0), the side (row 1) level, up (row 2) square to both
+    Vec4 side{-f.y, f.x, 0.0f, 0.0f};
+    if (vec2_length(side) < 1e-4f) return;
+    vec3_set_length(side, side, 1.0f);
+    Vec4 up{f.y * side.z - f.z * side.y, f.z * side.x - f.x * side.z, f.x * side.y - f.y * side.x, 0.0f};
+    for (int i = 0; i < 3; ++i) {
+        const Vec4& r = i == 0 ? f : i == 1 ? side : up;
+        swc1(rows + i * 0x10, r.x);
+        swc1(rows + i * 0x10 + 4, r.y);
+        swc1(rows + i * 0x10 + 8, r.z);
+    }
+}
+
+// orig: (none) — enhancement (advanced.h)
+bool advanced_aim_angles(uint32_t from, float& yaw, float& pitch) {
+    if (!advanced_aiming()) return false;
+    const Vec4 d = aim_shot(V(from), 1.0f);
+    yaw = atan2_f(d.x, d.y);
+    pitch = -atan2_f(vec2_length(d), d.z);
+    return true;
 }
 
 // --- R&C 3's on-foot movement -------------------------------------------------------

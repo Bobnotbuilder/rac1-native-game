@@ -5,7 +5,8 @@
  "includes": [
   "game/ovl/weapons.h",
   "game/ovl/decoy.h",
-  "game/ovl/pause_menu.h"
+  "game/ovl/pause_menu.h",
+  "game/enhance/advanced.h"
  ],
  "functions": [
   {
@@ -30,7 +31,14 @@
    "addr": "2d2158",
    "name": "decoy_2d2158",
    "ret": "void",
-   "params": "uint32_t p0, uint32_t p1, uint32_t p2"
+   "params": "uint32_t p0, uint32_t p1, uint32_t p2",
+   "host": {
+    "2d22c8": "if (advanced_aiming()) set32(v0, v0.w() | 5u);  // enhancement: the modern aim takes the original's L1 / L2 camera aim, as the other gloves (advanced.h)",
+    "2d2300": "if (advanced_aiming()) set32(v0, v0.w() | 5u);  // enhancement: the modern aim takes the original's L1 / L2 camera aim, as the other gloves (advanced.h)",
+    "2d23cc": "if (advanced_aiming()) set32(v0, v0.w() | 5u);  // enhancement: the modern aim takes the original's L1 / L2 camera aim, as the other gloves (advanced.h)",
+    "2d245c": "if (advanced_aiming()) set32(v0, v0.w() | 5u);  // enhancement: the modern aim takes the original's L1 / L2 camera aim, as the other gloves (advanced.h)",
+    "2d25f8": "if (advanced_aiming()) set32(v0, v0.w() | 5u);  // enhancement: the modern aim takes the original's L1 / L2 camera aim, as the other gloves (advanced.h)"
+   }
   },
   {
    "addr": "2d2670",

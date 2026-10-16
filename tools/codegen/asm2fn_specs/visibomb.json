@@ -5,7 +5,8 @@
  "includes": [
   "game/ovl/weapons.h",
   "game/ovl/visibomb.h",
-  "game/ovl/pause_menu.h"
+  "game/ovl/pause_menu.h",
+  "game/enhance/advanced.h"
  ],
  "functions": [
   {
@@ -62,7 +63,10 @@
    "addr": "2b3058",
    "name": "visibomb_update",
    "ret": "void",
-   "params": "uint32_t m"
+   "params": "uint32_t m",
+   "host": {
+    "2b32c0": "if (advanced_aim_angles(s1.w() + 0x10, fr[20], fr[21])) fr[14] = -fr[21];  // enhancement: the modern aim's yaw / pitch (advanced.h), the original's level launch otherwise"
+   }
   }
  ],
  "register_fn": "visibomb_fns_register",

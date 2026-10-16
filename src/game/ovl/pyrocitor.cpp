@@ -7,6 +7,7 @@
 // and throw streaks when they die. The hand's pvars: +0 the nozzle moby, +4..+0x3f 15 kept
 // flame particles, +0x44 the light slot, +0x4a the fire sound, +0x4c the fire's least time,
 // +0x4e the sparks' timer, +0x50 the frames fired in a row (0x2b8230).
+#include <game/enhance/advanced.h>
 #include <game/math/vecmath.h>
 #include <game/ovl/ovl_reloc.h>
 #include <game/ovl/enemy_749.h>
@@ -390,6 +391,7 @@ void pyrocitor_update(uint32_t m) {
         } else {
             V(from) = V(nozzle);
             vec3_set_length(V(dir), V(0x0013f9c0), lwc1(OV(0x00166c00u - 0x56e0)) + up4 + 0.75f);
+            advanced_aim_shot(nozzle, dir);  // enhancement: the modern aim's line (advanced.h), the facing otherwise
             vec3_add(V(to), V(dir), V(nozzle));
         }
         float len;
