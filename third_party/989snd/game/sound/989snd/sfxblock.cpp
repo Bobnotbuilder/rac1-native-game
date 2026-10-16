@@ -3,11 +3,31 @@
 #include "blocksound_handler.h"
 #include "sfxgrain.h"
 
+#include <mutex>
+#include <set>
+#include <utility>
+
 #include "common/log/log.h"
 
 #include "third-party/magic_enum.hpp"
 
 namespace snd {
+
+// rac1: an id past the block's sounds, reported once per (sound count, id). The IRX's snd_PlaySFX
+// (989snd.irx 0x3df0) plays nothing for a sound < 0 or >= the block's count (its handle 0).
+bool SFXBlock::ValidSound(u32 sound_id, const char* where) const {
+  if (sound_id < Sounds.size()) {
+    return true;
+  }
+  static std::mutex m;
+  static std::set<std::pair<size_t, u32>> reported;
+  std::scoped_lock lock(m);
+  if (reported.emplace(Sounds.size(), sound_id).second) {
+    lg::warn("{}: sound {} is not in the block ({} sounds), not played", where, static_cast<s32>(sound_id),
+             Sounds.size());
+  }
+  return false;
+}
 
 std::optional<std::unique_ptr<SoundHandler>> SFXBlock::MakeHandler(VoiceManager& vm,
                                                                    u32 sound_id,
@@ -16,6 +36,9 @@ std::optional<std::unique_ptr<SoundHandler>> SFXBlock::MakeHandler(VoiceManager&
                                                                    SndPlayParams& params,
                                                                    s32 current_tick,
                                                                    u32 owner) {
+  if (!ValidSound(sound_id, "play_sound")) {
+    return std::nullopt;
+  }
   auto& SFX = Sounds[sound_id];
 
   if (SFX.Grains.empty()) {

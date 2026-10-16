@@ -230,6 +230,8 @@ int main(int argc, char** argv) {
     batch_270();
     batch_271();
     batch_310();
+    batch_330();
+    batch_340();
     batch_370();
     batch_371();
     batch_372();

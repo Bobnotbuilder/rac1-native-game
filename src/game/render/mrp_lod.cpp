@@ -780,8 +780,15 @@ namespace {
 // draws two to five times the 4:3 game's mobys and filled it (Novalis at LOD 100: the last mobys of the list, those near the camera
 // included, missing). The shadow run's packets go to a host region instead (EE 0x03c00000.., above the game's 32 MB, free since the
 // legacy GS ring was removed: runtime/level/host_layout.h): the cursor 0x1611c0 moved there, the work area (its 0x2000 bytes copied)
-// to 0x03ee0000, so the limit is 0x03ed0000 (3.3 MB). Inside the journal: put back after the run. RAC1_MRP_LOD_ROOM=0: off (testing).
-constexpr uint32_t kShadowPackets = 0x03c00000u, kShadowWork = 0x03ee0000u;
+// to 0x03ee0000, so the limit is 0x03ed0000 (2.8 MB; at LOD High in a 32:9 view Rilgar, Gemlik and Kalebo's landing reach it).
+// The skinning records go to a host region too: the draw loop writes one per moby drawn to the ring 0x15f5f8 (the pass's start sets
+// the ring's cursor 0x15ffd4 to it), which the game sizes for its own frame (0x15f578 = 0x1e000 bytes at the top of the packet
+// buffer, ending where the buffer ends: sub_002a0858) and never bounds. With the shadow's two to five times the mobys it ran past the
+// buffer's end into what lies above it (Kalebo's landing: the ship scene's streamed animation frames at 0x40c000.., a moby's
+// keyframe header then read back as garbage -> a pose's scratchpad address 0x700c130c, the pointer fault). The shadow's ring is
+// 0x03f40000..0x04000000 (0xc0000 bytes, above the host's texture tables; the landing used 0x2c140). Inside the journal: put back
+// after the run. RAC1_MRP_LOD_ROOM=0: off (testing).
+constexpr uint32_t kShadowPackets = 0x03c00000u, kShadowWork = 0x03ee0000u, kShadowRing = 0x03f40000u;
 void shadow_packet_room() {
     static const bool off = [] {
         const char* v = std::getenv("RAC1_MRP_LOD_ROOM");
@@ -791,6 +798,7 @@ void shadow_packet_room() {
     const uint32_t work = lwu(OV(0x0015f5fcu));
     std::memcpy(ee_ram_ptr_write(kShadowWork, 0x2000), ee_ram_ptr_read(work), 0x2000);
     sw(OV(0x0015f5fcu), kShadowWork);
+    sw(OV(0x0015f5f8u), kShadowRing);
     sw(OV(0x001611c0u), kShadowPackets);
 }
 

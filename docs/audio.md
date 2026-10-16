@@ -37,7 +37,9 @@ lines (`dialog_play`).
 `runtime/iop/snd989_iop.cpp` registers the two sound servers and runs them on **OpenGOAL's 989snd**
 (`third_party/989snd`, from the [jak-project](https://github.com/open-goal/jak-project), ISC licence,
 adapted as listed in its README). It loads the level's sound banks into IOP memory, plays, stops and
-changes sounds, and answers the game's queries ("is this sound still playing?").
+changes sounds, and answers the game's queries ("is this sound still playing?"). As in the PS2's
+driver, a sound id the bank does not have plays nothing (the game asks for some: on Quartu the
+hero's low-air beep is sound -1); the first time an id is refused it is reported on the console.
 `runtime/iop/snd989_stream.cpp` plays the streamed music and dialogue, read from the disc.
 
 **Timing.** Everything the game reads back from the sound must depend only on the game's own time,

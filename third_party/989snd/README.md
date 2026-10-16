@@ -10,6 +10,10 @@ Changes from upstream:
 
 - `player.h` / `player.cpp`: the cubeb output stream removed; `Tick` is public, the host's
   audio device pulls the output. `SetSoundPBend` added (the handler's pitch bend), `ActiveSounds` (a debug count).
+- `sfxblock.h` / `sfxblock.cpp`, `sfxgrain.cpp`, `musicbank.cpp`: a sound id past the bank's
+  sounds plays nothing (reported once) instead of indexing past `Sounds`, as the IRX's
+  `snd_PlaySFX` does (`sound < 0 || sound >= count`: handle 0). The game plays such ids: on
+  Quartu the hero's low-air beep is sound -1.
 - `common/common_types.h`: only the integer types kept.
 - Not taken: `fakeplayer`, `sndplay` (a command-line player), `common/flava.h` (Jak 3).
 - Shims for what the code used from the rest of OpenGOAL: `common/util/Assert.h`,

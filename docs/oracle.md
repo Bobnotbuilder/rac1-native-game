@@ -147,6 +147,7 @@ shared code every level runs:
 | 0, 1, 3, 4, 6, 8 and 9 | 192 (the particle types 0x0a, 0x0e, 0x27, 0x49; no dumps: states built from the level) |
 | 17 | 260, 261, 271 (and the hero batches 44 .. 55) |
 | 18 | 270, 261, 271 (and the hero batches 44 .. 55) |
+| 0 .. 18 | 340 (the 17 particle types no level's code spawns, 0x03 .. 0x4c: their updates registered so that none can hang; no dumps: states built from the level) |
 | 15, 17 and 18 | 370 (the particle types 0x1f and 0x50: Giant Clank's streaks, Drek's fleet's laser beams) |
 | 16 | 371 (Kalebo III's classes on the race's dumps, the racers finished) |
 | 18 | 372 (the hero's frame in level 18's water) |
