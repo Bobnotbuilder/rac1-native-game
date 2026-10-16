@@ -84,6 +84,23 @@ void sim_script(const char* script, uint64_t frame, uint16_t& held, float& lx, f
         std::printf("[seq] frame %llu state %d pos %.2f %.2f %.2f mode %d level %d bolts %d tgt %08x/%d item %d/%d/%08x\n", static_cast<unsigned long long>(frame), lw(0x001413d4),
                     hm ? lwc1(hm + 0x10) : 0.0f, hm ? lwc1(hm + 0x14) : 0.0f, hm ? lwc1(hm + 0x18) : 0.0f, lw(OV(0x0015f5c4)), lw(0x0015ed84),
                     lw(0x0015ed98), static_cast<uint32_t>(lw(0x0013f350 + 0x968)), lw(0x0013f350 + 0x99c) >> 16, lw(0x0013f350 + 0x10b8), lw(0x0013f350 + 0x10b4), static_cast<uint32_t>(lw(0x0013f350 + 0x1090)));  // (the swingshot target +0x968, +0x99e)
+        // RAC1_SEQ_PEEK=<addr>[:<n>][,...]: n signed halfwords (default 2) of EE memory from each address at each trace (testing)
+        static const char* peek = std::getenv("RAC1_SEQ_PEEK");
+        if (peek != nullptr) {
+            std::printf("[seq-peek] frame %llu", static_cast<unsigned long long>(frame));
+            const char* p = peek;
+            while (*p != '\0') {
+                char* e = nullptr;
+                const uint32_t a = static_cast<uint32_t>(std::strtoul(p, &e, 0));
+                if (e == p) break;
+                long n = 2;
+                if (*e == ':') n = std::strtol(e + 1, &e, 0);
+                std::printf(" %08x:", a);
+                for (long i = 0; i < n; ++i) std::printf(" %d", lh(a + 2u * static_cast<uint32_t>(i)));
+                p = *e == ',' ? e + 1 : e;
+            }
+            std::printf("\n");
+        }
         // the Suck Cannon in hand (item 9): the mobys it holds (the hero's carried count 0x1413c8)
         if (lw(0x0013f350 + 0x10b8) == 9)
             std::printf("[seq-suck] frame %llu carried %d\n", static_cast<unsigned long long>(frame), lw(0x001413c8));

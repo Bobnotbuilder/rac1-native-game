@@ -27,6 +27,7 @@ constexpr VariantRow kVeldinFinale[] = {
     {0x002d8138, 0x002e2248, 0x7c},  // crate_spawn_companion
     {0x002e8648, 0x00301230, 0x28},  // cam0_set_flag116
     {0x002ec678, 0x003052b0, 0x30},  // cam7_step
+    {0x0026eb88, 0x00270bf8, 0x19c}, // particle type 0x1f's update (the matcher placed none of Veldin's 0x26e200..0x26ed28 here)
     // level 18's cutscene_level_extras is empty (a `jr ra`): Veldin's port does nothing on level 18 either (its branches are keyed on levels 0 / 2 / 3)
     {0x0023e268, 0x002408c0, 0x8},    // cutscene_level_extras
     // level 18's own hero controller build (the Novalis family's; transliterated at its addresses: veldin_finale_hero_tr_*.cpp)

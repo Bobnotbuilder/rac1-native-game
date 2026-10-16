@@ -2019,6 +2019,11 @@ int main(int argc, char** argv) {
             if (fn != 0 && !rac1::ovl_moby_fn_ported(fn))
                 std::printf("[moby] %08x class %d fn %08x pos %.1f %.1f %.1f\n", m, lh(m + 0xa6), fn, lwc1(m + 0x10), lwc1(m + 0x14), lwc1(m + 0x18));
         }
+    if (std::getenv("RAC1_MOBY_LIST") != nullptr)  // the particle types whose update (the table 0x1b1e80) has no port
+        for (uint32_t t = 0; t < 0x60; ++t) {
+            const uint32_t fn = lwu(OV(0x001b1e80) + t * 4);
+            if (fn != 0 && fn < 0x02000000u && !rac1::ovl_moby_fn_ported(fn)) std::printf("[particle] type %02x update %08x not ported\n", t, fn);
+        }
     if (std::getenv("RAC1_MOBY_LIST") != nullptr)  // the level's live cameras: type, trigger kind
         for (uint32_t i = 0; i < 48; ++i) {
             const uint32_t c = OV(0x00167150) + i * 0xa0;

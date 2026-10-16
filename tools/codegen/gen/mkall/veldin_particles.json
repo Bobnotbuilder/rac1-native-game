@@ -16,7 +16,9 @@
   "26a880:particle_0a_update:void:a0",
   "26ba68:particle_0e_update:void:a0",
   "26fc38:particle_27_update:void:a0",
-  "275320:particle_49_update:void:a0"
+  "275320:particle_49_update:void:a0",
+  "26eb88:particle_1f_update:void:a0",
+  "275eb0:particle_50_update:void:a0"
  ],
  "glue_files": [],
  "files": [
