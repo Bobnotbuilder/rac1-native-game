@@ -1114,9 +1114,10 @@ bool advanced_rac3_swing_exit(uint32_t step) {
 int32_t advanced_rac3_swing_jump_back(int32_t back) {
     // UYA 0x503b68 (cases 0x13 / 0x15): the look-back (t - row[+0xc]) * 2, but a fixed 8 in the
     // throw. R&C1's row 3 has +0xc = 83, so with its jump-cancel lowered to 35 (combo_table_sync)
-    // the computed look-back stays negative until time 83 and no jump press would count
+    // the computed look-back stays negative until time 83 and no jump press would count. (UYA's 8 is
+    // a plain count of its 60 Hz frames: here frame-scaled, as R&C1's own look-backs - 7 at 50 Hz)
     if (!advanced_rac3_movement() || lw(HERO + 0x2084) != 0x15) return back;
-    return 8;
+    return frame_scale_i(8);
 }
 
 // orig: (none) — enhancement (advanced.h)
