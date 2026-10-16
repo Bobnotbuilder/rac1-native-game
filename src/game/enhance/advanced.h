@@ -109,8 +109,20 @@ void advanced_aim_after_camera();
 // (`pad_held & 5`, the first-person view), or the modern controls aiming
 bool advanced_camera_aim(uint32_t pad_held);
 // orig: (none) — enhancement: while aiming, a shot's direction (`dir`, length `speed`) from the
-// point `from` toward the point under the screen's centre (the camera's line, 30 units out)
+// point `from` toward the point under the screen's centre (the first thing the camera's line meets
+// within 80 units, else that far)
 void advanced_aim_direction(uint32_t from, uint32_t dir, float speed);
+// orig: (none) — enhancement: the other weapons' shots: while aiming, the direction `dir` (computed
+// by the original from the hero's facing) turned toward the point under the screen's centre, from
+// the point `from` (or the hand moby's chain point 0), its length kept; nothing otherwise
+void advanced_aim_shot(uint32_t from, uint32_t dir);
+void advanced_aim_shot_hand(uint32_t hand, uint32_t dir);
+// orig: (none) — enhancement: while aiming (not leaning on a wall), the weapon's frame `rows` (three rows:
+// forward, side, up; the original copies the hero's) turned onto the aim from the hand's chain point 0
+void advanced_aim_frame_hand(uint32_t hand, uint32_t rows);
+// orig: (none) — enhancement: while aiming, the yaw / pitch of that shot from `from`, in the weapons'
+// convention (atan2_f(x, y), -atan2_f(horizontal length, z)); false (and nothing set) otherwise
+bool advanced_aim_angles(uint32_t from, float& yaw, float& pitch);
 
 // --- R&C 3's on-foot movement ---
 // orig: (none) — enhancement: Movement = RAC 3

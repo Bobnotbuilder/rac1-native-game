@@ -5,7 +5,8 @@
  "includes": [
   "game/ovl/weapons.h",
   "game/ovl/tesla.h",
-  "game/ovl/pause_menu.h"
+  "game/ovl/pause_menu.h",
+  "game/enhance/advanced.h"
  ],
  "functions": [
   {
@@ -30,7 +31,10 @@
     "2b8f30",
     "2b9180",
     "2b9058"
-   ]
+   ],
+   "host": {
+    "2b8d50": "advanced_aim_shot(s2.w(), s4.w());  // enhancement: the modern aim's line (advanced.h), the original's facing otherwise"
+   }
   }
  ],
  "register_fn": "tesla_fns_register",

@@ -6,7 +6,8 @@
   "game/ovl/suck_cannon.h",
   "game/ovl/carry_hooks.h",
   "game/ovl/pause_menu.h",
-  "game/ovl/carry_hooks_levels.h"
+  "game/ovl/carry_hooks_levels.h",
+  "game/enhance/advanced.h"
  ],
  "jalr_level_first": true,
  "listings": "$RE_TMP",
@@ -72,13 +73,19 @@
    "addr": "2ddcb8",
    "name": "suck_2ddcb8",
    "ret": "void",
-   "params": "uint32_t p0, uint32_t p1"
+   "params": "uint32_t p0, uint32_t p1",
+   "host": {
+    "2ddddc": "advanced_aim_frame_hand(s0.w(), sp.w());  // enhancement: the modern aim's frame (advanced.h), the original's hero frame otherwise"
+   }
   },
   {
    "addr": "2ddf60",
    "name": "suck_2ddf60",
    "ret": "void",
-   "params": "uint32_t p0, uint32_t p1"
+   "params": "uint32_t p0, uint32_t p1",
+   "host": {
+    "2de0a4": "advanced_aim_frame_hand(lw_(sp.w() + 0x180), a2.w());  // enhancement: the modern aim's frame (advanced.h), the original's hero frame otherwise"
+   }
   },
   {
    "addr": "2df1e0",
@@ -122,7 +129,10 @@
     "2d5780",
     "2cae60",
     "2db858"
-   ]
+   ],
+   "host": {
+    "2db39c": "advanced_aim_shot(sp.w() + 0x80, sp.w());  // enhancement: the modern aim's line (advanced.h), the original's facing otherwise"
+   }
   },
   {
    "addr": "2dd8e8",

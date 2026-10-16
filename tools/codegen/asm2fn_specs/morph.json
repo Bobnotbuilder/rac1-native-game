@@ -5,7 +5,8 @@
  "includes": [
   "game/ovl/weapons.h",
   "game/ovl/morph.h",
-  "game/ovl/pause_menu.h"
+  "game/ovl/pause_menu.h",
+  "game/enhance/advanced.h"
  ],
  "functions": [
   {
@@ -48,7 +49,10 @@
    "addr": "2bc7e8",
    "name": "morph_update",
    "ret": "void",
-   "params": "uint32_t m"
+   "params": "uint32_t m",
+   "host": {
+    "2bcaac": "advanced_aim_shot(s2.w(), sp.w());  // enhancement: the modern aim's line (advanced.h), the original's facing otherwise"
+   }
   }
  ],
  "register_fn": "morph_fns_register",
