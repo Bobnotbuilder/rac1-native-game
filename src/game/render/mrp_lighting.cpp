@@ -1395,6 +1395,17 @@ void bind_common(const ShadowLocs& l) {
     glUniformMatrix4fv(l.inv_view, 1, GL_FALSE, glm::value_ptr(g_sh.inv_view));
     glUniform2f(l.proj, g_sh.proj.x, g_sh.proj.y);
 }
+// the lighting's samplers on their own units, whatever the draw (a lit receiver, the sky, a caster, the lighting off): left at
+// their default unit 0, the point lights' cube maps (samplerCubeArrayShadow) and the tiles (usampler2D) would share it with uTexs[0]
+// (sampler2DArray) and every draw of the program would fail (GL_INVALID_OPERATION). A program's uniforms keep their values: once
+// a lit receiver had set them, all was well - but the loading screen's flight from the title's Load Game, the first frames the lighting
+// runs in, draws the sky alone (an empty world): its sky was never drawn
+void bind_units(const ShadowLocs& l) {
+    glUniform1i(l.map, kUnit);
+    glUniform1i(l.depth, kDepthUnit);
+    glUniform1i(l.pt_map, kPtUnit);
+    glUniform1i(l.pt_tiles, kTileUnit);
+}
 }  // namespace
 
 // orig: (host) see mrp_lighting.h
@@ -1402,7 +1413,7 @@ void mrp_lighting_bind_receiver(const ShadowLocs& l, bool sky) {
     const bool on = mrp_lighting_active() && !sky;
     glUniform1i(l.pass, 0);
     glUniform1i(l.on, on ? 1 : 0);
-    glUniform1i(l.map, kUnit);
+    bind_units(l);
     if (!on) return;
     bind_common(l);
     glm::mat4 m[kCascades];
@@ -1416,16 +1427,13 @@ void mrp_lighting_bind_receiver(const ShadowLocs& l, bool sky) {
     if (l.depth >= 0) {  // (only the lighting's variants have them)
         static const float fd[3] = {static_cast<float>(env_int("RAC1_SHADOW_FADE_FROM", 25)), static_cast<float>(env_int("RAC1_SHADOW_FADE_TO", 120)),
                                     static_cast<float>(env_int("RAC1_SHADOW_FADE_KEEP", 35)) / 100.0f};  // (testing: units, units, percent)
-        glUniform1i(l.depth, kDepthUnit);
         glUniform3f(l.range, g_sh.casc[0].range, g_sh.casc[1].range, g_sh.casc[2].range);
         glUniform4f(l.fade, fd[0], fd[1], fd[2], g_shadow_fade != 0 ? 1.0f : 0.0f);
         glUniform1f(l.sun_k, g_sh.sun_k);
     }
     glUniform1i(l.debug, g_shadow_debug);
     glUniform1i(l.pt_n, g_modern_points != 0 ? g_sh.npts : -1);
-    glUniform1i(l.pt_map, kPtUnit);
     glUniform1f(l.pt_near, kPtNear);
-    glUniform1i(l.pt_tiles, kTileUnit);
     glUniformMatrix4fv(l.pt_vp, 1, GL_FALSE, glm::value_ptr(g_sh.view_proj));
     if (g_sh.npts > 0) {
         glUniform4fv(l.pt_pos, g_sh.npts, glm::value_ptr(g_sh.pt_pos[0]));
@@ -1437,7 +1445,7 @@ void mrp_lighting_bind_receiver(const ShadowLocs& l, bool sky) {
 void mrp_lighting_bind_caster(const ShadowLocs& l, const float* light_vp) {
     glUniform1i(l.pass, 1);
     glUniform1i(l.on, 0);
-    glUniform1i(l.map, kUnit);
+    bind_units(l);
     bind_common(l);
     glUniformMatrix4fv(l.light, 1, GL_FALSE, light_vp);
     glUniform4f(l.cut, g_sh.sun.x, g_sh.sun.y, g_sh.sun.z, kBack + glm::dot(g_sh.cam, g_sh.sun));
@@ -1448,7 +1456,7 @@ void mrp_lighting_bind_off(const ShadowLocs& l) {
     glUniform1i(l.pass, 0);
     glUniform1i(l.on, 0);
     glUniform1i(l.pt_n, -1);
-    glUniform1i(l.map, kUnit);
+    bind_units(l);
 }
 
 }  // namespace rac1
