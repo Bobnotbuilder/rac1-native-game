@@ -1,12 +1,12 @@
 # Environment variables
 
-rac1-native reads a number of `RAC1_*` environment variables. This page lists all of them: 279 in
+rac1-native reads a number of `RAC1_*` environment variables. This page lists all of them: 281 in
 total, in three groups.
 
 | Group | Count | Who it is for |
 |---|---|---|
 | [Player](#player-variables) | 18 | Settings a player may want to change: files, window, audio, the ISO |
-| [Debugging](#debugging-variables) | 205 | Developers: profilers, overlays, switching a renderer or an optimisation on or off to compare |
+| [Debugging](#debugging-variables) | 207 | Developers: profilers, overlays, switching a renderer or an optimisation on or off to compare |
 | [Automated testing](#automated-testing-variables) | 56 | Scripted and headless runs: frame counts, screenshots, simulated input, self-checks |
 
 The oracle (`build/tests/ovl_oracle`) reads variables of its own (`ORACLE_*`, `RAC1_ORACLE_DUMPS`): see
@@ -219,6 +219,8 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_SND_TRACE` | any value = on; default off | Prints a trace of the sound-bank (989snd) events the game sends to the emulated IOP sound driver. |
 | `RAC1_STALL_LOG` | milliseconds as a number; default off (-1) | Logs every game step (a game frame or a blocking loop's frame) that takes longer than the given number of milliseconds, with the vsyncs it spanned. |
 | `RAC1_SUB_TRACE` | any value = on; default off | Prints, for each substituted draw range, how many substitute and real primitives the GS emulation kept or dropped. |
+| `RAC1_SUN_COVER` | 0 = off; default on | The modern lighting's check of how much of the view sees the sun (the sun's shadows fade out in a view covered from it, such as a room). 0 keeps the zone's sun everywhere, to compare. See [Lighting](lighting.md). |
+| `RAC1_SUN_COVER_TRACE` | set (any value) = on; default off | Every 60 frames prints how much of the view sees the sun, the sky's share and the sun's weight scale that follows from it. |
 | `RAC1_SUN_DIR` | three comma-separated floats "x,y,z"; unset = the level's own sun direction | Overrides the direction of the sun used by the modern lighting and shadows (normalised; ignored if near zero length). |
 | `RAC1_SUN_LEVEL` | set (any value) = on; default off | The modern lighting's sun always uses the level's light set 0 (the old way) instead of the light set the hero is lit with. See [Lighting](lighting.md). |
 | `RAC1_SUN_TRACE` | set (any value) = on; default off | Prints the light sets the hero is lit with, for the modern lighting's sun. See [Lighting](lighting.md). |
