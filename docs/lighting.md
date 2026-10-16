@@ -11,24 +11,30 @@ point lights per pixel, cascaded sun shadows, ambient occlusion and an in-game l
 > so the game's state is the same with it on or off. It is a labelled enhancement (see
 > [Settings](settings.md)).
 
-**What it is today.** Its parts work and have been run on every level up to Umbris (Veldin,
-Novalis, Aridia, Kerwan, Eudora, Rilgar, Blarg, Umbris) without crashes or shader errors, but how
-good the result looks differs a lot between planets. Where each part comes from is described in
+**What it is today.** Its parts work and have been run on every level of the game (Veldin to the
+Veldin finale) at each quality without crashes or shader errors, but how good the result looks
+differs a lot between planets. Where each part comes from is described in
 [How a level is analysed](#how-a-level-is-analysed).
 
 - **The sun** is the light the game itself lights Ratchet with in the zone where he stands: the
   hero's light sets, turned and faded as he moves from one zone to the next. It is not a fixed
   per-level direction. Where the zone's light does not come from above, there is no sun and no sun
-  shadows there.
+  shadows there. Where it does but a roof stops it (a room, a corridor, a ship's hold), so that
+  almost nothing in view sees the sun, its shadows fade out and the picture is the original's
+  ([Views covered from the sun](#views-covered-from-the-sun)).
 - **The objects that glow** (lamps, screens, strips) are bright textures in the game, not lights.
   When a level loads they are found automatically and turned into small point lights. This is
   our own heuristic, not game data, and it can be wrong (see the table below).
 - **Lights placed by hand** with the [light editor](#the-light-editor) cover what the automatic
-  search can't find. No light files are shipped with the project.
+  search can't find. The project ships no hand-placed lights; it ships two level files that only
+  turn off an automatic class the search got wrong (Gaspar, Orxon).
 
-**State per level** (what the project's own survey found, levels 0 to 7, with the lighting set to
-Medium, point-light shadows and ambient occlusion on). "Works" means no crash, no artefact worth
-noting and shadows where they should be; it does not mean every lamp is lit.
+**State per level** (what the project's own surveys found, with the lighting set to Medium,
+point-light shadows and ambient occlusion on; levels 8 to 18 also at Low and High). "Works" means
+no crash, no artefact worth noting and shadows where they should be; it does not mean every lamp is
+lit. Levels 8 to 18 were surveyed headless (the start of each level, a walk and a turn of the
+camera, and a few places reached by moving Ratchet), not played through: their rows say what was
+seen, and every one of them still needs a playtest.
 
 | Level | State |
 |---|---|
@@ -38,12 +44,22 @@ noting and shadows where they should be; it does not mean every lamp is lit.
 | Kerwan | Works. Few automatic lights. |
 | Eudora | Works. The heaviest level for the lighting (its forest has many shadow casters; roughly twice the frame time of the lighting off in the survey, on an integrated GPU). Trees and woodwork glow bright orange in the textures: they are recognised as materials and not turned into lights. Need some works. |
 | Rilgar | Works. Same warm-material handling as Eudora. Needs some works, some automatic lights are a bit non-sense |
-| Blarg (Nebula G34, Blarg's station) | **Still a mess.** Playtesting found some zones pitch dark. The station's closed zones are lit by a light that reaches the floor only through the geometry above it, so the sun's shadow covers the whole zone and darkens it. The likely cause is known but not fixed. The hangar has only a faint, low blue sun. |
+| Blarg (Nebula G34, Blarg's station) | **Still a mess, possibly better.** Playtesting found some zones pitch dark: the station's closed zones are lit by a light that reaches the floor only through the geometry above it, so the sun's shadow covered the whole zone. [Views covered from the sun](#views-covered-from-the-sun) now fades the sun out where almost nothing in view sees it, which should give those zones the original's look: in a headless check one closed room (light set 6) got exactly that, while the lounges with large windows still see enough sun to keep their shadows; the pitch-dark zones themselves were not found again, not yet playtested. The hangar has only a faint, low blue sun. |
 | Umbris | Works outdoors: the dead trees cast long shadows. Near the lava the zone's light comes from below, so there is no sun there and the shadows fade out. No automatic lights are found on this level. |
+| Batalia | Works outdoors: a low warm sun (15 degrees) gives long shadows across the decks in the rain. No automatic lights: the towers' cyan bands are thin strips on their objects' textures (2 or 3 of a triangle's 7 samples, under the objects' 4-of-7 rule), so they cast no light. |
+| Gaspar | Works outdoors (sun at 40 degrees). Inside the buildings the view is covered from the sun and the picture is the original's. The tanks' gold band (tie class 1558, paint) was taken for a lamp and lit their corner gold: turned off in `data/lights/level09.txt`. The robots' shots, the game's own lights, light the floor and pillars per pixel, strongly. |
+| Orxon | Works outdoors (sun at 20 degrees). The base's rooms and corridors are covered from the sun: the original's look. The rooms' mint floor panels (tie class 1521) were taken for lamps and lit the floor with itself: turned off in `data/lights/level10.txt`. |
+| Pokitaru | Works (sun at 30 degrees): shadows on the boardwalks at the start. No automatic lights are found on this level. |
+| Hoven | Works outdoors on the snow (sun at 30 degrees). A few blue panels inside give 16 small lights. |
+| Gemlik Base | Works: a moon base in space, lit from the side (20 degrees), with long shadows. Ratchet in a shadow is almost black: the level's light without its key light is nearly nothing (the game's own formula, see [How a shadow darkens](#sun-shadows-cascaded-shadow-maps)). |
+| Oltanis | **Needs Daino's eye.** The key light is dim and grey, yet it is the brightest of its set, so its shadows are full; the streets between the tall buildings are mostly in shadow and Ratchet is dark there. Where almost the whole view is shaded the sun fades out (the view covered), so the shadows come and go as the camera turns toward or away from the lit plazas. The street lamps are mobys, which give no automatic lights; the level's 137 are beacons on top of the towers, high above the streets. |
+| Quartu | **Needs Daino's eye.** The factory at night: the courtyards' walls shade most of the view, so the sun is often faded out (the original's look) and comes back, with dark courtyards, when the camera sees the lit ground or the sky. 7 small lights. |
+| Kalebo III | Works: the city on its platforms in the sun (30 degrees) with clean shadows. 85 automatic lights (cyan strips of tie class 2157), away from the start. |
+| Drek's fleet | Works as the original indoors: the ships' halls and corridors are covered from the sun (none of the view sees it), so the picture is the original's with the occlusion on top. The sun is the zone's second light (the first comes from below). The orange door trims (tie class 2154, warm, 14 % of the class: just under the material share) give 10 faint lights: borderline. |
+| Veldin finale | Works outdoors (sun at 40 degrees). The bridges' cyan strips (tie class 2033) light the bridges' undersides strongly cyan: **needs Daino's eye**. Ratchet in the cliffs' shadows is dark. |
 
-Levels after Umbris have not been surveyed. Until a planet has been through this analysis and a
-playtest, the modern lighting may look wrong there: shadows from a doubtful sun, a zone far too
-dark, or lamps that cast no light.
+Until a planet has had a playtest with the modern lighting, it may look wrong there: shadows from a
+doubtful sun, a zone far too dark, or lamps that cast no light.
 
 This page assumes the renderer described in [Rendering](rendering.md). Code paths are under
 `src/game/render/` unless stated.
@@ -132,7 +148,7 @@ flowchart TD
     E --> E1
     E4 --> F["World and sky: SH_POINTS variant<br/>(sun shadow, point lights, fade)"]
     F --> G["Mobys: SH_SPLIT variant<br/>(sun shadow on the key light)"]
-    G --> H["mrp_lighting_ao_pass (SSAO)"]
+    G --> H["mrp_lighting_ao_pass<br/>(the covered view's test, SSAO)"]
     H --> I["GS replica: effects, particles, 2D"]
 ```
 
@@ -183,9 +199,12 @@ where he stands**.
    weight changes at most **1/30 a frame**. In a zone without a sun the shadows fade out in about
    half a second instead of vanishing. At weight 0 the cascades are not drawn, and the characters
    get the original game's drop shadows back.
-5. **Overrides for testing:** `RAC1_SUN_DIR=x,y,z` forces a sun, `RAC1_SUN_LEVEL=1` always uses
-   light set 0 (the old way), and `RAC1_SUN_TRACE=1` prints the hero's sets and a census of the
-   sets the level's mobys use.
+5. **The view covered** (our choice): the weight is then scaled by how much of the view sees the
+   sun, see [Views covered from the sun](#views-covered-from-the-sun).
+6. **Overrides for testing:** `RAC1_SUN_DIR=x,y,z` forces a sun, `RAC1_SUN_LEVEL=1` always uses
+   light set 0 (the old way), `RAC1_SUN_TRACE=1` prints the hero's sets and a census of the
+   sets the level's mobys use, `RAC1_SUN_COVER=0` turns the covered views' fade off and
+   `RAC1_SUN_COVER_TRACE=1` prints it.
 
 What the levels up to Umbris give (direction toward the sun):
 
@@ -199,6 +218,44 @@ What the levels up to Umbris give (direction toward the sun):
 | Rilgar | 0 | (-0.90 -0.35 0.27) |
 | Blarg | 0 in the hangar (its main light comes from below), 2 to 8 in the other zones | hangar: the second light, low (12 degrees) and blue, weight about 0.5 |
 | Umbris | 0 outside; 5 / 6 near the lava (light from below) | (-0.92 0.01 0.40); no sun near the lava |
+| Batalia | 0 | (-0.68 -0.69 0.26), low and warm |
+| Gaspar | 0 | (-0.74 0.20 0.64); the set's second light comes from below |
+| Orxon | 0 | (0.66 -0.66 0.34); the set's second light comes from below |
+| Pokitaru | 0 | (0.58 -0.65 0.50) |
+| Hoven | 0 | (-0.61 -0.61 0.50) |
+| Gemlik Base | 0 | (-0.94 0.00 0.34) |
+| Oltanis | 0 | (-0.68 -0.56 0.48), dim and grey (0.26) but the set's only light: full weight |
+| Quartu | 0 | (0.94 0.00 0.34) |
+| Kalebo III | 0 | (0.72 -0.47 0.50) |
+| Drek's fleet | 0 | (0.77 0.41 0.48): the set's second light (its first comes from below) |
+| Veldin finale | 0 | (-0.76 -0.07 0.65); the set's second light comes from below |
+
+On levels 8 to 18 the hero kept set 0 in every survey run (the other sets the level data holds,
+up to 8 on Hoven, are used by other mobys), so their sun is set 0's everywhere; their rooms are
+dealt with by the next section.
+
+### Views covered from the sun
+
+Our choice, not the game's (`cover_probe` in `mrp_lighting.cpp`). A room, a corridor or a ship's
+hold is often lit by its zone's key light coming from above, so the sun's shadow of the roof covers
+everything in view and only darkens it: Orxon's base, Gaspar's halls, the whole of Drek's fleet,
+Blarg's station. The sun's shadows show nothing there, so they fade out:
+
+1. Each frame, after the mobys, the 3D's depth is copied at 128 x 72 (a blit) and a 64 x 36 pass
+   takes, per sample, its world point and face normal and tests it against the cascades (one tap,
+   offset a little along the normal and toward the sun). A face turned away from the sun is not
+   counted (the receivers do not shadow it either); the sky counts as seeing the sun.
+2. The result is read back the next frame (a pixel buffer, always the last frame's, so a run gives
+   the same picture every time).
+3. The sun's weight is scaled by the share of the view that sees the sun: 0 under 5 %, 1 over
+   25 %. The scale follows the share slowly (3 % of the way a frame, about a second), and the weight
+   then fades as between zones. At 0 the picture is the original's, with the original's drop
+   shadows, the point lights and the occlusion on top.
+4. The cascades are still drawn while the zone has a sun, for the next frame's test.
+
+It also fades the sun where a large shadow fills the whole view outdoors (Ratchet under Novalis's
+big mushroom trees looking at the shaded ground): the shadow comes back as soon as some lit
+ground or the sky is in view, a little like an eye adjusting.
 
 ### The sun's shadows
 
@@ -242,43 +299,67 @@ strips).
 1. **Sampling.** For each triangle of a tie (the class's LOD 0 geometry) and of a tfrag (the "near"
    copy of its data, rebuilt with the CPU version of the VU1 program and an identity view), take
    7 texture points: the three vertices, the three edge midpoints and the centre.
-2. **A glowing texel** has value (max of r, g, b) >= 0.8, saturation >= 0.55 and alpha >= 0x40. A
-   triangle glows with at least 4 of 7 points for ties, 2 of 7 for tfrags (the strips are thin).
+2. **A glowing texel** has value (max of r, g, b) >= 0.8, saturation >= 0.55 and alpha >= 0x40; a
+   warm one (r >= g >= b, b < 0.35: ochre rock, wood, rust) also needs value >= 0.92 or luma >= 0.72.
+   A triangle glows with at least 4 of 7 points for ties, 3 of 7 for tfrags (the strips are thin);
+   a tfrag triangle with more than 64 square units glowing is ground or wall, not a lamp.
 3. **A tfrag's texture** comes from the CLAMP_1 register of the texture change (its MINV field holds
    the level texture's index).
-4. **Material, not lamp.** If a tie class, or a tfrag texture, glows over **more than 35 %** of its
-   surface **in a warm colour** (hue outside 165 to 260 degrees), it is a material (orange trees,
-   wood, paint). Cool colours on large surfaces stay lights: screens, glass, energy, the cyan
-   panels of Ratchet's house.
+4. **Material, not lamp.** A tie class glowing **in a warm colour** (hue outside 165 to 260
+   degrees) over **more than 15 %** of its surface, or over more than 220 square units, is a
+   material (orange trees, wood, paint); a tfrag texture in a warm colour over more than 12 %, 70
+   square units glowing or 350 in all. A cool colour stays a light (screens, glass, energy, the cyan
+   panels of Ratchet's house) unless it covers more than 85 % of a tie class of over 500 square
+   units, or more than 75 % (or 500 square units) of a tfrag texture.
 5. **Grouping.** Glowing triangles are grouped in cells of 4 units; for ties at most the 12
    largest cells per class. Each cell becomes a light, repeated for every instance of the class with
    its matrix. The colour is the mean of the texels. Intensity is clamp(0.35 + 0.25 * sqrt(area),
-   0.35, 0.9) and radius clamp(2 + 3 * sqrt(area), 2, 7). Tfrag lights sit 1.5 units above the surface.
-6. **Merge and density.** Nearby lights are merged in cells of 3 units. If more than 88 remain within
-   60 units of one light, the cell grows (x1.5, up to 24 units). So near the camera there are never more than the shader
-   lights (96) and no light switches on or off as the camera turns.
-7. **Each frame.** The lights within 60 units are taken, nearest first, with a 6-unit fade at the edge.
+   0.35, 0.9) and radius clamp(2 + 3 * sqrt(area), 2, 7). Tfrag lights sit 1.2 units off the surface.
+6. **Merge and density.** Nearby lights are merged in cells of 3 units; if more than 88 remain within
+   60 units of one light, the cells grow once to 4.5 units (no larger, so that separate lamps are
+   not averaged into one in mid-air). On levels 8 to 18 this leaves at most 67 within 60 units of
+   one light (Gaspar before its correction), under the shaders' 96; Blarg keeps 101 even in cells
+   of 4.5, so there the farthest are faded out (step 7).
+7. **Each frame.** The lights within 60 units are taken, nearest first, with a 6-unit fade at the
+   edge of that reach, and the same fade toward the first one left out if there are more than the
+   shaders light, so that none switches on or off as the camera turns.
 8. **Hand corrections.** In the debug menu's Lights tab, section "Automatic emitters", each class
    found has a switch. A class turned off goes into the level's file as `noauto <class>`.
 
-Automatic lights found per level (before merging):
+Automatic lights found per level, as the code stands (the survey of levels 0 to 7 found more
+before the rules above were tightened):
 
-| Level | Lights (before the merge) |
-|---|---|
-| Veldin | 153 (372) |
-| Novalis | 63 (66) |
-| Aridia | 170 (192) |
-| Kerwan | 30 (89) |
-| Eudora | 208 (555) |
-| Rilgar | 383 (1190) |
-| Blarg | 110 (1399) |
-| Umbris | 0 |
+| Level | Lights (before the merge) | Notes |
+|---|---|---|
+| Veldin | 82 (135) | |
+| Novalis | 0 | |
+| Aridia | 104 (112) | all from the terrain |
+| Kerwan | 8 (8) | |
+| Eudora | 74 (286) | |
+| Rilgar | 106 (136) | |
+| Blarg | 140 (290) | |
+| Umbris | 0 | |
+| Batalia | 0 | the towers' bands are too thin for the ties' rule |
+| Gaspar | 10 (12) | tie class 1558 turned off (`data/lights/level09.txt`) |
+| Orxon | 2 (2) | tie class 1521 turned off (`data/lights/level10.txt`) |
+| Pokitaru | 0 | |
+| Hoven | 16 (19) | all from the terrain |
+| Gemlik Base | 67 (136) | |
+| Oltanis | 137 (140) | beacons on top of the towers |
+| Quartu | 7 (7) | |
+| Kalebo III | 85 (108) | |
+| Drek's fleet | 10 (24) | the orange door trims, borderline |
+| Veldin finale | 138 (181) | the bridges' cyan strips light them strongly |
 
 ### Lights placed by hand (our choice)
 
 Made in the debug menu (F1, Lights tab) and saved in `data/lights/level<NN>.txt`; see
 [The light editor](#the-light-editor). They are positions and colours chosen by us, with nothing
 taken from the disc. They are lit like the automatic ones and ahead of them.
+
+The project ships two level files, and neither places a light: `level09.txt` (Gaspar) and
+`level10.txt` (Orxon) each turn off one automatic class that was taken for a lamp, with a comment
+saying why. The levels 0 to 7 have no file.
 
 ### Point-light shadows, per-pixel cost and occlusion
 
@@ -444,9 +525,11 @@ part of the original. The editor is in the debug menu (Lights tab), so it needs 
   change the game's state: it is a debug tool.
 - Lights are saved per level in `data/lights/levelNN.txt` (relative to the working directory;
   `RAC1_LIGHTS_DIR` changes the directory), one light per line:
-  `light x y z  r g b  intensity radius flicker on`, with `#` for comments.
+  `light x y z  r g b  intensity radius flicker on`, and `noauto <class>` for an automatic class
+  turned off, with `#` for comments. Saving from the editor keeps the file's own comment lines.
 - A level's file is loaded when the level's first shadow pass runs, and hand-placed lights are only
-  used with Secondary Lights set to All. No light files are shipped with the project.
+  used with Secondary Lights set to All. The project ships the files of Gaspar and Orxon, which only
+  turn an automatic class off (see [Lights placed by hand](#lights-placed-by-hand-our-choice)).
 
 ## Settings
 
@@ -489,7 +572,7 @@ From the project's measurements at 1920x1080 on a shared machine with an integra
 | Per-pixel point lights (GPU) | about 6 ms | about 1 ms with tiles |
 | Ambient occlusion (GPU) | | about 2 ms |
 
-Finding the automatic emitters costs 16 to 25 ms once per level.
+Finding the automatic emitters costs 10 to 50 ms once per level (the survey of every level).
 
 ## Limits
 
@@ -506,7 +589,12 @@ Finding the automatic emitters costs 16 to 25 ms once per level.
 - While any of the game's short-lived point lights is active, the world's vertex colours are held as they were.
 - The intensity value of the game's point lights is not used per pixel; only their colour and radius.
 - Lighting is not applied on the title screen, in menus or during fades.
-- A zone whose key light comes from below or the horizon has no sun shadows, and a closed zone lit
-  through geometry can come out far too dark (Blarg, known and not fixed).
-- The automatic lights are a heuristic: some lamps are missed, and a bright coloured material can be
-  taken for a lamp or the reverse.
+- A zone whose key light comes from below or the horizon has no sun shadows. A closed zone lit
+  through geometry gets the original's look only when almost nothing in view sees the sun; a
+  courtyard or a street shaded by tall walls sits in between, and its shadows come and go as the
+  camera turns (Oltanis, Quartu).
+- The covered views' test looks at the last frame (one frame late) and at the cascades' reach
+  (220 units): beyond them, everything counts as seeing the sun.
+- The automatic lights are a heuristic: some lamps are missed (thin strips, lamps that are mobys:
+  Batalia's towers, Oltanis's street lamps), and a bright coloured material can be taken for a lamp
+  or the reverse.

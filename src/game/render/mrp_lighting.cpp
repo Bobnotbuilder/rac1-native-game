@@ -68,6 +68,9 @@ constexpr float kBack = 400.0f;
 constexpr float kCacheGrow = 1.25f;
 std::atomic<bool> g_sun_known{false};
 std::atomic<bool> g_has_sun{true};  // the level's key light comes from above: the sun's shadows (else none: Blarg)
+// how much of the sun's weight the view keeps: 0 covered from the sun .. 1 open (see kProbeW)
+float view_open();
+std::atomic<bool> g_casc_on{true};  // the cascades drawn: the zone has a sun (its shadows' weight may be faded to 0: the view covered)
 float g_cull_sun[3] = {0.0f, 0.0f, 1.0f};  // (the sun for the casters' search on the scene's worker)
 float g_cull_tan[2] = {0.0f, 0.0f};         // (the drawn view's half-angle tangents, 1 / P00 and 1 / P11)
 
@@ -294,6 +297,8 @@ void fit_cascades() {
     {  // the zone's sun: turned toward a new zone's at most 1 degree a frame, its shadows' weight faded (1 / 30 a frame)
         float tw = 0.0f;
         const glm::vec3 target = sun_direction(&tw);
+        const float zone_w = tw;
+        tw *= view_open();  // (a view covered from the sun: its shadows faded out, the cascades still drawn - the probe's)
         static glm::vec3 cur{0.0f, 0.0f, 1.0f};
         static float curw = 0.0f;
         static int32_t lvl = -1;
@@ -315,6 +320,7 @@ void fit_cascades() {
         g_sh.sun = cur;
         g_sh.sun_k = curw;
         g_has_sun.store(curw > 0.01f);
+        g_casc_on.store(curw > 0.01f || zone_w > 0.01f);
     }
     for (int i = 0; i < 3; ++i) g_cull_sun[i] = g_sh.sun[i];  // (the casters' search of the next frames: the level's sun is fixed)
     g_cull_tan[0] = 1.0f / g_sh.proj.x;
@@ -741,13 +747,254 @@ struct Ao {
     GLint u_depth = -1, u_inv_vp = -1, u_vp = -1, u_cam = -1, u_param = -1;
     GLint u_b_depth = -1, u_b_ao = -1, u_b_texel = -1;
 } g_ao_s;
+
+// ---- the view covered from the sun -----------------------------------------------------------------------------------
+//
+// Our choice, not the game's: a room, a corridor, a ship's hold is lit by its zone's key light, which comes from above, but the
+// roof stops it, so the sun's shadow covers the whole view and darkens it (Blarg's station, Orxon's base, Gaspar's halls). Each
+// frame the 3D's depth is copied at 2 kProbeW x 2 kProbeH (a blit, nearest); per sample its world point and face normal (from its
+// neighbours), tested against the cascades (one tap, a few texels toward the sun) when it faces the sun - a face turned away is
+// not counted, as the receivers do not shadow it -, the sky as seeing it. Read back the next frame (a pixel buffer): the sun's
+// weight is scaled by how much of the view sees the sun - none under kCoverLo, all over kCoverHi, the scale following it slowly
+// (kCoverRate a frame, about a second), then faded as between zones. In a room, the original's look (the mobys' drop shadows back);
+// outdoors, where the ground in the sun or the sky shows, the shadows as before.
+constexpr int kProbeW = 64, kProbeH = 36;
+constexpr float kCoverLo = 0.05f, kCoverHi = 0.25f, kCoverRate = 0.03f;
+const char* kProbeFs = R"(#version 460 core
+uniform sampler2D uDepth;
+uniform sampler2DArrayShadow uShMap;
+uniform mat4 uShCasc[3];
+uniform vec3 uShPart;
+uniform vec3 uShTexel;
+uniform vec3 uShSun;
+uniform vec3 uCam;
+uniform mat4 uInvVP;
+out vec4 FragOut;  // r the sun seen, g counted, b the sky
+vec3 world(ivec2 ip, float d) {
+    vec2 uv = (vec2(ip) + 0.5) / vec2(textureSize(uDepth, 0));
+    vec4 w = uInvVP * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+    return w.xyz / w.w;
+}
+void main() {
+    ivec2 ip = ivec2(gl_FragCoord.xy) * 2;
+    float d = texelFetch(uDepth, ip, 0).r;
+    if (d >= 1.0) { FragOut = vec4(1.0, 1.0, 1.0, 1.0); return; }
+    float dx = texelFetch(uDepth, ip + ivec2(1, 0), 0).r, dy = texelFetch(uDepth, ip + ivec2(0, 1), 0).r;
+    vec3 P = world(ip, d);
+    if (dx >= 1.0 || dy >= 1.0) { FragOut = vec4(0.0); return; }
+    vec3 N = cross(world(ip + ivec2(1, 0), dx) - P, world(ip + ivec2(0, 1), dy) - P);
+    if (dot(N, N) < 1e-12) { FragOut = vec4(0.0); return; }
+    N = normalize(N);
+    if (dot(N, uCam - P) < 0.0) N = -N;
+    if (dot(N, uShSun) < 0.1) { FragOut = vec4(0.0); return; }
+    for (int k = 0; k < 3; ++k) {
+        vec4 q = uShCasc[k] * vec4(P + N * (uShTexel[k] * 1.5) + uShSun * (uShTexel[k] * 2.0), 1.0);
+        if (any(lessThan(q.xy, vec2(0.02))) || any(greaterThan(q.xy, vec2(0.98))) || q.z >= 1.0) continue;
+        FragOut = vec4(texture(uShMap, vec4(q.xy * uShPart[k], float(k), q.z)), 1.0, 0.0, 1.0);
+        return;
+    }
+    FragOut = vec4(1.0, 1.0, 0.0, 1.0);
+}
+)";
+struct Probe {
+    GLuint prog = 0, vao = 0, dfbo = 0, dtex = 0, ofbo = 0, otex = 0, pbo[2] = {0, 0};
+    GLenum dfmt = 0;
+    GLint last_fb = -1;
+    bool filled[2] = {false, false};
+    int next = 0;
+    GLint u_depth = -1, u_map = -1, u_casc = -1, u_part = -1, u_texel = -1, u_sun = -1, u_cam = -1, u_inv_vp = -1;
+    float open = 1.0f, sky = 1.0f;  // the last measure: the counted samples' share that see the sun, the samples' share of sky
+    float k = 1.0f;                 // the sun's weight's scale (smoothed)
+    int32_t level = -1;
+} g_probe;
+}  // namespace
+
+namespace {
+// orig: (host) the view covered from the sun (see kProbeW): this frame's samples drawn and read into a pixel buffer, the last
+// frame's read (its fence long passed: the map does not wait in practice; always the last frame's - the same picture every run)
+void cover_probe(GLint fb, const int vp[4]) {
+    static const int on = env_int("RAC1_SUN_COVER", 1);  // (testing: 0 off)
+    static const bool trace = std::getenv("RAC1_SUN_COVER_TRACE") != nullptr;
+    Probe& P = g_probe;
+    const int32_t level = lw(0x0015ed84);
+    if (level != P.level) {  // (a new level: nothing measured yet)
+        P.level = level;
+        P.k = 1.0f;
+        P.open = P.sky = 1.0f;
+        P.filled[0] = P.filled[1] = false;
+    }
+    if (on == 0 || !g_casc_on.load()) {
+        P.k = 1.0f;
+        P.filled[0] = P.filled[1] = false;
+        return;
+    }
+    if (P.prog == 0) {
+        P.prog = ao_link(kProbeFs);
+        P.u_depth = glGetUniformLocation(P.prog, "uDepth");
+        P.u_map = glGetUniformLocation(P.prog, "uShMap");
+        P.u_casc = glGetUniformLocation(P.prog, "uShCasc");
+        P.u_part = glGetUniformLocation(P.prog, "uShPart");
+        P.u_texel = glGetUniformLocation(P.prog, "uShTexel");
+        P.u_sun = glGetUniformLocation(P.prog, "uShSun");
+        P.u_cam = glGetUniformLocation(P.prog, "uCam");
+        P.u_inv_vp = glGetUniformLocation(P.prog, "uInvVP");
+        glGenVertexArrays(1, &P.vao);
+        glGenFramebuffers(1, &P.dfbo);
+        glGenFramebuffers(1, &P.ofbo);
+        glGenTextures(1, &P.dtex);
+        glGenTextures(1, &P.otex);
+        glGenBuffers(2, P.pbo);
+        for (int i = 0; i < 2; ++i) {
+            glBindBuffer(GL_PIXEL_PACK_BUFFER, P.pbo[i]);
+            glBufferData(GL_PIXEL_PACK_BUFFER, 4 * kProbeW * kProbeH, nullptr, GL_STREAM_READ);
+        }
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+        glBindTexture(GL_TEXTURE_2D, P.otex);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kProbeW, kProbeH, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glBindFramebuffer(GL_FRAMEBUFFER, P.ofbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, P.otex, 0);
+    }
+    // the last frame's measure
+    const int prev = P.next ^ 1;
+    if (P.filled[prev]) {
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, P.pbo[prev]);
+        if (const auto* px = static_cast<const uint8_t*>(glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, 4 * kProbeW * kProbeH, GL_MAP_READ_BIT))) {
+            uint32_t lit = 0, counted = 0, sky = 0;
+            for (int i = 0; i < kProbeW * kProbeH; ++i) {
+                lit += px[4 * i];
+                counted += px[4 * i + 1] >= 128 ? 1u : 0u;
+                sky += px[4 * i + 2] >= 128 ? 1u : 0u;
+            }
+            glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+            P.open = counted > 0 ? static_cast<float>(lit) / (255.0f * static_cast<float>(counted)) : 1.0f;
+            P.sky = static_cast<float>(sky) / static_cast<float>(kProbeW * kProbeH);
+            P.k += (std::clamp((P.open - kCoverLo) / (kCoverHi - kCoverLo), 0.0f, 1.0f) - P.k) * kCoverRate;
+        }
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+        P.filled[prev] = false;
+    }
+    if (trace) {
+        static uint64_t n = 0;
+        if (n++ % 60 == 0) std::printf("[sun] cover probe: %.0f %% sees the sun, %.0f %% sky: the sun's weight x %.2f\n", 100.0f * P.open, 100.0f * P.sky, P.k);
+    }
+    // this frame's: the depth at 2 kProbeW x 2 kProbeH (a blit of the same format, nearest)
+    GLenum fmt = P.dfmt;
+    if (fb != P.last_fb || fmt == 0) {
+        GLint dbits = 24, sbits = 8, dtype = GL_UNSIGNED_NORMALIZED;
+        glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(fb));
+        const GLenum datt = fb == 0 ? GL_DEPTH : GL_DEPTH_ATTACHMENT, satt = fb == 0 ? GL_STENCIL : GL_STENCIL_ATTACHMENT;
+        glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, datt, GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE, &dbits);
+        glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, datt, GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE, &dtype);
+        glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, satt, GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE, &sbits);
+        while (glGetError() != GL_NO_ERROR) {}
+        fmt = dtype == GL_FLOAT ? (sbits > 0 ? GL_DEPTH32F_STENCIL8 : GL_DEPTH_COMPONENT32F)
+                                : (sbits > 0 ? GL_DEPTH24_STENCIL8 : (dbits >= 32 ? GL_DEPTH_COMPONENT32 : dbits >= 24 ? GL_DEPTH_COMPONENT24 : GL_DEPTH_COMPONENT16));
+        P.last_fb = fb;
+    }
+    const bool st = fmt == GL_DEPTH24_STENCIL8 || fmt == GL_DEPTH32F_STENCIL8;
+    if (P.dfmt != fmt) {
+        P.dfmt = fmt;
+        glBindTexture(GL_TEXTURE_2D, P.dtex);
+        glTexImage2D(GL_TEXTURE_2D, 0, static_cast<GLint>(fmt), 2 * kProbeW, 2 * kProbeH, 0, st ? GL_DEPTH_STENCIL : GL_DEPTH_COMPONENT,
+                     fmt == GL_DEPTH24_STENCIL8 ? GL_UNSIGNED_INT_24_8 : fmt == GL_DEPTH32F_STENCIL8 ? GL_FLOAT_32_UNSIGNED_INT_24_8_REV : GL_FLOAT, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glBindFramebuffer(GL_FRAMEBUFFER, P.dfbo);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, st ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, P.dtex, 0);
+        glDrawBuffer(GL_NONE);
+        glReadBuffer(GL_NONE);
+    }
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(fb));
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, P.dfbo);
+    glBlitFramebuffer(vp[0], vp[1], vp[0] + vp[2], vp[1] + vp[3], 0, 0, 2 * kProbeW, 2 * kProbeH, GL_DEPTH_BUFFER_BIT | (st ? GL_STENCIL_BUFFER_BIT : 0), GL_NEAREST);
+    // the samples against the cascades (the caller's state saved and restored around)
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, P.ofbo);
+    glViewport(0, 0, kProbeW, kProbeH);
+    glUseProgram(P.prog);
+    glBindVertexArray(P.vao);
+    constexpr int kProbeUnit = 28;
+    glActiveTexture(GL_TEXTURE0 + kProbeUnit);
+    glBindTexture(GL_TEXTURE_2D, P.dtex);
+    glActiveTexture(GL_TEXTURE0 + kUnit);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, g_sh.tex);
+    glUniform1i(P.u_depth, kProbeUnit);
+    glUniform1i(P.u_map, kUnit);
+    glm::mat4 m[kCascades];
+    for (int k = 0; k < kCascades; ++k) m[k] = g_sh.casc[k].tex;
+    glUniformMatrix4fv(P.u_casc, kCascades, GL_FALSE, glm::value_ptr(m[0]));
+    glUniform3f(P.u_part, g_sh.casc[0].part, g_sh.casc[1].part, g_sh.casc[2].part);
+    glUniform3f(P.u_texel, g_sh.casc[0].texel, g_sh.casc[1].texel, g_sh.casc[2].texel);
+    glUniform3f(P.u_sun, g_sh.sun.x, g_sh.sun.y, g_sh.sun.z);
+    glUniform3f(P.u_cam, g_sh.cam.x, g_sh.cam.y, g_sh.cam.z);
+    float vpf[16];
+    mrp_world_view_proj(vpf);
+    const glm::mat4 IVP = glm::inverse(glm::make_mat4(vpf));
+    glUniformMatrix4fv(P.u_inv_vp, 1, GL_FALSE, glm::value_ptr(IVP));
+    glDrawArrays(GL_TRIANGLES, 0, 3);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, P.ofbo);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, P.pbo[P.next]);
+    GLint align = 4;
+    glGetIntegerv(GL_PACK_ALIGNMENT, &align);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, kProbeW, kProbeH, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glPixelStorei(GL_PACK_ALIGNMENT, align);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    P.filled[P.next] = true;
+    P.next ^= 1;
+}
+// orig: (host) how much of the sun's weight the view keeps (a room lit by a key light from above that its roof stops: no sky,
+// nearly no sample sees the sun - the sun's shadows faded out there; our choice, see kProbeW)
+float view_open() { return g_probe.k; }
 }  // namespace
 
 // orig: (host) see mrp_lighting.h
 void mrp_lighting_ao_pass() {
-    if (g_ao == 0 || !g_sh.on) return;
+    if (!g_sh.on) return;
     int vp[4];
     if (!mrp_world_last_viewport(vp)) return;
+    {  // the view covered from the sun (the samples' pass, its own state restored)
+        GLint fb = 0, rfb = 0, prev_prog = 0, prev_vao = 0, prev_vp[4] = {}, prev_active = 0, prev_t0 = 0, prev_t1 = 0, prev_rb = 0;
+        glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fb);
+        glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &rfb);
+        glGetIntegerv(GL_CURRENT_PROGRAM, &prev_prog);
+        glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prev_vao);
+        glGetIntegerv(GL_VIEWPORT, prev_vp);
+        glGetIntegerv(GL_ACTIVE_TEXTURE, &prev_active);
+        glGetIntegerv(GL_READ_BUFFER, &prev_rb);
+        glActiveTexture(GL_TEXTURE0 + 28);
+        glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_t0);
+        glActiveTexture(GL_TEXTURE0 + kUnit);
+        glGetIntegerv(GL_TEXTURE_BINDING_2D_ARRAY, &prev_t1);
+        const GLboolean blend = glIsEnabled(GL_BLEND), depth = glIsEnabled(GL_DEPTH_TEST), scissor = glIsEnabled(GL_SCISSOR_TEST), cull = glIsEnabled(GL_CULL_FACE);
+        GLboolean cmask[4];
+        glGetBooleanv(GL_COLOR_WRITEMASK, cmask);
+        glDisable(GL_BLEND);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_SCISSOR_TEST);
+        glDisable(GL_CULL_FACE);
+        glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+        cover_probe(fb, vp);
+        glColorMask(cmask[0], cmask[1], cmask[2], cmask[3]);
+        if (blend) glEnable(GL_BLEND);
+        if (depth) glEnable(GL_DEPTH_TEST);
+        if (scissor) glEnable(GL_SCISSOR_TEST);
+        if (cull) glEnable(GL_CULL_FACE);
+        glActiveTexture(GL_TEXTURE0 + 28);
+        glBindTexture(GL_TEXTURE_2D, static_cast<GLuint>(prev_t0));
+        glActiveTexture(GL_TEXTURE0 + kUnit);
+        glBindTexture(GL_TEXTURE_2D_ARRAY, static_cast<GLuint>(prev_t1));
+        glActiveTexture(static_cast<GLenum>(prev_active));
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, static_cast<GLuint>(fb));
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, static_cast<GLuint>(rfb));
+        glReadBuffer(static_cast<GLenum>(prev_rb));
+        glViewport(prev_vp[0], prev_vp[1], prev_vp[2], prev_vp[3]);
+        glUseProgram(static_cast<GLuint>(prev_prog));
+        glBindVertexArray(static_cast<GLuint>(prev_vao));
+    }
+    if (g_ao == 0) return;
     Ao& A = g_ao_s;
     GLint fb = 0, rfb = 0, prev_prog = 0, prev_vao = 0, prev_vp[4] = {}, prev_tex = 0, prev_active = 0;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &fb);
@@ -890,6 +1137,7 @@ void mrp_lighting_ao_pass() {
 namespace {
 std::vector<UserLight> g_user;
 std::vector<int> g_user_noauto;  // the tie classes whose automatic emitters are off
+std::vector<std::string> g_user_notes;  // the file's own comment lines (why a class is off), kept when the editor saves it
 int g_user_level = -1;
 std::string g_user_path;
 // orig: (host) the level's lights file
@@ -903,6 +1151,7 @@ std::string user_path(int level) {
 void user_load(int level) {
     g_user.clear();
     g_user_noauto.clear();
+    g_user_notes.clear();
     g_user_level = level;
     g_user_path = user_path(level);
     g_user_light_selected = -1;
@@ -912,6 +1161,12 @@ void user_load(int level) {
     while (std::fgets(line, sizeof line, f) != nullptr) {
         UserLight l;
         int on = 1, cls = 0;
+        if (line[0] == '#' && std::strncmp(line, "# rac1-native: lights placed by hand", 36) != 0 && std::strncmp(line, "# light x y z", 13) != 0) {
+            std::string n(line);
+            while (!n.empty() && (n.back() == '\n' || n.back() == '\r')) n.pop_back();
+            g_user_notes.push_back(n);
+            continue;
+        }
         if (std::sscanf(line, "noauto %d", &cls) == 1) {
             g_user_noauto.push_back(cls);
             continue;
@@ -955,6 +1210,7 @@ bool mrp_user_lights_save() {
     if (f == nullptr) return false;
     std::fprintf(f, "# rac1-native: lights placed by hand for level %d (the debug menu's Lights tab)\n", g_user_level);
     std::fprintf(f, "# light x y z  r g b  intensity radius flicker on\n");
+    for (const std::string& n : g_user_notes) std::fprintf(f, "%s\n", n.c_str());
     for (int c : g_user_noauto) std::fprintf(f, "noauto %d\n", c);
     for (const UserLight& l : g_user)
         std::fprintf(f, "light %.3f %.3f %.3f  %.3f %.3f %.3f  %.3f %.3f %.3f %d\n", l.pos[0], l.pos[1], l.pos[2], l.col[0], l.col[1], l.col[2], l.intensity, l.radius,
@@ -964,7 +1220,7 @@ bool mrp_user_lights_save() {
 }
 
 // orig: (host) see mrp_lighting.h
-bool mrp_lighting_casters_wanted() { return g_has_sun.load() && (g_shadow_cache == 0 || g_sh.want.load()); }
+bool mrp_lighting_casters_wanted() { return g_casc_on.load() && (g_shadow_cache == 0 || g_sh.want.load()); }
 
 // orig: (host) see mrp_lighting.h
 bool mrp_lighting_has_sun() { return g_has_sun.load(); }
@@ -1108,7 +1364,7 @@ void mrp_lighting_shadow_pass() {
             if (k == 0) glEndQuery(GL_TIME_ELAPSED);  // (the "cascades" query: up to here, the frame's world upload and dispatch)
             glBeginQuery(GL_TIME_ELAPSED, cq[k]);
         }
-        if (!g_has_sun.load()) {  // (no sun, no cascades drawn - the receivers look at none)
+        if (!g_casc_on.load()) {  // (no sun, no cascades drawn - the receivers look at none)
             if (prof) glEndQuery(GL_TIME_ELAPSED);
             continue;
         }

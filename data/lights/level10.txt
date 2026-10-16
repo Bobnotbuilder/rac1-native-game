@@ -1,0 +1,5 @@
+# rac1-native: lights placed by hand for level 10 (the debug menu's Lights tab)
+# light x y z  r g b  intensity radius flicker on
+# Orxon. Tie class 1521 (the mint floor panels of the base's rooms, on an 8-unit grid): a floor colour, not a lamp (53 % of
+# the class, hue 181: a cool colour, so the heuristic kept it as a light and lit the floor with itself).
+noauto 1521
