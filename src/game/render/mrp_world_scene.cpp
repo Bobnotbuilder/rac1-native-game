@@ -170,6 +170,7 @@ struct Build {
         uint32_t fog = 0, alpha = 0;
     };
     std::vector<ChkRec> chk[2];
+    std::vector<std::array<uint32_t, 4>> chk_gif;  // (the check: the shrub range's DIRECT data, against the host's far variants)
     // the chain's tfrag draws not drawn (the host made the frame's tfrag decisions); emitted once; the walker's (entry, code)
     // for the check (RAC1_MRPW_TFRAG_CHECK)
     bool tfrag_discard = false, tfrag_emitted = false;
@@ -574,9 +575,12 @@ void draw_tie(Build& b, VUState& st, Program prog) {
     draw_wrapped(b, 0, [&] { draw_tie_impl(b, st, prog); });
 }
 
+void emit_variants(Build& b);
+
 // orig: (host) the host's ties (kind 0) / shrubs (1) of the frame drawn where the pass's range ends, as the GPU path's
 // packets (the instance's rows, morph, F, alpha; its resident colours; the class's texture prims as VU1 memory would hold them);
-// a tie A alpha-test state packet first when the program's state (0x3cb y) is not the host instances' 0
+// a tie A alpha-test state packet first when the program's state (0x3cb y) is not the host instances' 0; after the shrubs their
+// far variants' quads (emit_variants)
 void emit_static(Build& b, VUState& st, int kind) {
     const StaticFrame* sf = b.in.stat;
     const StaticLevel* sl = b.in.stat_level;
@@ -633,6 +637,7 @@ void emit_static(Build& b, VUState& st, int kind) {
         sp.inst = static_cast<uint32_t>(map[d.inst]);
         ++b.f.stat_draws[kind];
     }
+    if (kind == 1) emit_variants(b);
 }
 
 // orig: (host) the check (RAC1_MRPW_STATIC_CHECK=1): the walker's tie / shrub instance draws against the host's, by (colour
@@ -707,6 +712,31 @@ void static_check(Build& b) {
             }
         }
         b.f.chk_extra[kind] += static_cast<uint32_t>(sf->draws[kind].size() - std::min(sf->draws[kind].size(), used));
+    }
+    // the shrub far variants' stream: the host's word for word against the chain's (the shrub range's DIRECT data also holds the
+    // texture uploads before it and the TEST_1 writes after it: from the stream's header (its three qwords) on, its length)
+    if (sf->on[1] && sf->variant_gif.size() >= 3) {
+        ++b.f.chk_gif_frames;
+        b.f.chk_gif_quads += sf->variants;
+        const auto& H = sf->variant_gif;
+        size_t at = 0;
+        while (at + 3 <= b.chk_gif.size() && !(b.chk_gif[at] == H[0] && b.chk_gif[at + 1] == H[1] && b.chk_gif[at + 2] == H[2])) ++at;
+        const std::vector<std::array<uint32_t, 4>> chain(b.chk_gif.begin() + static_cast<std::ptrdiff_t>(std::min(at, b.chk_gif.size())),
+                                                         b.chk_gif.begin() + static_cast<std::ptrdiff_t>(std::min(at + H.size(), b.chk_gif.size())));
+        const size_t n = std::min(chain.size(), H.size());
+        size_t q = 0;
+        while (q < n && chain[q] == H[q]) ++q;
+        if (q != chain.size() || q != H.size()) {
+            ++b.f.chk_gif_bad;
+            if (b.f.chk_gif_bad <= 3) {
+                char t[300];
+                const auto w = q < chain.size() ? chain[q] : std::array<uint32_t, 4>{};
+                const auto h = q < H.size() ? H[q] : std::array<uint32_t, 4>{};
+                std::snprintf(t, sizeof t, "far variants' stream: qwords chain %zu host %zu, first difference at %zu: chain %08x %08x %08x %08x host %08x %08x %08x %08x", chain.size(),
+                              H.size(), q, w[0], w[1], w[2], w[3], h[0], h[1], h[2], h[3]);
+                b.f.chk_notes.push_back(t);
+            }
+        }
     }
 }
 
@@ -932,7 +962,7 @@ void packed_write(uint32_t d, const uint8_t* q, std::vector<SkyWrite>& out) {
 // kept across the DIRECTs, as the replica's Gs::gif: an IMAGE's data may come in a later transfer). its PACKED vertex
 // words (RGBA, STQ, UV, XYZ(F), FOG: the shrub far variants' quads the EE builds) as the GS register writes
 // they make (SceneFrame::sky), the run between two register writes a `gif` packet of its own, with the pass's view (`build`) and
-// `table`, when `draw` (not when the pass's ties / shrubs are the host's, its far variants are then not made)
+// `table`, when `draw` (not when the pass's ties / shrubs are the host's: the host makes its far variants then, emit_variants)
 struct GifPath {
     uint32_t left = 0, flg = 0, nreg = 1, reg = 0;
     uint64_t regs = 0;
@@ -1004,6 +1034,20 @@ struct GifPath {
         close(f);
     }
 };
+
+// orig: (host) the host-made shrub far variants' quads (StaticFrame::variant_gif: the shrub pass's DIRECT data as 0x287c04.. writes
+// it) drawn as the chain's are (GifPath, the shrub pass's view and table); RAC1_MRPW_GIF=0 not drawn, as the chain's
+void emit_variants(Build& b) {
+    static const bool no_gif = std::getenv("RAC1_MRPW_GIF") != nullptr && std::atoi(std::getenv("RAC1_MRPW_GIF")) == 0;
+    const StaticFrame* sf = b.in.stat;
+    if (sf == nullptr || sf->variant_gif.empty() || no_gif) return;
+    GifPath g;
+    g.draw = true;
+    g.build = &b;
+    g.table = 2;
+    g.data(reinterpret_cast<const uint8_t*>(sf->variant_gif.data()), static_cast<uint32_t>(sf->variant_gif.size()), b.f);
+    b.f.stat_variants += sf->variants;
+}
 
 
 // orig: (host) the sky's GIF streams as GS register writes, as the replica takes them (gs_emu.cpp Gs::gif / packed):
@@ -1283,6 +1327,7 @@ bool scene_build(const WorldIndex& idx, const SceneInput& in, SceneFrame& f, boo
     f.resident = f.copied = f.verified = f.verify_bad = 0;
     for (int k = 0; k < 2; ++k) f.stat_draws[k] = f.chk_walker[k] = f.chk_found[k] = f.chk_missing[k] = f.chk_extra[k] = 0;
     f.chk_morph_bad = f.chk_fog_bad = f.chk_alpha_bad = f.chk_rows_bad = 0;
+    f.stat_variants = f.chk_gif_frames = f.chk_gif_bad = f.chk_gif_quads = 0;
     f.chk_rows_maxrel = 0;
     f.chk_notes.clear();
     f.tfrag.clear();
@@ -1483,6 +1528,12 @@ bool scene_build(const WorldIndex& idx, const SceneInput& in, SceneFrame& f, boo
                     sky_packet(first, false);
                     if (prof) f.ms_sky += std::chrono::duration<double, std::milli>(clock::now() - t0).count();
                 } else {
+                    if (b.in.stat_check && pass_now == 2)
+                        for (uint32_t k = 0; k + 16 <= take; k += 16) {
+                            std::array<uint32_t, 4> w;
+                            std::memcpy(w.data(), at(i + k, 16), 16);
+                            b.chk_gif.push_back(w);
+                        }
                     gif.draw = world && (pass_now < 1 || pass_now > 2 || !b.discard[pass_now - 1]) && !no_gif;
                     gif.build = &b;
                     gif.table = pass_now;

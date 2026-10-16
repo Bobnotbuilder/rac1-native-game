@@ -242,7 +242,10 @@ The game's own decisions are never changed, because they are game state. Instead
   distance and the global maximum.
 - **The world**: the host makes the tie, shrub and tfrag per-instance decisions itself, with C++
   copies of the passes' culls and the scaled distances (`mrp_world_static.cpp`, `tfrag_decide`).
-  These copies were checked draw for draw against the game's own.
+  That includes the shrubs' far billboard variants (antennas, spires, lights and plants seen from
+  afar), whose camera-facing quads the shrub pass writes as a GIF stream: the host writes the same
+  stream (`variant_stream`). These copies were checked draw for draw against the game's own
+  (`RAC1_MRPW_STATIC_CHECK=1`; the billboards' stream word for word).
 - **Original** runs no shadow run at all.
 
 With the whole of EE memory hashed after every frame, the game's state was identical at Original and
@@ -362,5 +365,4 @@ integrated GPU, while the CPU side was 25 to 40 ms before the work above.
 - Drop shadows of mobys drawn only because of a higher level of detail are missing.
 - A moby whose class logic reads its own "drawn" flag behaves as in 4:3 when it is only visible in
   the widened side bands: that flag is game state, and the port does not change it.
-- At a higher level of detail or in widescreen, shrubs' far billboard variants are not drawn.
 - Linux and OpenGL 4.6 only. The MRP's interface would allow other backends later.

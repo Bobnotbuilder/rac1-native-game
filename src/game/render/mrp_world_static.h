@@ -83,6 +83,14 @@ struct StaticSnapshot {
     std::array<float, 8> wind{};                // 0x1c3ff0 (vf8, vf9 of the wind)
     uint32_t tie_max = 0, shrub_max = 0;        // *(0x160fe0), *(0x1604a4): the draw distances' maximum (float bits)
     uint32_t shrub_data = 0;                    // *(0x16049c): the shrubs' 0x40-byte instance data
+    // the shrub far variants' quads (world_render.md 18.4, 0x287c04..0x288010): the matrix 0x166cc0 (vf28..vf31), vf22 0x16cc50,
+    // vf23 0x16cbe0 (vf21 is `fog`), the stream's templates (the header 0x1c2c10, the fading ones' header 0x1c2be0, the class /
+    // instance transfers 0x160b80..0x160bb0) and the unit corners with their ST 0x1c2cb0 (8 qwords)
+    std::array<std::array<float, 4>, 4> vm{};
+    std::array<float, 4> vf22{}, vf23{};
+    std::array<std::array<uint32_t, 4>, 4> vhdr{}, vtpl{};
+    std::array<std::array<uint32_t, 4>, 3> vhdr2{};
+    std::array<std::array<float, 4>, 8> vcorner{};
 };
 // orig: (host) before the real tie (kind 1) / shrub (kind 2) pass, every game frame (mrp_lod_world_shadow): the snapshot taken;
 // `handle`: the pass's instances made by the host this frame (its shadow run not needed); `scale` / `widen` / `widen_y` as the shadow's
@@ -131,6 +139,10 @@ struct StaticFrame {
     std::vector<StaticInst> insts;
     std::vector<StaticDraw> draws[2];  // ties, shrubs
     uint32_t tested[2] = {}, visible[2] = {};
+    // the shrub far variants' quads as the shrub pass's GIF stream (0x287c04..0x288010): the DIRECT transfers' data alone (their DMA
+    // tags / VIF codes left out), in the pass's order; empty when the host does not make the shrubs
+    std::vector<std::array<uint32_t, 4>> variant_gif;
+    uint32_t variants = 0;  // (the quads in it)
 };
 // orig: (host) after the update (its state frozen; any thread): the frame's instances from the snapshot (`check`: made at the
 // game's own distances and frustum whatever the switches, for RAC1_MRPW_STATIC_CHECK)
