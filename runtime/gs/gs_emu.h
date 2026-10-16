@@ -73,7 +73,7 @@ struct Primitive {
 class Gs {
 public:
     Gs();
-    void reset_frame() { prims_.clear(); tag_left_ = 0; fx_mark_ = SIZE_MAX; fx_external_ = false; scr_prim_ = -1; }
+    void reset_frame() { prims_.clear(); tag_left_ = 0; fx_mark_ = SIZE_MAX; moby_mark_ = SIZE_MAX; fx_external_ = false; scr_prim_ = -1; }
     // Host: the frame the game draws into (block `bp`, `bw` x 64 pixels wide, `h` rows, CT32; bw 0: none). The GS
     // replica draws no pixels into its memory (the host draws its primitives), so an IMAGE transfer into the frame - the game
     // putting a stored picture back as the frame, the Vendor's screens (0x2a0fc8) - is kept as a primitive of type 7 in the
@@ -111,8 +111,14 @@ public:
         // item models): at the range's first tag a type-8 primitive goes into the primitives' order, with the drawing state of
         // context 1 then (its FRAME the target) and fx_id = host_3d (the MRP: the moby's address)
         uint32_t host_3d = 0;
+        // (host) a range of the moby pass's draw loop (the MRP's mobys): moby_mark() is the primitives' count when the first of
+        // these is met, where the MRP's mobys go in the primitives' order
+        bool moby = false;
     };
     void set_chain_skips(std::vector<SkipRange> ranges);
+    // (host) the primitives' count when the chain met its first SkipRange::moby range (SIZE_MAX: none): what the GS replica
+    // draws before it (the draw lists that run before the moby pass, 0x1f85b8) belongs under the MRP's mobys
+    size_t moby_mark() const { return moby_mark_; }
     // Host (the widescreen's sides): the next chain's range [first, end) (its tags from the tag at `first` up to the
     // tag at `end`) is preceded by `chain`, the chain a shadow run of the same code wrote at `first` (mrp_lod.h): that chain is
     // walked first (its tags and data at [first, first + size) read from `chain`, the rest from EE memory, the skip ranges not
@@ -220,6 +226,7 @@ private:
     uint8_t fx_now_ = 0;
     uint32_t fx_id_ = 0;
     size_t fx_mark_ = SIZE_MAX;
+    size_t moby_mark_ = SIZE_MAX;
     const FxRange* fx_tag(uint32_t addr, uint8_t sub) const;
 public:
     void set_moby_kick(bool mk) { moby_kick_ = mk; }

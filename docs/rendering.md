@@ -216,6 +216,11 @@ still runs those ranges, with the ported particle program on its VU1, but instea
 primitives it keeps them aside. `src/game/render/mrp_fx.cpp` takes them back to world space and draws
 them in the shared projection and depth buffer, from a texture atlas, in the GS's primitive order,
 breaking batches only on a blend or depth change. Effects that need it use dual-source blending.
+What the chain draws before the moby pass (the draw lists `render_frame` runs before it, such as Hoven's
+water) is drawn before the MRP's mobys, the rest after them, as in the original's order: a moby part that
+writes its colour but no Z (Ratchet's ice cube on Hoven) is not covered by them. On the Vendor's screens'
+frames that put their stored picture back, no world pass and no effect runs, so the MRP neither draws nor
+skips anything there (the passes noted last were an older frame's, and skipped the screens' own packets).
 The atlas holds at most 1024 layers (fewer if the GPU allows fewer array layers); when it is full, the
 layer least recently drawn with is reused. Some effects get new texture pixels every frame (Aridia's
 sand sea), so an atlas that only grew reached the GPU's limit after about half a minute there, and every
@@ -293,6 +298,10 @@ and flashes, fades, and any effect the MRP does not take. The 2D maps cleanly to
 emulating it is simple and exact. What the game draws into its own memory to use as a texture (the
 menus' pictures, such as the ship's planet menu's planet, made of three blended layers) goes into a
 render target that keeps the GS's alpha (0x80 = 1.0); its blending reads that alpha at the GS's scale.
+Every ALPHA register's `(A - B) C + D` maps to the GL's blending (add, subtract or reverse subtract; the two
+combinations with a factor `1 + C` use 1), for the replica, the MRP's mobys, world and effects alike: the
+subtractive second pass of the force fields, Orxon's O2 barriers and Quartu's gates (`(Cd - Cs) FIX`) was drawn
+as an opaque copy of the source before, black.
 
 ## The original rendering, kept as the reference
 

@@ -811,6 +811,7 @@ void Gs::chain_walk(uint32_t tag, uint32_t end, Mem&& mem) {
             ++skipped_tags_;
             if (!skip_started_[k]) {  // the range's VU1 program starts, once
                 skip_started_[k] = true;
+                if (skip_ranges_[k].moby && moby_mark_ == SIZE_MAX) moby_mark_ = prims_.size();
                 if (skip_ranges_[k].host_3d != 0) {  // the host's 3D in the primitives' order, with context 1's state now
                     if (scr_prim_ >= 0) screen_picture();
                     Primitive p;

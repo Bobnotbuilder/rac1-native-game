@@ -238,23 +238,42 @@ void blend_state(const DrawState& st) {
         return;
     }
     glEnable(GL_BLEND);
+    // ALPHA: Cv = (A - B) C + D, A / B / D one of Cs (0), Cd (1), 0 (2; 3 is reserved, read as 0), C one of As (0), Ad (1), FIX (2)
     const uint32_t A = field(st.alpha, 0, 2), B = field(st.alpha, 2, 2), C = field(st.alpha, 4, 2), D = field(st.alpha, 6, 2);
     const float fix = static_cast<float>(field(st.alpha, 32, 8)) / 128.0f;
     glBlendColor(0, 0, 0, std::min(fix, 1.0f));
     const GLenum cf = C == 2 ? GL_CONSTANT_ALPHA : (C == 1 ? GL_DST_ALPHA : GL_SRC_ALPHA);
     const GLenum cf1 = C == 2 ? GL_ONE_MINUS_CONSTANT_ALPHA : (C == 1 ? GL_ONE_MINUS_DST_ALPHA : GL_ONE_MINUS_SRC_ALPHA);
+    // the factor of Cs and of Cd in that sum, k0 + k1 C (k0, k1 of -1, 0, 1), as a GL factor and its sign; every ALPHA but the two
+    // that give a factor 1 + C (A = D, B = 0) maps exactly (those: 1). Before, the combinations without a case of their own were
+    // drawn as (Cs - Cd) C + Cd: Orxon's O2 barriers' second pass (Cd - Cs) FIX, ALPHA 0xa1, was drawn as the source - opaque black
+    auto factor = [&](uint32_t who, GLenum& f) {
+        const int k0 = D == who ? 1 : 0, k1 = (A == who ? 1 : 0) - (B == who ? 1 : 0);
+        if (k1 == 0) {
+            f = k0 != 0 ? GL_ONE : GL_ZERO;
+            return 1;
+        }
+        if (k0 == 0) {
+            f = cf;
+            return k1;
+        }
+        f = k1 < 0 ? cf1 : GL_ONE;  // (1 - C; 1 + C, not a GL factor: 1)
+        return 1;
+    };
+    GLenum sf = GL_ZERO, df = GL_ZERO;
+    const int ss = factor(0, sf), ds = factor(1, df);
     // (the GS blends the colour; the alpha written is the source's)
-    glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
-    if (A == B && A != 3 && D != 3) {  // (X - X) C + D = D: Cs, Cd or 0 (the Vendor's screens' sprites that keep the colour, ALPHA 0x4a)
-        glBlendFuncSeparate(D == 0 ? GL_ONE : GL_ZERO, D == 1 ? GL_ONE : GL_ZERO, GL_ONE, GL_ZERO);
-    } else if (A == 0 && B == 1 && D == 1) glBlendFuncSeparate(cf, cf1, GL_ONE, GL_ZERO);           // (Cs - Cd) C + Cd
-    else if (A == 0 && B == 2 && D == 1) glBlendFuncSeparate(cf, GL_ONE, GL_ONE, GL_ZERO);   // Cs C + Cd
-    else if (A == 0 && B == 2 && D == 2) glBlendFuncSeparate(cf, GL_ZERO, GL_ONE, GL_ZERO);  // Cs C
-    else if (A == 1 && B == 0 && D == 0) glBlendFuncSeparate(cf1, cf, GL_ONE, GL_ZERO);      // (Cd - Cs) C + Cs
-    else if (A == 2 && B == 0 && D == 1) {                                                   // Cd - Cs C
+    if (ss >= 0 && ds >= 0) {
+        glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
+    } else if (ss < 0 && ds >= 0) {  // Cd df - Cs sf
         glBlendEquationSeparate(GL_FUNC_REVERSE_SUBTRACT, GL_FUNC_ADD);
-        glBlendFuncSeparate(cf, GL_ONE, GL_ONE, GL_ZERO);
-    } else glBlendFuncSeparate(cf, cf1, GL_ONE, GL_ZERO);
+    } else if (ss >= 0) {  // Cs sf - Cd df
+        glBlendEquationSeparate(GL_FUNC_SUBTRACT, GL_FUNC_ADD);
+    } else {  // (-(Cs + Cd) C: below 0, clamped to black)
+        glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
+        sf = df = GL_ZERO;
+    }
+    glBlendFuncSeparate(sf, df, GL_ONE, GL_ZERO);
 }
 
 void draw_init() {
