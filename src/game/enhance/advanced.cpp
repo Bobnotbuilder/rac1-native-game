@@ -674,8 +674,9 @@ void camera_pitch_turn(uint32_t cam, float a, float px, float py, float pz) {
     swc1(cam + 0x34, py + rel.y);
     swc1(cam + 0x38, pz + rel.z);
 }
-constexpr int32_t RELEASE_FRAMES = 60;           // after the aim, the view held on it until the camera catches up
+constexpr int32_t RELEASE_FRAMES = 60;           // after the aim, the view eased from it to the camera's own heading
 int32_t g_release = 0;                           // frames of that left
+constexpr float STICK_TURN = 0.2f;               // the right stick's x past this: the player turning the camera
 
 // orig: (none) — enhancement: (x, y) of the vector at `a` turned by `c` / `s` about the up axis
 void turn_vec(uint32_t a, float c, float s) {
@@ -807,8 +808,8 @@ void advanced_aim_after_camera() {
     swc1(PAD + 0x104, g_saved_ry);
     // while aiming the camera is held on the aim. When the aim ends the follow camera's own state
     // (its points and offset, which kept following the hero) is turned onto the aim once; its
-    // springs then reach the aim's heading in about 30 frames, and until they do the view is still
-    // held on the aim (a cut back to the camera's own heading was a jolt)
+    // springs then reach the aim's heading in about 30 frames, while the view eases from the aim
+    // back to the camera's own heading (a cut back to it was a jolt)
     const bool aiming = g_aim_was && advanced_strafing();  // the heading held (strafe or aim)
     const bool modern = aiming && g_pitch_was;              // the pitch and the shoulder view too
     if (!aiming && g_release <= 0 && g_pitch_release <= 0 && g_shoulder <= 0.0f) return;
@@ -821,9 +822,19 @@ void advanced_aim_after_camera() {
     }
     if (aiming || g_release > 0) {
         const bool first = !aiming && g_release == RELEASE_FRAMES;
-        if (!aiming) --g_release;
-        const float d = angle_sub(g_aim_yaw, lwc1(CAMERA_YAW));
+        // after the aim the view eased from the aim's heading to the camera's own (holding it fully
+        // locked the right stick out of the camera for the whole release: the stick kept the
+        // camera from catching up); the right stick turning the camera lets go 4 times as fast
+        float weight = 1.0f;
+        if (!aiming) {
+            weight = static_cast<float>(g_release) / static_cast<float>(RELEASE_FRAMES);
+            weight = weight * weight * (3.0f - 2.0f * weight);  // smoothstep
+            g_release -= abs_f(g_saved_rx) < STICK_TURN ? 1 : 4;
+            if (g_release < 0) g_release = 0;
+        }
+        float d = angle_sub(g_aim_yaw, lwc1(CAMERA_YAW));
         if (!aiming && abs_f(d) < 0.005f) g_release = 0;  // caught up
+        if (!first) d = d * weight;
         if (1e-5f <= abs_f(d)) {
             // the camera turned back onto the aim's heading about the hero: its rows and its
             // position (not the follow camera's own points and offset while aiming: turning those
