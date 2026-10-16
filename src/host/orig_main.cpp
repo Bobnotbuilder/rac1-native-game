@@ -2556,14 +2556,15 @@ int main(int argc, char** argv) {
                         skips.push_back(std::move(r));
                     }
                 if (!skips.empty()) gs.set_chain_skips(std::move(skips));
-                bool substituted = false;
-                {  // the widened view's 3D effects: the shadow's chain walked in place of the real block's
-                    uint32_t sub_first = 0, sub_end = 0;
-                    std::vector<uint8_t> sub_bytes;
-                    if (mrp_lod_effects_substitute(sub_first, sub_end, sub_bytes) && chain_runs && !prev_chain && !menu_mode && !fade) {
-                        gs.set_chain_substitute(sub_first, sub_end, std::move(sub_bytes));
-                        substituted = true;
-                    }
+                std::vector<int> substituted;  // (the shadow blocks' slots, in the order given to the replica)
+                {  // the widened view's draw lists and 3D effects: the shadows' chains walked in place of the real blocks'
+                    std::vector<MrpLodSubstitute> subs;
+                    mrp_lod_substitutes(subs);
+                    if (chain_runs && !prev_chain && !menu_mode && !fade)
+                        for (MrpLodSubstitute& u : subs) {
+                            gs.add_chain_substitute(u.first, u.end, std::move(u.bytes));
+                            substituted.push_back(u.slot);
+                        }
                 }
                 {  // the MRP's 3D effects: their producers' ranges run by the replica as before, their primitives kept for the MRP
                     std::vector<rac1::gs::Gs::FxRange> fr;

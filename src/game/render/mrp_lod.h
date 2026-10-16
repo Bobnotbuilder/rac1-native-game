@@ -71,18 +71,39 @@ void mrp_lod_moby_shadow(void (*pass)());
 // factor 0x16cc20: vf26 / vf27); the lights' glows (light_group_glows_draw 0x2df3d8) are drawn only for the mobys the moby pass drew
 // this frame (moby +0x31, set by the draw loop 0x2559c0 when the moby is on screen). Before the real block (packet cursor `cur`), when
 // the view is wider than the game's frustum and the MRP draws the world, the block is run as a shadow (the journal, as the world's)
-// with the tangent widened (patch_widen: the frustum, not the projections A the block projects with: what it draws stays in the
-// game's 4:3 frame, past its sides for what is beyond them) and the mobys' +0x31 as the moby pass's shadow left them;
-// mrp_lod_effects_after keeps its chain; mrp_lod_effects_substitute hands it to the GS replica (gs::Gs::set_chain_substitute), whose
-// projected 3D the window's side bands then show (gs_draw.cpp: past the frame's sides).
+// with the tangent widened (patch_cull: the sphere test, not the projections A the block projects with: what it draws stays in the
+// game's 4:3 frame, past its sides for what is beyond them), the draw lists' clip matrix widened (mrp_lod_draw_list_widen) and the
+// mobys' +0x31 as the moby pass's shadow left them; mrp_lod_effects_after keeps its chain; mrp_lod_substitutes hands it to the GS
+// replica (gs::Gs::add_chain_substitute), whose projected 3D the window's side bands then show (gs_draw.cpp: past the frame's sides).
 void mrp_lod_effects_shadow(void (*block)(), uint32_t cur);
 void mrp_lod_effects_after(uint32_t cur, uint32_t real_end);
-// orig: (host) the last drawn update's effects shadow chain (false: none): the real range [first, end) and the shadow's bytes
-// (moved out: once per frame)
-bool mrp_lod_effects_substitute(uint32_t& first, uint32_t& end, std::vector<uint8_t>& bytes);
+// orig: (host) the same for the draw lists render_frame runs between the world passes (0x16dc80 after the ties, 0x16de80 after the
+// shrubs; `list` 0 / 1): the levels' water and lava surfaces (Aridia's sand sea L2:0x2ea048, the water grids of Rilgar, Pokitaru,
+// Hoven, Gemlik Base, Umbris...) are queued there, and their cells / tiles are culled against the 4:3 clip matrix 0x166d80 (VCLIP /
+// clip_outcode of their corners). Before the real block (packet cursor `cur`) it is run as a shadow (the journal) with that matrix
+// widened (mrp_lod_draw_list_widen) and the sphere test's tangent (patch_cull); its chain stands in for the block's in the GS replica
+// as the effects shadow's does. Run whenever the list is not empty and the view is widened (nothing to predict it by).
+void mrp_lod_list_shadow(int list, void (*block)(), uint32_t cur);
+void mrp_lod_list_after(int list, uint32_t cur, uint32_t real_end);
+// orig: (host) the last drawn update's shadow chains, in the chain's order (the lists' blocks, then the effects'): the real range
+// [first, end), the shadow's bytes, and `slot` (0 / 1 the lists, 2 the effects: mrp_lod_shadow_slot). Moved out: once per frame.
+struct MrpLodSubstitute {
+    int slot = 0;
+    uint32_t first = 0, end = 0;
+    std::vector<uint8_t> bytes;
+};
+void mrp_lod_substitutes(std::vector<MrpLodSubstitute>& out);
+// orig: (host) the shadow block running now: -1 none, 0 / 1 the draw lists' (mrp_lod_list_shadow), 2 the effects'
+constexpr int kMrpLodSlotEffects = 2, kMrpLodSlots = 3;
+int mrp_lod_shadow_slot();
 // orig: (host) true while the effects shadow's block runs; the widening it was made with
 bool mrp_lod_in_effects_shadow();
 float mrp_lod_effects_widen();
+// orig: (host) around the draw lists' callbacks (render_passes.cpp draw_list_run): inside a shadow block (the lists' or the effects'),
+// the clip matrix 0x166d80 (render_view_setup 0x1f6e48: the view's frustum, |x| / |y| <= w; the callbacks' VCLIP / clip_outcode
+// cull tests) with its x and y columns divided by the widening (fill_widen / fill_widen_y), put back after the list. The projections
+// the callbacks draw with (0x166cc0..0x166d7f) are left alone. Outside a shadow: nothing.
+void mrp_lod_draw_list_widen(bool begin);
 
 // orig: (host) around the body of projection_setup 0x1f7980 (`view` false) and render_view_setup 0x1f6e48 (`view` true)
 // when the game's code calls them inside a shadow run whose pass runs on a patched projection (the effects shadow's widened cull

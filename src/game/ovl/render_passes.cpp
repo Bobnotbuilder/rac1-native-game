@@ -6,6 +6,7 @@
 #include <game/ovl/ovl_common.h>
 #include <game/port_stubs.h>
 #include <game/render/mrp_fx.h>
+#include <game/render/mrp_lod.h>
 
 #include <cstdlib>
 
@@ -158,12 +159,14 @@ namespace {
 // orig: (helper) repeated in 0x001f9430 / 0x001f94a8 / 0x001f9520 / 0x001f95e8
 void draw_list_run(uint32_t count, uint32_t fns, uint32_t args) {
     static const bool inventory = std::getenv("RAC1_MRP_FX_INVENTORY") != nullptr;  // (host: testing)
+    mrp_lod_draw_list_widen(true);  // (host: in a widened view's shadow block, the callbacks' clip matrix widened, mrp_lod.h)
     for (int32_t i = 0; i < lw(count); ++i) {
         const uint32_t at = inventory ? lwu(CUR) : 0;
         if (inventory) mrp_fx_list_call(0, 0, 0);
         ovl_call_moby_fn(lwu(fns + static_cast<uint32_t>(i) * 4), lwu(args + static_cast<uint32_t>(i) * 4));
         if (inventory) mrp_fx_list_call(lwu(fns + static_cast<uint32_t>(i) * 4), at, lwu(CUR));
     }
+    mrp_lod_draw_list_widen(false);  // (host)
 }
 }  // namespace
 
