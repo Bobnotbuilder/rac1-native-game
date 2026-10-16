@@ -175,6 +175,11 @@ not supported yet.
 - **`./setup.sh --update`** (`setup.cmd --update` on Windows) fetches the latest release (or `main` when
   Options > Advanced > Update Channel is Development), then rebuilds and regenerates only what changed;
   the in-game update notice's **Update Now** button runs it and restarts the game when it finishes.
+  A git clone is updated with git; a zip download, or a clone where git is not installed (or cannot read
+  the clone), from the release's (or `main`'s) source zip, which replaces the source files and leaves
+  `assets/`, `build/`, `.git/` and files of your own alone. It asks before overwriting files you edited.
+  After such an update git sees the replaced files as changes, so the next updates use the zip too, until
+  the clone is put back in step with git (`git fetch`, then `git reset --hard origin/main` or the release's tag).
 - **`./setup.sh --force`** regenerates the code and all the data; **`./setup.sh --force moby,world`**
   only those steps.
 - If you build with CMake yourself (`cmake -S . -B build && cmake --build build`), run `./setup.sh`

@@ -911,15 +911,18 @@ std::vector<Step> g_steps;
 }  // namespace
 
 // orig: (host) see mrp_fx.h
-void mrp_fx_draw(const gs::Gs& gs, int win_w, int win_h, const gs::Viewport* vp, const std::function<void(size_t, size_t)>& gs_draw) {
+void mrp_fx_draw(const gs::Gs& gs, int win_w, int win_h, const gs::Viewport* vp, const std::function<void(size_t, size_t)>& gs_draw, size_t from,
+                 size_t to) {
     const std::vector<gs::Primitive>& prims = gs.primitives();
+    to = std::min(to, prims.size());
+    if (from >= to) return;
     if (!gs.fx_external() || g_frame.notes.empty() || !init_gl()) {
-        if (gs_draw) gs_draw(0, prims.size());
+        if (gs_draw) gs_draw(from, to);
         return;
     }
     using clock = std::chrono::steady_clock;
     const auto t0 = clock::now();
-    ++g_st.frames;
+    if (from == 0) ++g_st.frames;
     g_v.clear();
     g_batches.clear();
     g_steps.clear();
@@ -930,12 +933,12 @@ void mrp_fx_draw(const gs::Gs& gs, int win_w, int win_h, const gs::Viewport* vp,
         for (int r = 0; r < 4; ++r) VP[c][r] = vpm[c * 4 + r];
     const bool vu_mode = g_mrp_world_projection != 0;
     uint64_t env_xyoff = 0;
-    size_t gs_from = 0;   // the start of the GS replica's run in progress
+    size_t gs_from = from;  // the start of the GS replica's run in progress
     bool in_mrp = false;  // the MRP's run in progress (its batches from g_steps.back().from)
     auto close_gs = [&](size_t at) {
         if (at > gs_from) g_steps.push_back(Step{true, gs_from, at});
     };
-    for (size_t pi = 0; pi < prims.size(); ++pi) {
+    for (size_t pi = from; pi < to; ++pi) {
         const gs::Primitive& p = prims[pi];
         // the MRP's: fx, not the real block's while the effects shadow's stands in for it (as gs::draw: those are dropped)
         if (p.fx == 0) {
@@ -1074,7 +1077,7 @@ void mrp_fx_draw(const gs::Gs& gs, int win_w, int win_h, const gs::Viewport* vp,
         g_batches.back().count += n;
     }
     if (in_mrp) g_steps.back().to = g_batches.size();
-    else close_gs(prims.size());
+    else close_gs(to);
     const auto t1 = clock::now();
     g_st.ms_build += std::chrono::duration<double, std::milli>(t1 - t0).count();
     if (g_env_debug && g_st.frames % 60 == 1)

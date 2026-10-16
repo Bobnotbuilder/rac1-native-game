@@ -2527,6 +2527,7 @@ int main(int argc, char** argv) {
                             r.last = m.chain_end - 1;
                             for (uint32_t k = 0; k < m.part_count; ++k) r.mscals.push_back(sf.parts[m.part_first + k].mscal);
                             if (m.rt) r.host_3d = m.moby;  // a moby drawn into a render target: the MRP draws it there, in the GS's order
+                            r.moby = true;  // (Gs::moby_mark: where the MRP's mobys go in the primitives' order)
                             skips.push_back(std::move(r));
                         }
                     if (g_moby_upload_chain_first != 0) {
@@ -2567,7 +2568,7 @@ int main(int argc, char** argv) {
                 }
                 {  // the MRP's 3D effects: their producers' ranges run by the replica as before, their primitives kept for the MRP
                     std::vector<rac1::gs::Gs::FxRange> fr;
-                    const bool fx_active = chain_runs && !prev_chain && !menu_mode && !fade && movie_pic == nullptr && ((!title && !fd.exiting) || fd.flight);
+                    const bool fx_active = chain_runs && !prev_chain && !menu_mode && !fade && !fd.vendor_pic && movie_pic == nullptr && ((!title && !fd.exiting) || fd.flight);
                     if (mrp_fx_chain_ranges(fx_active, substituted, fr)) gs.set_chain_fx(std::move(fr), true);
                 }
                 if (chain_runs) {
@@ -2599,7 +2600,11 @@ int main(int argc, char** argv) {
                 const uint32_t cs = lwu(OV(0x001611b8) + (ci & 1) * 4), ce = lwu(OV(0x001611c0));
                 // (the scene's inputs captured, its build started on the worker thread while this thread runs the GS replica's chain)
                 // (the boot's title scene too, once its level is loaded (the title loop), its main menu (game mode 3) included: the boot module draws its scene under it)
-                mrp_world_begin_frame_async(movie_pic == nullptr && (fd.flight || ((title ? boot_in_title() : !menu_mode) && !exiting)) && !fade && ce > cs, cs, ce);
+                // (not on the Vendor's screens' frames that put their stored picture back: no world pass runs on them, and the passes
+                // noted last are an older frame's - their ranges skipped the screens' own packets at those addresses, issue #47 / #48)
+                mrp_world_begin_frame_async(movie_pic == nullptr && (fd.flight || ((title ? boot_in_title() : !menu_mode) && !exiting)) && !fade &&
+                                                !fd.vendor_pic && ce > cs,
+                                            cs, ce);
             }
             chain_stage();
             fd.chain_start = chain_start_r;
@@ -2935,6 +2940,25 @@ int main(int argc, char** argv) {
                     moby_gpu_draw(w, h, &gv);
                 }
                 static const bool s_mrp_diff = std::getenv("RAC1_MRP_DIFF") != nullptr;
+                const int prim_filt = (g_moby_renderer == MobyRenderer::kGpu || s_moby_diff || mrp_moby_active() || (mrp_world_testing() && mrp_world_active())) ? 2 : 0;
+                // the GS replica's primitives the chain made before the moby pass (the draw lists 0x1f85b8 runs before it: Hoven's water,
+                // translucent and without Z): drawn under the MRP's mobys, in the original's order (drawn after them, they covered what a
+                // moby draws without Z - the faces of Ratchet's ice cube, which fail its alpha test and write their colour only, #48)
+                size_t pre_moby = 0;
+                if (mrp_moby_active() && g_render_moby && g_render_gs2d && movie_pic == nullptr && !fd.fade_held && !menu_mode && !title) {
+                    const size_t mark = gs.moby_mark();
+                    if (mark != SIZE_MAX && mark > 0) {
+                        const rac1::gs::Viewport pv = g_scaled_scene.on ? g_scaled_scene.scaled(gv) : gv;
+                        if (gs.fx_external()) {
+                            mrp_fx_draw(gs, w, h, &pv, [&](size_t from, size_t to) {
+                                rac1::gs::draw(gs, w, h, fd.fb_w, fd.fb_h, has_dm ? &dm : nullptr, &pv, prim_filt, from, to);
+                            }, 0, mark);
+                        } else {
+                            rac1::gs::draw(gs, w, h, fd.fb_w, fd.fb_h, has_dm ? &dm : nullptr, &pv, prim_filt, 0, mark);
+                        }
+                        pre_moby = mark;
+                    }
+                }
                 if (mrp_moby_active()) {  // the MRP's mobys (with RAC1_MRP_DIFF: first both renderers' offscreen, compared)
                     if (s_mrp_diff) mrp_moby_diff(w, h, &gv, gs, fd.fb_w, fd.fb_h, fd.frame, has_dm ? &dm : nullptr);
                     if (g_render_moby) {
@@ -2995,14 +3019,13 @@ int main(int argc, char** argv) {
                                 hm ? lbu(hm + 0x23) : 0, hm ? lwu(hm + 0x3c) : 0, hm ? lh(hm + 0x32) : 0, in_scene, sm ? sm->tint[3] : 0, sm ? sm->far_lod : 0, sm ? sm->deferred : 0);
                 }
                 fprof.mark(5);
-                int prim_filt = (g_moby_renderer == MobyRenderer::kGpu || s_moby_diff || mrp_moby_active() || (mrp_world_testing() && mrp_world_active())) ? 2 : 0;
-                // (the MRP's 3D effects in the primitives' order, the GS replica's runs between them)
+                // (the MRP's 3D effects in the primitives' order, the GS replica's runs between them; those before the moby pass drawn above)
                 if (gs.fx_external() && movie_pic == nullptr && !fd.fade_held) {
                     mrp_fx_draw(gs, w, h, &gv, [&](size_t from, size_t to) {
                         if (g_render_gs2d) rac1::gs::draw(gs, w, h, fd.fb_w, fd.fb_h, has_dm ? &dm : nullptr, &gv, prim_filt, from, to);
-                    });
+                    }, pre_moby);
                 } else if (g_render_gs2d && movie_pic == nullptr && !fd.fade_held) {
-                    rac1::gs::draw(gs, w, h, fd.fb_w, fd.fb_h, has_dm ? &dm : nullptr, &gv, prim_filt);
+                    rac1::gs::draw(gs, w, h, fd.fb_w, fd.fb_h, has_dm ? &dm : nullptr, &gv, prim_filt, pre_moby);
                 }
                 glViewport(0, 0, w, h);
                 fprof.mark(6);

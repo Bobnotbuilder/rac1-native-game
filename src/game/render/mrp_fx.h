@@ -95,7 +95,9 @@ bool mrp_fx_particles_widen_needed(float widen);
 bool mrp_fx_chain_ranges(bool active, bool substitute, std::vector<gs::Gs::FxRange>& ranges);
 // orig: (host) the frame's primitives drawn in their order (the GS replica's chain joined): the runs of the MRP's (fx) by the MRP, the
 // runs between them by `gs_draw(from, to)` (the GS replica's gs::draw over those primitives); into the bound framebuffer, viewport `vp`
-void mrp_fx_draw(const gs::Gs& gs, int win_w, int win_h, const gs::Viewport* vp, const std::function<void(size_t, size_t)>& gs_draw);
+// (`from` / `to`: only the primitives [from, to): the ones before the moby pass go under the MRP's mobys, Gs::moby_mark)
+void mrp_fx_draw(const gs::Gs& gs, int win_w, int win_h, const gs::Viewport* vp, const std::function<void(size_t, size_t)>& gs_draw, size_t from = 0,
+                 size_t to = SIZE_MAX);
 // orig: (host) testing (RAC1_MRP_FX_KICKCHECK=1): a start of the particle program (`hash`) on the GS replica's VU1 (`vu`: a vu1::Vu1)
 // run on the VU interpreter from a copy of the same state as well, its kicks and data memory compared with the port's; true when it ran
 // the program (the port, its kicks to `kick`)
