@@ -31,6 +31,7 @@
 #   K  after each call of the level's own hero_stick_speed (Blarg, Pokitaru): advanced_move_speed, as hero_stick_speed (ovl_21.cpp)
 #   L  0x227fa0  hero_item_use, after its +0x1090 test: no item input while the thrown wrench is out (advanced_rac3_wrench_out; to the return 0)
 #   M  0x22c45c  crouch_input (state 4): the crouch throw 0x15 skipped while the thrown wrench is out (to the instruction after the call)
+#   N  0x22b348  swing_input: the jump press's look-back (a1, from the combo row's +0xc) fixed at 8 frames in R&C 3's throw (advanced_rac3_swing_jump_back; the address by the copies' alignment, 0x48 before H in each)
 
 # ---- Rilgar (level 5): hero_state_update 0x244a70, hero_set_state 0x24cee8, hero_input_update 0x255960, hero_horizontal_velocity 0x242258
 L5 0x00249b10: if (advanced_rac3_movement()) { advanced_rac3_along_stick(); set32(s0, s5.w() + -0xcb0); goto L_249bb4; }  // enhancement (A)
@@ -207,6 +208,19 @@ L16 0x002294f8: if (advanced_rac3_wrench_out()) goto L_229504;  // enhancement (
 L17 0x00228290: if (advanced_rac3_wrench_out()) goto L_22829c;  // enhancement (M)
 L18 0x0022cde4: if (advanced_rac3_wrench_out()) goto L_22cddc;  // enhancement (L)
 L18 0x00230e2c: if (advanced_rac3_wrench_out()) goto L_230e38;  // enhancement (M)
+
+# ---- Point N (R&C 3's throw: the jump press looked back 8 frames, UYA 0x503b68 case 0x15), every level with a copy: the call of
+# pad_button_history 0x266d60 in hero_input_update's swing / throw block (its label, before the delay slot's a2 = 0)
+L5 0x00257088: if (advanced_rac3_movement()) set32(a1, static_cast<uint32_t>(advanced_rac3_swing_jump_back(static_cast<int32_t>(a1.w()))));  // enhancement (N)
+L6 0x0023c520: if (advanced_rac3_movement()) set32(a1, static_cast<uint32_t>(advanced_rac3_swing_jump_back(static_cast<int32_t>(a1.w()))));  // enhancement (N)
+L8 0x002387f0: if (advanced_rac3_movement()) set32(a1, static_cast<uint32_t>(advanced_rac3_swing_jump_back(static_cast<int32_t>(a1.w()))));  // enhancement (N)
+L11 0x00255140: if (advanced_rac3_movement()) set32(a1, static_cast<uint32_t>(advanced_rac3_swing_jump_back(static_cast<int32_t>(a1.w()))));  // enhancement (N)
+L12 0x0024794c: if (advanced_rac3_movement()) set32(a1, static_cast<uint32_t>(advanced_rac3_swing_jump_back(static_cast<int32_t>(a1.w()))));  // enhancement (N)
+L14 0x002366c0: if (advanced_rac3_movement()) set32(a1, static_cast<uint32_t>(advanced_rac3_swing_jump_back(static_cast<int32_t>(a1.w()))));  // enhancement (N)
+L15 0x0021e728: if (advanced_rac3_movement()) set32(a1, static_cast<uint32_t>(advanced_rac3_swing_jump_back(static_cast<int32_t>(a1.w()))));  // enhancement (N)
+L16 0x002287e0: if (advanced_rac3_movement()) set32(a1, static_cast<uint32_t>(advanced_rac3_swing_jump_back(static_cast<int32_t>(a1.w()))));  // enhancement (N)
+L17 0x00227080: if (advanced_rac3_movement()) set32(a1, static_cast<uint32_t>(advanced_rac3_swing_jump_back(static_cast<int32_t>(a1.w()))));  // enhancement (N)
+L18 0x00230040: if (advanced_rac3_movement()) set32(a1, static_cast<uint32_t>(advanced_rac3_swing_jump_back(static_cast<int32_t>(a1.w()))));  // enhancement (N)
 
 # ---- Points I / J in the PAL build (SCES-50916) of hero_horizontal_velocity, for the stand-ins generated from the PAL disc
 # (tools/codegen/ovlist.py: the PAL build changed this function, its NTSC-U code is not on that disc). `L<n> PAL:0xADDR` is an

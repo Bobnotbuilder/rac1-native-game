@@ -1111,6 +1111,15 @@ bool advanced_rac3_swing_exit(uint32_t step) {
 }
 
 // orig: (none) — enhancement (advanced.h)
+int32_t advanced_rac3_swing_jump_back(int32_t back) {
+    // UYA 0x503b68 (cases 0x13 / 0x15): the look-back (t - row[+0xc]) * 2, but a fixed 8 in the
+    // throw. R&C1's row 3 has +0xc = 83, so with its jump-cancel lowered to 35 (combo_table_sync)
+    // the computed look-back stays negative until time 83 and no jump press would count
+    if (!advanced_rac3_movement() || lw(HERO + 0x2084) != 0x15) return back;
+    return 8;
+}
+
+// orig: (none) — enhancement (advanced.h)
 bool advanced_rac3_wrench_out() {
     // R&C1 needs no such guard: its hero stays in the throw (0x15) until the wrench is back (row 3
     // ends at 91, reached after the catch). Leaving it early (advanced_rac3_swing_exit, the jump

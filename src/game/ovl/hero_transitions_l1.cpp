@@ -837,7 +837,8 @@ void swing_input() {
         }
     }
     const uint32_t step = OV(0x0017bc28) + lwu(P + 0xa60) * 0x2c;
-    const int32_t back = (float_to_int(lwc1(P + 0xaa8)) - lw(step + 0xc)) * 2;
+    // enhancement: R&C 3's throw looks back a fixed 8 frames for the jump press
+    const int32_t back = advanced_rac3_swing_jump_back((float_to_int(lwc1(P + 0xaa8)) - lw(step + 0xc)) * 2);
     bool to_end = true;
     if (static_cast<float>(lw(step + 0x14)) < lwc1(P + 0xaa8)) {  // the jump window
         if (lw(P + 0xa9c) != 0) to_end = false;
