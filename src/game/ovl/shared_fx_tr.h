@@ -1,5 +1,6 @@
 // Code every level's overlay carries, reached on Novalis: the particle types 0x06 / 0x08 / 0x38 / 0x39 updates
-// and the Vendor's draw callback, transliterated at Veldin's addresses, proved against the original.
+// and the Vendor's draw callback; and the scenes' level 14 effect (0x23e008) and its draw (0x23db30), the level 14 branch of
+// cutscene_level_extras (Oltanis runs its own build: oltanis_*): transliterated at Veldin's addresses, proved against the original.
 #ifndef RAC1_GAME_OVL_SHARED_FX_TR_H
 #define RAC1_GAME_OVL_SHARED_FX_TR_H
 
@@ -15,6 +16,8 @@ void particle_08_update(uint32_t a0);  // 0x0026a5b8
 void vendor_draw_tr(uint32_t a0);  // 0x002a5040
 void particle_38_update(uint32_t a0);  // 0x00272838
 void particle_39_update(uint32_t a0);  // 0x002728e8
+void cutscene_l14_effect_tr(uint32_t a0);  // 0x0023e008
+void cutscene_l14_effect_draw_tr(uint32_t a0);  // 0x0023db30
 
 }  // namespace rac1
 

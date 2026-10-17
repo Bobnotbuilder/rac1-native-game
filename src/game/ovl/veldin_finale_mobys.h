@@ -193,6 +193,8 @@ TrRet vf_hook_2fcc50_u(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint3
 TrRet vf_hook_2fcca0_u(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t t0, uint32_t t1, uint32_t t2, uint32_t t3, float f12, float f13, float f14, float f15, float f16, float f17, float f18, float f19);  // L18:0x002fcca0
 TrRet vf_hook_2fccd0_u(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t t0, uint32_t t1, uint32_t t2, uint32_t t3, float f12, float f13, float f14, float f15, float f16, float f17, float f18, float f19);  // L18:0x002fccd0
 TrRet vf_1f3e08_l18(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t t0, uint32_t t1, uint32_t t2, uint32_t t3, float f12, float f13, float f14, float f15, float f16, float f17, float f18, float f19);  // L18:0x001f3e08
+void vf_hook_2d6280_l18(uint32_t a0);  // L18:0x002d6280 (class 568's hook +0x14)
+void vf_hook_2fcd00_l18(uint32_t a0);  // L18:0x002fcd00 (class 1906's hook +0x14)
 void vf_cam0_hook_l18(uint32_t a0);  // L18:0x00305318
 void vf_cam_callback_l18(uint32_t a0);  // L18:0x00305378
 void vf_cb_2d5768_l18(uint32_t a0);  // L18:0x002d5768

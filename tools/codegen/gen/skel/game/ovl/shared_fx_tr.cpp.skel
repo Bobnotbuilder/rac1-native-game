@@ -1,4 +1,5 @@
-// Shared effects: particle types 0x06 / 0x08 / 0x38 / 0x39, the Vendor's draw (transliterated at Veldin's addresses).
+// Shared effects: particle types 0x06 / 0x08 / 0x38 / 0x39, the Vendor's draw, the scenes' level 14 effect and its draw (Veldin's 0x23e008 /
+// 0x23db30: cutscene_level_extras's level 14 branch; Oltanis runs its own build of them) (transliterated at Veldin's addresses).
 // Transliterated instruction by instruction from Veldin's own overlay with tools/codegen/mips2cpp.py (tools/codegen/mkall.py:
 // the original's control flow and PS2 float rules by construction), not rewritten
 // by hand: the names are the entries', the helpers `ovl_<addr>_tr` (uniform ABI: TrRet).
@@ -39,5 +40,11 @@ using namespace vu0m;
 //@gen particle_38_update
 
 //@gen particle_39_update
+
+//@gen ovl_272060_tr
+
+//@gen cutscene_l14_effect_tr
+
+//@gen cutscene_l14_effect_draw_tr
 
 }  // namespace rac1

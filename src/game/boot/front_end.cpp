@@ -96,17 +96,10 @@ void intro_start() {
     std::printf("[boot] the intro movie\n");
 }
 
-// After the intro: the fade, the copyright picture (the boot data's +0 NTSC / +8 PAL), the frame
-// counter, the title's sound bank (table of contents +0x14e0) and its sound tables (0x186100: 7
-// sounds, the title's; 0x1861e0: class 0x472's), then the title loop's start.
-// orig: front:0x001e9658 (after its intro movie)
-void after_intro() {
-    sw(0x0015eed8, 0);
-    screen_fade(frame_scale_i(0x12));
-    picture_frame(BOOT_DATA + (lw(0x0015ed80) != 0 ? 8u : 0u));
-    g_boot.picture = true;
-    TODO_PORT(0x00122298, "kernel: vsync wait")(0);
-    sw(FR(0x0015f438), lwu(FR(0x0015f438)) + 1);
+// The title's sound bank (table of contents +0x14e0) and its sound tables (0x186100: 7 sounds,
+// the title's; 0x1861e0: class 0x472's), then the title loop's start (its level loaded).
+// orig: (helper) repeated in front:0x001e9658 (after its intro movie) and frontbin:0x001e9658
+void title_bank_and_load() {
     debug_printf_stub();
     const uint32_t bank = static_cast<uint32_t>(boot_bank_load(lwu(TOC + 0x14e0)));
     snd_cmd_08();
@@ -118,8 +111,21 @@ void after_intro() {
     for (uint32_t o : {0x1cu, 0x3cu, 0x5cu, 0x7cu}) sw(FR(0x001861e0) + o, bank);
     g_boot.wait = title_loop_start();
     if (g_boot_title_loaded_hook != nullptr) g_boot_title_loaded_hook();  // (host: the renderers' copy of the title's level)
-    g_boot.phase = Phase::Wait;
     std::printf("[boot] the title loaded (bank %08x)\n", bank);
+}
+
+// After the intro: the fade, the copyright picture (the boot data's +0 NTSC / +8 PAL), the frame
+// counter, the title's sound bank and its sound tables, then the title loop's start.
+// orig: front:0x001e9658 (after its intro movie)
+void after_intro() {
+    sw(0x0015eed8, 0);
+    screen_fade(frame_scale_i(0x12));
+    picture_frame(BOOT_DATA + (lw(0x0015ed80) != 0 ? 8u : 0u));
+    g_boot.picture = true;
+    TODO_PORT(0x00122298, "kernel: vsync wait")(0);
+    sw(FR(0x0015f438), lwu(FR(0x0015f438)) + 1);
+    title_bank_and_load();
+    g_boot.phase = Phase::Wait;
 }
 
 // An attract movie (table of contents +0x1a78 + k * 8, PAL +0x1a98: 80..83.pss NTSC): any button
@@ -204,6 +210,47 @@ void boot_start() {
     g_boot = Boot{};
     g_boot.phase = Phase::Card;
     std::printf("[boot] the boot module started: the memory card check\n");
+}
+
+// Quitting to the title (the pause menu's Quit): the level exit has read the boot module back
+// from the disc (0x243d38: the disc's frontbin, table of contents +0x4f8) and the base ELF's
+// overlay load starts it. That module is another build of the boot module: its data, its tables
+// and every function but four are the boot module's (the same instructions, its code moved: its
+// data differs only in the code pointers, relocated); its main skips the IOP's and the GS's
+// start-up, the boot data, the memory card check and its pictures, the intro movie and the
+// copyright, and its title loop has no wait before its first pass. The host loads the boot
+// module's own image in its place (front_image_load: the same data at the same addresses, the
+// code pointers at the boot module's addresses, which the ports run) and runs that main here: the
+// front end flag, 989snd's stream callback, the vsync callback, the memory map, the screen and
+// projection, the debug font, the texture base, its BSS cleared, the frame's state, the render
+// enables, the display, black; the title's sound bank and its level, the title loop at once.
+// orig: frontbin:0x001e9658 (up to its title loop; the boot module's addresses below)
+void boot_return_start() {
+    sw(FR(0x0015f5e8), 1);
+    sub_00264bf8();
+    sw(FR(0x00160f0c), FR(0x00160000u));
+    TODO_PORT(0x00122e68, "libgraph: the vsync callback set")(0x0012f1c8u);
+    memory_layout();
+    screen_setup();
+    projection_setup();
+    TODO_PORT(0x001e9338, "front: the debug font (the overlays' 0x1eb000)")();
+    boot_tex_base();
+    for (uint32_t a = FR(0x00161280); a < FR(0x00165430); ++a) sb(a, 0);
+    sub_002a07f8();
+    sub_002a1128();
+    render_enables_init();
+    sw(FR(0x0015f438), 0);
+    TODO_PORT(0x00122298, "kernel: vsync wait")(0);
+    sw(MODE, 0);
+    TODO_PORT(0x001fb2a8, "front: the display packet sent (the overlays' 0x200f18)")();
+    bg_color_set(0, 0, 0);
+    g_boot = Boot{};
+    std::printf("[boot] the boot module read back (quit to the title)\n");
+    title_bank_and_load();
+    // (frontbin:0x001eb518: the boot module's title loop without its wait)
+    title_loop_ready();
+    g_boot.phase = Phase::Title;
+    std::printf("[boot] the title\n");
 }
 
 // One frame of the boot: the memory card check's pass, the intro movie's frame, a frame of the

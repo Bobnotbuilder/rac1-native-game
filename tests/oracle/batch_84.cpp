@@ -171,15 +171,14 @@ void batch_84() {
                                  c.set32(2, 0);
                              }});
     // the callees left TODO_PORT: the kernel's vsync wait, DMA kick and handlers, the card's
-    // machine, the state table, the boot data's read, the GS display registers, the fade, the
-    // vsync callback
+    // machine, the state table, the GS display registers, the fade, the vsync callback
     // the memory card's machines (0x24b690 / 0x24ac20, task 0301) run on both sides, libmc the
     // host's stand-in (no card)
     g_extra_hooks.push_back({0x00123d68, [](EeCpu& c) { c.set32(2, mc_get_info(static_cast<int32_t>(c.r32(4)), static_cast<int32_t>(c.r32(5)), c.r32(6), c.r32(7), c.r32(8))); }});
     g_extra_hooks.push_back({0x00123c30, [](EeCpu& c) { c.set32(2, mc_sync(static_cast<int32_t>(c.r32(4)), c.r32(5), c.r32(6))); }});
-    g_extra_noop_hooks = {0x00122298, OVF(0x002a08c8), 0x001187d0, 0x001190f8, OVF(0x00243d38),
-                          OVF(0x002900a0),  // (and the flight's drawing)
-                          OVF(0x001f8540), 0x00122e68};
+    // (the boot module's read back 0x243d38 runs on both sides: batch 420; so does the flight's drawing 0x2900a0, ported by
+    // task 0406 and proved by batch 143: the loading screen's frames draw it on both sides)
+    g_extra_noop_hooks = {0x00122298, OVF(0x002a08c8), 0x001187d0, 0x001190f8, OVF(0x001f8540), 0x00122e68};
     // 989snd's IOP server with the stream system's disc reads (command 0x38) done as the IRX does
     // them (batch 75's): the scene blocks' reads complete on both sides
     auto snd_server = [](bool reads) {

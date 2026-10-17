@@ -13,8 +13,10 @@
 #include <game/ovl/ovl_common.h>
 #include <game/ovl/pause_menu_pages.h>
 #include <game/ovl/screen_fade.h>
+#include <game/ovl/shared_fx_tr.h>
 #include <game/ovl/umbris_call.h>
 #include <game/ovl/oltanis_mobys.h>
+#include <game/ovl/particle_16_spawn.h>
 #include <game/ovl/variants_l14.h>
 #include <game/ovl/quartu_call.h>
 #include <game/port_stubs.h>
@@ -304,11 +306,14 @@ void cutscene_end() {
 
 // The scenes' level-specific extras each frame: Veldin, the ships (class 0x212) drawn with their
 // engines (0x2935b8); level 2, the class 0x1b1 mobys flagged 0x800; level 3 scene 5 frames
-// 900..1100, four sparks from the second moby's chain points (0x26ced0, not ported); level 7
+// 900..1100, four sparks (particle_16_spawn 0x26ced0) from the scene's fourth moby's (+0x184) chain points; level 7
 // scene 4, the ship (0x214, second moby) with its engines; level 14 scene 0 frames 0x1c..0x21,
-// the first moby's effect (0x23e008, not ported) and its draw 0x23db30; level 15 scenes 3 / 4,
-// the mobys' lights.
-// orig: 0x0023e268
+// the first moby's effect 0x23e008 and its draw 0x23db30 (shared_fx_tr.cpp; Oltanis runs its own
+// build of this function, so only a level 14 without it would reach them); level 15 scenes 3 / 4,
+// the mobys' lights. Aridia's and Kerwan's overlays carry their own builds with only their level's branch (L2:0x002400c8,
+// L3:0x0022c728: the same instructions as this one's level 2 / level 3 branch; the others are keyed on other levels): this
+// port runs there, proved against both builds by batch 410.
+// orig: 0x0023e268 L2:0x002400c8 L3:0x0022c728
 void cutscene_level_extras() {
     if (on_umbris()) { umb_call(umb_cutscene_level_extras_u); return; }  // (level 7's own: L7:0x00265bd8)
     if (on_oltanis()) { olt_cutscene_level_extras_l14(0); return; }  // (level 14's own: L14:0x002460f8, its scene 0 effect and draw)
@@ -328,8 +333,10 @@ void cutscene_level_extras() {
     if (lw(0x0015ed84) == 3 && lw(SC + 0x30) == 5 && frame_scale_i(0x384) < lw(SC + 0x34) && lw(SC + 0x34) < frame_scale_i(0x44c)) {
         const uint32_t m = lwu(SC + 0x184);
         if (m != 0) {
+            const uint32_t f = ee_stack_alloc(0x20);  // (the frame's two vectors handed to the spawner: the point +0, the velocity +0x10)
             for (int32_t s1 = 0; s1 < 4; ++s1) {
-                Vec4 at, dir;
+                Vec4& at = V(f);
+                Vec4& dir = V(f + 0x10);
                 vec_clear(dir);
                 moby_chain_point_v(m, static_cast<uint32_t>(s1 % 2), at);
                 const float f21 = rand_angle();
@@ -340,8 +347,9 @@ void cutscene_level_extras() {
                 const int32_t lo = frame_scale_i(0xc);
                 const int32_t hi = frame_scale_i(0x23);
                 const int32_t life = rand_range(lo, hi);
-                TODO_PORT(0x0026ced0, "sparks")(life);
+                particle_16_spawn(f, f + 0x10, 0x80808080u, 0x00808080u, life, u2f(0x480f8e00u));
             }
+            ee_stack_free(0x20);
         }
     }
     if (lw(0x0015ed84) == 7 && lw(SC + 0x30) == 4) {
@@ -351,7 +359,7 @@ void cutscene_level_extras() {
     if (lw(0x0015ed84) == 0xe && lw(SC + 0x30) == 0) {
         const uint32_t m = lwu(SC + 0x17c);
         if (m != 0 && static_cast<uint32_t>(lw(SC + 0x34) - 0x1c) < 6u) {
-            TODO_PORT(0x0023e008, "level 14 scene 0 effect")(m);
+            cutscene_l14_effect_tr(m);
             sub_001f93e0(OVF(0x0023db30), m);
         }
     }

@@ -10,6 +10,7 @@
 #include "ovl_oracle.h"
 
 #include <game/ovl/ovl_reloc.h>
+#include <runtime/kernel/disc.h>
 namespace rac1::oracle {
 
 void batch_91() {
@@ -22,6 +23,38 @@ void batch_91() {
     g_ignored_words.push_back(OV(0x0016018c));
     const bool null_ram = g_ee_null_is_ram;
     g_ee_null_is_ram = true;  // as in the runtime
+    // 989snd's IOP server (batch 80's) with the stream system's disc reads (command 0x38) done as the IRX does them: the
+    // frames played may start a scene (Novalis's class 730, ported since the batch was written, starts scene 5), whose
+    // blocks are read through the stream system, as in the game
+    auto snd_server = [](bool reads) {
+        auto result = [](uint32_t id, uint32_t a0) -> uint32_t {
+            const uint32_t h = (id * 0x9e3779b1u) ^ (a0 * 0x85ebca6bu);
+            return ((h >> 7) % 4 == 0) ? 0u : ((h >> 3) | 1u);
+        };
+        sif_rpc_register(0x123456, [result, reads](uint32_t fno, uint32_t send, uint32_t, uint32_t recv, uint32_t) {
+            if (fno == 0x4d) {
+                const uint32_t n = ee_read<uint32_t>(send);
+                uint32_t p = send + 4;
+                for (uint32_t i = 0; i < n; ++i) {
+                    const uint32_t id = ee_read<uint16_t>(p), size = ee_read<uint16_t>(p + 2);
+                    ee_write<uint32_t>(recv + 4 + i * 4, result(id, size != 0 ? ee_read<uint32_t>(p + 4) : 0u));
+                    if (reads && id == 0x38) {
+                        disc_read_ee(ee_read<uint32_t>(p + 0xc), ee_read<uint32_t>(p + 4), ee_read<uint32_t>(p + 8));
+                        ee_write<uint32_t>(0x00137b10, 0);
+                        ee_write<uint32_t>(0x00137b00, 0);
+                    }
+                    p += 4 + ((size + 3) & ~3u);
+                }
+                ee_write<uint32_t>(recv, 0xffffffffu);
+                ee_write<uint32_t>(recv + 4 + n * 4, 0xffffffffu);
+                return;
+            }
+            ee_write<uint32_t>(recv + 4, result(fno, send != 0 ? ee_read<uint32_t>(send) : 0u));
+            ee_write<uint32_t>(recv, 0xffffffffu);
+            ee_write<uint32_t>(recv + 8, 0xffffffffu);
+        });
+    };
+    snd_server(true);
 
     static std::vector<uint8_t> snap;
     auto level = [boot] {
@@ -30,6 +63,9 @@ void batch_91() {
             boot();
             level_setup_body(1, 0);
             w32(OV(0x0016c060), 0xf);
+            w32(0x0015ec8c, 1);  // the stream system up (the disc reads by command 0x38), the disc idle (batch 80's)
+            w32(0x00137b00, 0);
+            sub_00264bf8();
             snap.assign(ram, ram + 0x02000000);
             // the class update functions not ported yet: no-ops on both sides
             for (uint32_t m = ee_read<uint32_t>(OV(0x0015ffd8)); ee_read<uint8_t>(m + 0x20) != 0xff; m += 0x100) {
@@ -104,6 +140,7 @@ void batch_91() {
         return Args{};
     }, [](A) { hero_enter_idle(); return uint64_t{0}; }, OV(0x00173e7c));
 
+    snd_server(false);
     g_ee_null_is_ram = null_ram;
     g_extra_noop_hooks.clear();
 }

@@ -248,7 +248,9 @@ int32_t two_pictures_draw(uint32_t w) {
 }
 
 // The items help's label: its texts by whether item 2 is owned (0x13d4c2).
-// orig: 0x0027a6e0
+// The levels' own copies (the same instructions, their own tables; handed over through the code pointer pairs) run this
+// port: proved on each level by batch 411.
+// orig: 0x0027a6e0 L1:0x002904a0 L2:0x0027bbf8 L3:0x00269350 L4:0x0026da10 L5:0x002a49e8 L6:0x002894c0 L7:0x002a3100 L8:0x00284e30 L9:0x00299500 L10:0x0026d600 L11:0x0029fa68 L12:0x00293388 L13:0x00286860 L14:0x00282e70 L15:0x0026a388 L16:0x002759d8 L17:0x00274790 L18:0x0027c668
 int32_t items_help_focus_in(uint32_t w) {
     sw(w + 0x34, lbu(0x0013d4c2) != 0 ? OV(0x001b47d0u) : OV(0x001b4808u));
     return 0;

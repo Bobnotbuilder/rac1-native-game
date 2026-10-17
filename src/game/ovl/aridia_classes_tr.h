@@ -45,6 +45,7 @@ uint32_t shark_hook_14_l2(uint32_t a0);  // L2:0x002d6340
 uint32_t shark_hook_10_l2(uint32_t a0);  // L2:0x002d6310
 void class737_update_l2(uint32_t a0);  // L2:0x002dfcd0
 void cam_mode_hook_2fa710_l2(uint32_t a0);  // L2:0x002fa710
+void cam_callback_2fa770_l2(uint32_t a0);  // L2:0x002fa770 (the end-of-update callback the camera hook 0x2fa710 queues)
 // the sparks (Veldin's unported 0x26ced0; the Rocks spawn them): proved against the original
 // class 1633's spawner (a parent, a position, f12..f15): the oracle's generator spawns one with it
 TrRet lv2_2efdd0_l2(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t t0, uint32_t t1, uint32_t t2, uint32_t t3, float f12, float f13, float f14, float f15, float f16, float f17, float f18, float f19);  // L2:0x002efdd0

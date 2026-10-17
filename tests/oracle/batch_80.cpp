@@ -20,9 +20,10 @@ void batch_80() {
     if (g_only_batch != 80) return;
     g_batch = 80;
     g_ignored_words = vcross_lanes();
-    // the callees left TODO_PORT: the kernel's vsync wait, the movie player, two effects of other
-    // levels' scenes, the level change request
-    g_extra_noop_hooks = {0x00122298, OVF(0x0023e008), OVF(0x0026ced0), OVF(0x0024d430)};
+    // the callees left TODO_PORT: the kernel's vsync wait, the movie player, the level change request (the two effects of
+    // other levels' scenes, Kerwan's sparks 0x26ced0 and level 14's effect 0x23e008, ported since: they run on both sides,
+    // batches 410 and 401)
+    g_extra_noop_hooks = {0x00122298, OVF(0x0024d430)};
     const bool null_ram = g_ee_null_is_ram;
     g_ee_null_is_ram = true;
     g_ignored_words.push_back(OV(0x00160188));  // the particle update's saved return address

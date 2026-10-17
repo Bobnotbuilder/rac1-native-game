@@ -123,8 +123,8 @@ shared code every level runs:
 
 | Level (`ORACLE_LEVEL`) | Batches |
 |---|---|
-| 0 | 63, 79, 95, 103, 104, 106, 110, 113, 115, 118, 123, 125, 130, 141 |
-| 1 | 97, 103, 113, 115, 123 |
+| 0 | 63, 79, 80, 84, 85, 89, 95, 103, 104, 106, 110, 113, 115, 118, 123, 125, 130, 141 |
+| 1 | 91, 97, 103, 113, 115, 123 |
 | 2 | 107, 109, 123, 137 |
 | 3 | 112, 123, 137, 138 |
 | 4 | 111 |
@@ -151,6 +151,10 @@ shared code every level runs:
 | 15, 17 and 18 | 370 (the particle types 0x1f and 0x50: Giant Clank's streaks, Drek's fleet's laser beams) |
 | 16 | 371 (Kalebo III's classes on the race's dumps, the racers finished) |
 | 18 | 372 (the hero's frame in level 18's water) |
+| 0 .. 18 | 400 (the Metal Detector's display: HUD slot 7's draw 0x23a2d0, with its start / update, on every level's own copy; no dumps) |
+| 0, 2, 14 and 18 | 401 (level 18's class hooks +0x14, Aridia's camera callback 0x2fa770, the scenes' level 14 effect 0x23e008 / 0x23db30; no dumps) |
+| 0, 2, 3, 10 and 13 | 410 (the levels' own builds of the rail search, the cutscenes' level extras and the hit record) |
+| 0 .. 18 | 411 (the pause menu's Special page widgets; the levels' copies of two shared widget functions) |
 
 For a quick check after a small change, level 0's 63, 79, 118 and 141 are the usual minimum.
 
