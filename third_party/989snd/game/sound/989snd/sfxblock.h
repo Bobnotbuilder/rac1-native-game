@@ -42,6 +42,8 @@ class SFXBlock : public SoundBank {
   };
 
   std::vector<SFX> Sounds;
+  // rac1: false (reported once) for an id past Sounds
+  bool ValidSound(u32 sound_id, const char* where) const;
   std::string Name;
   std::map<std::string, u32> Names;
   std::unique_ptr<u8[]> SampleData;
@@ -59,7 +61,10 @@ class SFXBlock : public SoundBank {
   std::optional<std::string_view> GetName() override { return Name; };
   std::optional<u32> GetSoundByName(const char* name) override;
   std::optional<const SFXUserData*> GetSoundUserData(u32 sound_id) override {
-    return &Sounds.at(sound_id).UserData;
+    if (!ValidSound(sound_id, "get_sound_user_data")) {
+      return std::nullopt;
+    }
+    return &Sounds[sound_id].UserData;
   };
   void DebugPrintAllSounds() override;
 };

@@ -216,6 +216,11 @@ still runs those ranges, with the ported particle program on its VU1, but instea
 primitives it keeps them aside. `src/game/render/mrp_fx.cpp` takes them back to world space and draws
 them in the shared projection and depth buffer, from a texture atlas, in the GS's primitive order,
 breaking batches only on a blend or depth change. Effects that need it use dual-source blending.
+What the chain draws before the moby pass (the draw lists `render_frame` runs before it, such as Hoven's
+water) is drawn before the MRP's mobys, the rest after them, as in the original's order: a moby part that
+writes its colour but no Z (Ratchet's ice cube on Hoven) is not covered by them. On the Vendor's screens'
+frames that put their stored picture back, no world pass and no effect runs, so the MRP neither draws nor
+skips anything there (the passes noted last were an older frame's, and skipped the screens' own packets).
 The atlas holds at most 1024 layers (fewer if the GPU allows fewer array layers); when it is full, the
 layer least recently drawn with is reused. Some effects get new texture pixels every frame (Aridia's
 sand sea), so an atlas that only grew reached the GPU's limit after about half a minute there, and every
@@ -237,7 +242,10 @@ The game's own decisions are never changed, because they are game state. Instead
   distance and the global maximum.
 - **The world**: the host makes the tie, shrub and tfrag per-instance decisions itself, with C++
   copies of the passes' culls and the scaled distances (`mrp_world_static.cpp`, `tfrag_decide`).
-  These copies were checked draw for draw against the game's own.
+  That includes the shrubs' far billboard variants (antennas, spires, lights and plants seen from
+  afar), whose camera-facing quads the shrub pass writes as a GIF stream: the host writes the same
+  stream (`variant_stream`). These copies were checked draw for draw against the game's own
+  (`RAC1_MRPW_STATIC_CHECK=1`; the billboards' stream word for word).
 - **Original** runs no shadow run at all.
 
 With the whole of EE memory hashed after every frame, the game's state was identical at Original and
@@ -249,12 +257,20 @@ at Maximum on Veldin, Novalis and Kerwan.
 
 - **Aspect Ratio**: 4:3 Original, 16:9, or Fill Screen (the 3D widened to the window's shape).
 - **Fit to Screen**: when the picture's shape is not the window's, black bars or stretched.
-- **Field of View**: a scale of the original's horizontal field of view.
+- **Field of View**: a scale of the original's field of view (both its horizontal and vertical angles).
 
 To widen the 3D, the host writes a wider projection into the game's projection block and runs the
 game's own projection set-up (0x1f7980) inside a journal. `render_view_projection_undo` restores the
 bytes before every game update, so **the game only ever sees its own 4:3 projection**. Objects in the
-side bands are culled by the same shadow-run mechanism as the level of detail, with the view widened.
+side bands are culled by the same shadow-run mechanism as the level of detail, with the view widened:
+horizontally by the widescreen and the field of view, vertically by the field of view (the sky too).
+Before the vertical part, a Field of View above x1.00 lost the sky and the objects in bands at the
+top and bottom of the screen.
+The levels' water, lava and sand-sea surfaces (Novalis's pond, Aridia's sand sea, Gaspar's lava, the
+water grids of Rilgar, Umbris and other levels) are drawn by draw-list callbacks that cull their tiles
+against the game's 4:3 clip matrix; those draw lists run as shadow blocks too, with that matrix
+widened, and the GS replica walks each shadow's chain in place of the real block's (several
+substitutes a frame). Before this, tiles at the sides of a widened view were missing.
 Before this, the game's state diverged on most frames of the Veldin intro when the view was widened;
 after it, its state is identical at 4:3 and at 5120x1440.
 
@@ -282,7 +298,13 @@ the GS's 4 MB memory, run VU1 programs where the chain starts them (ported progr
 hash of their code, see [Decisions](decisions.md#5-a-vu-interpreter-for-the-microprograms-not-yet-ported)),
 and draw the result with OpenGL. They draw the HUD, the help text and fonts, the menus, screen tints
 and flashes, fades, and any effect the MRP does not take. The 2D maps cleanly to the screen, so
-emulating it is simple and exact.
+emulating it is simple and exact. What the game draws into its own memory to use as a texture (the
+menus' pictures, such as the ship's planet menu's planet, made of three blended layers) goes into a
+render target that keeps the GS's alpha (0x80 = 1.0); its blending reads that alpha at the GS's scale.
+Every ALPHA register's `(A - B) C + D` maps to the GL's blending (add, subtract or reverse subtract; the two
+combinations with a factor `1 + C` use 1), for the replica, the MRP's mobys, world and effects alike: the
+subtractive second pass of the force fields, Orxon's O2 barriers and Quartu's gates (`(Cd - Cs) FIX`) was drawn
+as an opaque copy of the source before, black.
 
 ## The original rendering, kept as the reference
 
@@ -341,8 +363,6 @@ integrated GPU, while the CPU side was 25 to 40 ms before the work above.
 - The mobys' flattened shadow meshes (a second, flattened model some classes have) are not drawn by
   the MRP (`mrp_moby_renderer.cpp`).
 - Drop shadows of mobys drawn only because of a higher level of detail are missing.
-- The field-of-view scale widens the view horizontally only.
 - A moby whose class logic reads its own "drawn" flag behaves as in 4:3 when it is only visible in
   the widened side bands: that flag is game state, and the port does not change it.
-- At a higher level of detail or in widescreen, shrubs' far billboard variants are not drawn.
 - Linux and OpenGL 4.6 only. The MRP's interface would allow other backends later.

@@ -15,6 +15,10 @@ std::optional<std::unique_ptr<SoundHandler>> MusicBank::MakeHandler(VoiceManager
                                                                     s32 pb,
                                                                     s32 tick,
                                                                     u32 owner) {
+  if (sound_id >= Sounds.size()) {  // rac1: an id past the bank's sounds plays nothing
+    lg::warn("play_sound: music sound {} is not in the bank ({} sounds)", sound_id, Sounds.size());
+    return std::nullopt;
+  }
   auto& sound = Sounds[sound_id];
 
   // FIXME: global midi list

@@ -211,6 +211,13 @@ static int s_mrp_skip_mode = 1;  // orig: (host) RAC1_MRP_SKIP, see main()
 FILE* g_audio_dump = nullptr;
 // orig: (host) a vsync: the timer, the vsync callback, the IOP's time (the SPU2's output)
 uint64_t g_vsyncs = 0;  // (testing: the vsyncs passed, RAC1_STALL_LOG)
+// (testing) RAC1_TEST_ZERO_FB=<first>,<last>[,raw]: the host frames of the frames first..last (exclusive) see a framebuffer
+// of 0 x 0, as a minimised window's (Windows: a fullscreen window alt-tabbed out of); `raw`: given to the renderers as it
+// is, without the minimised window's skip (the behaviour before it)
+uint64_t g_test_zero_fb_from = 0, g_test_zero_fb_to = 0;
+bool g_test_zero_fb_raw = false;
+// orig: (host) testing: RAC1_TEST_ZERO_FB's size at this frame
+static bool test_zero_fb(uint64_t frame) { return g_test_zero_fb_to != 0 && frame >= g_test_zero_fb_from && frame < g_test_zero_fb_to; }
 // the longest game step of the last host frame; a step longer than kStallMs is a stall (a load) the host does
 // not catch up
 double g_last_steps_ms = 0.0;
@@ -338,6 +345,33 @@ static void ram_hash_frame(FILE* f, uint64_t frame) {
 // HostPacer (VSync on with no frame-rate cap: paced at the display's refresh); elsewhere VSync is the swap interval 1.
 // orig: (host)
 static int host_swap_interval(bool vsync) { return vsync && glfwGetPlatform() != GLFW_PLATFORM_WAYLAND ? 1 : 0; }
+// orig: (host) the monitor the Graphics page's Monitor row chose (an index in GLFW's list), else the primary
+// monitor, which on Wayland is only the first output the compositor advertises
+static GLFWmonitor* host_fullscreen_monitor() {
+    GLFWmonitor* primary = glfwGetPrimaryMonitor();
+    int n = 0;
+    GLFWmonitor** all = glfwGetMonitors(&n);
+    const int row = rac1::graphics_display().monitor;
+    if (all == nullptr || row < 0 || row >= n) return primary;
+    const GLFWvidmode* mode = glfwGetVideoMode(all[row]);
+    std::printf("[orig] the monitor: %s (%d), %s x %s at %d Hz\n", glfwGetMonitorName(all[row]), row, mode != nullptr ? std::to_string(mode->width).c_str() : "?", mode != nullptr ? std::to_string(mode->height).c_str() : "?",
+                mode != nullptr ? mode->refreshRate : 0);
+    return all[row];
+}
+// orig: (host) a windowed window centred on the monitor the Graphics page's Monitor row chose. GLFW cannot place a
+// window on Wayland (the compositor does, and ignores the request), so this does nothing there; it is for X11.
+static void host_window_on_monitor(GLFWwindow* w, int row) {
+    if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND || row < 0) return;
+    int n = 0;
+    GLFWmonitor** all = glfwGetMonitors(&n);
+    if (all == nullptr || row >= n) return;
+    const GLFWvidmode* mode = glfwGetVideoMode(all[row]);
+    if (mode == nullptr) return;
+    int mx = 0, my = 0, ww = 0, wh = 0;
+    glfwGetMonitorPos(all[row], &mx, &my);
+    glfwGetWindowSize(w, &ww, &wh);
+    glfwSetWindowPos(w, mx + std::max(0, (mode->width - ww) / 2), my + std::max(0, (mode->height - wh) / 2));
+}
 // orig: (host) the display's refresh rate (the window's monitor, else the first; 60 when unknown)
 static double host_refresh_hz(GLFWwindow* w) {
     GLFWmonitor* m = glfwGetWindowMonitor(w);
@@ -1448,6 +1482,16 @@ void pad_packet(GLFWwindow* win, uint64_t frame) {
                             std::hypot(lwc1(OV(0x00166dc0)) - lwc1(0x0013f3d0), lwc1(OV(0x00166dc4)) - lwc1(0x0013f3d4)),
                             lwc1(OV(0x00166dc8)) - lwc1(0x0013f3d8));
         }
+        if (std::strcmp(sim, "strafecam") == 0 || std::strcmp(sim, "strafecam0") == 0) {  // testing (RAC1_ADVANCED=1, Movement
+            // Strafing or RAC 3): Start at 120, L2 held 200..250 with the stick right, then the right stick right 255..340 (the
+            // camera turned just after the strafe; not for "strafecam0": the view's release alone); the camera's heading logged 240..380
+            if (frame >= 120 && frame < 124) held |= 0x0800;
+            if (frame >= 200 && frame < 250) { held |= 0x0001; lx = 1.0f; }
+            if (sim[9] == 0 && frame >= 255 && frame < 340) rx = 1.0f;
+            if (frame >= 240 && frame < 380)
+                std::printf("[strafecam] frame %llu state %d facing %.3f camera %.3f strafing %d\n", static_cast<unsigned long long>(frame), lw(0x001413d4),
+                            lwc1(0x0013f350 + 0x98), lwc1(OV(0x00166dd8)), advanced_strafing() ? 1 : 0);
+        }
         if (std::strcmp(sim, "qshold") == 0) {  // Start at 120 (the arrival scene skipped), the quick select held 200..360
             // with the stick up, the frame counters logged (Advanced > pause in the quick select: they stop)
             if (frame >= 120 && frame < 124) held |= 0x0800;
@@ -1584,6 +1628,10 @@ void pad_packet(GLFWwindow* win, uint64_t frame) {
 }  // namespace
 
 int main(int argc, char** argv) {
+    // (Windows: the console's QuickEdit off - a click in the console window froze the game - and the timer at 1 ms;
+    // put back at the exit: platform.h)
+    rac1::platform::process_begin();
+    std::atexit(rac1::platform::process_end);
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]) == "--setup" || std::string(argv[i]) == "-s") {
             return rac1::setup::run_setup(argc, argv);
@@ -1657,6 +1705,13 @@ int main(int argc, char** argv) {
     // Options > Graphics: the window, the view, the level of detail as the player left them (not read in a
     // headless run: g_advanced_disabled); the testing switches below override them
     rac1::graphics_load();
+    if (!headless) {  // Options > Graphics's Monitor row: the host's monitors, for the row and for the window to go on
+        std::vector<std::string> names;
+        int n = 0;
+        if (GLFWmonitor** all = glfwGetMonitors(&n); all != nullptr)
+            for (int i = 0; i < n; ++i) names.emplace_back(glfwGetMonitorName(all[i]));
+        rac1::graphics_set_monitors(std::move(names));
+    }
     int win_w0 = 960, win_h0 = 720;  // testing: RAC1_WINDOW=WxH, RAC1_VIEW_MODE=0|1|2 (render_toggles.h)
     if (!headless) {
         win_w0 = rac1::graphics_display().window_w;
@@ -1670,7 +1725,7 @@ int main(int argc, char** argv) {
     GLFWmonitor* fs_monitor = nullptr;
     const char* fs_env = std::getenv("RAC1_FULLSCREEN");
     if (!headless && (fs_env != nullptr ? std::atoi(fs_env) != 0 : rac1::graphics_display().fullscreen)) {
-        fs_monitor = glfwGetPrimaryMonitor();
+        fs_monitor = host_fullscreen_monitor();
         if (const GLFWvidmode* mode = fs_monitor != nullptr ? glfwGetVideoMode(fs_monitor) : nullptr) {
             win_w0 = mode->width;
             win_h0 = mode->height;
@@ -1681,6 +1736,7 @@ int main(int argc, char** argv) {
     GLFWwindow* window = glfwCreateWindow(win_w0, win_h0, "Ratchet & Clank - original runtime", fs_monitor, nullptr);
     if (window == nullptr) { std::fprintf(stderr, "rac1-native: no OpenGL 4.6 window\n"); return 1; }
     glfwMakeContextCurrent(window);
+    if (!headless && fs_monitor == nullptr) host_window_on_monitor(window, rac1::graphics_display().monitor);
     glfwSwapInterval(headless ? 0 : host_swap_interval(rac1::graphics_display().vsync));
     if (!headless) host_input_init(window);  // the controls: the controller database, the bindings
     // the Controls page's host side; its changes saved in a window, headless only to an explicit RAC1_CONTROLS_FILE
@@ -1963,6 +2019,11 @@ int main(int argc, char** argv) {
             if (fn != 0 && !rac1::ovl_moby_fn_ported(fn))
                 std::printf("[moby] %08x class %d fn %08x pos %.1f %.1f %.1f\n", m, lh(m + 0xa6), fn, lwc1(m + 0x10), lwc1(m + 0x14), lwc1(m + 0x18));
         }
+    if (std::getenv("RAC1_MOBY_LIST") != nullptr)  // the particle types whose update (the table 0x1b1e80) has no port
+        for (uint32_t t = 0; t < 0x60; ++t) {
+            const uint32_t fn = lwu(OV(0x001b1e80) + t * 4);
+            if (fn != 0 && fn < 0x02000000u && !rac1::ovl_moby_fn_ported(fn)) std::printf("[particle] type %02x update %08x not ported\n", t, fn);
+        }
     if (std::getenv("RAC1_MOBY_LIST") != nullptr)  // the level's live cameras: type, trigger kind
         for (uint32_t i = 0; i < 48; ++i) {
             const uint32_t c = OV(0x00167150) + i * 0xa0;
@@ -2029,6 +2090,15 @@ int main(int argc, char** argv) {
     // testing: RAC1_DIE_AT=<frame>: at that game frame Ratchet is killed through the game's own death state
     // (the debug menu's Kill Ratchet)
     const long long die_at = std::getenv("RAC1_DIE_AT") != nullptr ? std::atoll(std::getenv("RAC1_DIE_AT")) : -1;
+    if (const char* z = std::getenv("RAC1_TEST_ZERO_FB"); z != nullptr && g_test_switches) {
+        unsigned long long a = 0, b = 0;
+        char raw[8] = {};
+        if (std::sscanf(z, "%llu,%llu,%7s", &a, &b, raw) >= 2) {
+            g_test_zero_fb_from = a;
+            g_test_zero_fb_to = b;
+            g_test_zero_fb_raw = std::strcmp(raw, "raw") == 0;
+        }
+    }
     FrameProf fprof;
     HostPacer pacer;
     // (testing) RAC1_RAMHASH=<file>: after each game frame's update the 4 KB pages' hashes of the game's EE RAM
@@ -2060,9 +2130,13 @@ int main(int argc, char** argv) {
                 display_serial = rac1::graphics_display_serial();
                 display_settle = 60;
                 const rac1::GraphicsDisplay& gd = rac1::graphics_display();
-                if (gd.fullscreen && !is_fs) {
+                if (gd.fullscreen && is_fs) {  // (the Monitor row changed while fullscreen: the window goes to that screen)
+                    if (GLFWmonitor* m = host_fullscreen_monitor(); m != nullptr && m != glfwGetWindowMonitor(window)) {
+                        if (const GLFWvidmode* mode = glfwGetVideoMode(m); mode != nullptr) glfwSetWindowMonitor(window, m, 0, 0, mode->width, mode->height, mode->refreshRate);
+                    }
+                } else if (gd.fullscreen && !is_fs) {
                     glfwGetWindowPos(window, &windowed_pos[0], &windowed_pos[1]);
-                    GLFWmonitor* m = glfwGetPrimaryMonitor();
+                    GLFWmonitor* m = host_fullscreen_monitor();
                     if (const GLFWvidmode* mode = m != nullptr ? glfwGetVideoMode(m) : nullptr) glfwSetWindowMonitor(window, m, 0, 0, mode->width, mode->height, mode->refreshRate);
                 } else if (!gd.fullscreen && is_fs) {
                     glfwSetWindowMonitor(window, nullptr, windowed_pos[0], windowed_pos[1], gd.window_w, gd.window_h, 0);
@@ -2070,6 +2144,7 @@ int main(int argc, char** argv) {
                     int cw = 0, ch = 0;
                     glfwGetWindowSize(window, &cw, &ch);
                     if (cw != gd.window_w || ch != gd.window_h) glfwSetWindowSize(window, gd.window_w, gd.window_h);
+                    host_window_on_monitor(window, gd.monitor);  // (the Monitor row: the window over on that screen)
                 }
                 glfwSwapInterval(host_swap_interval(env_vsync >= 0 ? env_vsync != 0 : gd.vsync));
             } else if (display_settle > 0) {
@@ -2102,26 +2177,34 @@ int main(int argc, char** argv) {
         if (host_delay_ms > 0) std::this_thread::sleep_for(std::chrono::milliseconds(host_delay_ms));  // (testing: a slow host frame)
         bool iop_alone = true;  // (the IOP's mirror may play alone while the game's thread stalls; not while the host holds the game)
         bool host_paused = false;  // (the debug menu holds the game: its frames still drawn, the menu over them)
-#ifdef RAC1_DEVTOOLS
         // (testing) RAC1_REALTIME=1: a headless run steps the game as a window does (60 game frames a second of the wall
         // clock, the stalls not caught up), with RAC1_FPS_CAP its host frames' rate and RAC1_AUDIO_DEVICE=null the sound's queue
         static const bool realtime_test = headless && std::getenv("RAC1_REALTIME") != nullptr && std::atoi(std::getenv("RAC1_REALTIME")) != 0;
         if (!headless || realtime_test) {
+            // the debug menu's pause, single step and speed (a build without the debug tools: none, speed 1). The game's
+            // frames come from the wall clock in every build: without the debug tools the window ran one game frame per host
+            // frame, the game's speed tied to the display's refresh rate
+            bool paused = false, step_once = false;
+            double speed = 1.0;
+#ifdef RAC1_DEVTOOLS
             if (!headless) dt::dev_menu_poll(window);
             const dt::DevSettings& ds = dt::dev_settings();
-            const bool paused = ds.paused || (ds.open && ds.pause_when_open);
-            iop_alone = !paused && ds.speed == 1.0f;
+            paused = ds.paused || (ds.open && ds.pause_when_open);
+            step_once = ds.step_once;
+            speed = static_cast<double>(ds.speed);
+            if (paused) dt::dev_settings().step_once = false;
+#endif
+            iop_alone = !paused && speed == 1.0;
             host_paused = paused;
             if (paused) {
                 game_time = 0.0;
-                steps = ds.step_once ? 1 : 0;
-                dt::dev_settings().step_once = false;
+                steps = step_once ? 1 : 0;
             } else {
                 // a game frame that took the host long (a load: a level's start, a checkpoint's reload, a movie's open)
                 // is not caught up: the game goes on from where it was, as the PS2 after a long frame, instead of running the
                 // owed frames at once (up to 6 game frames in one host frame: a jump in the picture, a burst of sound)
                 const double owed_s = g_last_steps_ms > kStallMs ? std::min(dt_s, 1.0 / 60.0) : std::min(dt_s, 0.1);
-                game_time += owed_s * 60.0 * static_cast<double>(ds.speed);
+                game_time += owed_s * 60.0 * speed;
                 // nor the time the IOP's mirror already played alone while the game was late (ADR 0013): the PS2's
                 // IOP played on and the EE did not run those frames again; caught up, their sound would come on top of what
                 // was played (a surplus the queue skips). Only the frames owed beyond this host frame's own one are taken off:
@@ -2137,7 +2220,6 @@ int main(int argc, char** argv) {
                 steps = std::min(steps, 8);
             }
         }
-#endif
         audio_out_set_alone(iop_alone);
         g_last_steps_ms = 0.0;
         fprof.begin();
@@ -2355,6 +2437,7 @@ int main(int argc, char** argv) {
         fprof.mark(0);
         auto prepare = [&](FrameDraw& fd, bool snapshot) {
             glfwGetFramebufferSize(window, &fd.w, &fd.h);
+            if (test_zero_fb(frame)) fd.w = fd.h = 0;  // (testing: RAC1_TEST_ZERO_FB with raw)
             w = fd.w;
             h = fd.h;
             fd.vx = 0, fd.vy = 0, fd.vw = fd.w, fd.vh = fd.h;
@@ -2449,6 +2532,7 @@ int main(int argc, char** argv) {
                             r.last = m.chain_end - 1;
                             for (uint32_t k = 0; k < m.part_count; ++k) r.mscals.push_back(sf.parts[m.part_first + k].mscal);
                             if (m.rt) r.host_3d = m.moby;  // a moby drawn into a render target: the MRP draws it there, in the GS's order
+                            r.moby = true;  // (Gs::moby_mark: where the MRP's mobys go in the primitives' order)
                             skips.push_back(std::move(r));
                         }
                     if (g_moby_upload_chain_first != 0) {
@@ -2478,18 +2562,19 @@ int main(int argc, char** argv) {
                         skips.push_back(std::move(r));
                     }
                 if (!skips.empty()) gs.set_chain_skips(std::move(skips));
-                bool substituted = false;
-                {  // the widened view's 3D effects: the shadow's chain walked in place of the real block's
-                    uint32_t sub_first = 0, sub_end = 0;
-                    std::vector<uint8_t> sub_bytes;
-                    if (mrp_lod_effects_substitute(sub_first, sub_end, sub_bytes) && chain_runs && !prev_chain && !menu_mode && !fade) {
-                        gs.set_chain_substitute(sub_first, sub_end, std::move(sub_bytes));
-                        substituted = true;
-                    }
+                std::vector<int> substituted;  // (the shadow blocks' slots, in the order given to the replica)
+                {  // the widened view's draw lists and 3D effects: the shadows' chains walked in place of the real blocks'
+                    std::vector<MrpLodSubstitute> subs;
+                    mrp_lod_substitutes(subs);
+                    if (chain_runs && !prev_chain && !menu_mode && !fade)
+                        for (MrpLodSubstitute& u : subs) {
+                            gs.add_chain_substitute(u.first, u.end, std::move(u.bytes));
+                            substituted.push_back(u.slot);
+                        }
                 }
                 {  // the MRP's 3D effects: their producers' ranges run by the replica as before, their primitives kept for the MRP
                     std::vector<rac1::gs::Gs::FxRange> fr;
-                    const bool fx_active = chain_runs && !prev_chain && !menu_mode && !fade && movie_pic == nullptr && ((!title && !fd.exiting) || fd.flight);
+                    const bool fx_active = chain_runs && !prev_chain && !menu_mode && !fade && !fd.vendor_pic && movie_pic == nullptr && ((!title && !fd.exiting) || fd.flight);
                     if (mrp_fx_chain_ranges(fx_active, substituted, fr)) gs.set_chain_fx(std::move(fr), true);
                 }
                 if (chain_runs) {
@@ -2521,7 +2606,11 @@ int main(int argc, char** argv) {
                 const uint32_t cs = lwu(OV(0x001611b8) + (ci & 1) * 4), ce = lwu(OV(0x001611c0));
                 // (the scene's inputs captured, its build started on the worker thread while this thread runs the GS replica's chain)
                 // (the boot's title scene too, once its level is loaded (the title loop), its main menu (game mode 3) included: the boot module draws its scene under it)
-                mrp_world_begin_frame_async(movie_pic == nullptr && (fd.flight || ((title ? boot_in_title() : !menu_mode) && !exiting)) && !fade && ce > cs, cs, ce);
+                // (not on the Vendor's screens' frames that put their stored picture back: no world pass runs on them, and the passes
+                // noted last are an older frame's - their ranges skipped the screens' own packets at those addresses, issue #47 / #48)
+                mrp_world_begin_frame_async(movie_pic == nullptr && (fd.flight || ((title ? boot_in_title() : !menu_mode) && !exiting)) && !fade &&
+                                                !fd.vendor_pic && ce > cs,
+                                            cs, ce);
             }
             chain_stage();
             fd.chain_start = chain_start_r;
@@ -2857,6 +2946,25 @@ int main(int argc, char** argv) {
                     moby_gpu_draw(w, h, &gv);
                 }
                 static const bool s_mrp_diff = std::getenv("RAC1_MRP_DIFF") != nullptr;
+                const int prim_filt = (g_moby_renderer == MobyRenderer::kGpu || s_moby_diff || mrp_moby_active() || (mrp_world_testing() && mrp_world_active())) ? 2 : 0;
+                // the GS replica's primitives the chain made before the moby pass (the draw lists 0x1f85b8 runs before it: Hoven's water,
+                // translucent and without Z): drawn under the MRP's mobys, in the original's order (drawn after them, they covered what a
+                // moby draws without Z - the faces of Ratchet's ice cube, which fail its alpha test and write their colour only, #48)
+                size_t pre_moby = 0;
+                if (mrp_moby_active() && g_render_moby && g_render_gs2d && movie_pic == nullptr && !fd.fade_held && !menu_mode && !title) {
+                    const size_t mark = gs.moby_mark();
+                    if (mark != SIZE_MAX && mark > 0) {
+                        const rac1::gs::Viewport pv = g_scaled_scene.on ? g_scaled_scene.scaled(gv) : gv;
+                        if (gs.fx_external()) {
+                            mrp_fx_draw(gs, w, h, &pv, [&](size_t from, size_t to) {
+                                rac1::gs::draw(gs, w, h, fd.fb_w, fd.fb_h, has_dm ? &dm : nullptr, &pv, prim_filt, from, to);
+                            }, 0, mark);
+                        } else {
+                            rac1::gs::draw(gs, w, h, fd.fb_w, fd.fb_h, has_dm ? &dm : nullptr, &pv, prim_filt, 0, mark);
+                        }
+                        pre_moby = mark;
+                    }
+                }
                 if (mrp_moby_active()) {  // the MRP's mobys (with RAC1_MRP_DIFF: first both renderers' offscreen, compared)
                     if (s_mrp_diff) mrp_moby_diff(w, h, &gv, gs, fd.fb_w, fd.fb_h, fd.frame, has_dm ? &dm : nullptr);
                     if (g_render_moby) {
@@ -2917,14 +3025,13 @@ int main(int argc, char** argv) {
                                 hm ? lbu(hm + 0x23) : 0, hm ? lwu(hm + 0x3c) : 0, hm ? lh(hm + 0x32) : 0, in_scene, sm ? sm->tint[3] : 0, sm ? sm->far_lod : 0, sm ? sm->deferred : 0);
                 }
                 fprof.mark(5);
-                int prim_filt = (g_moby_renderer == MobyRenderer::kGpu || s_moby_diff || mrp_moby_active() || (mrp_world_testing() && mrp_world_active())) ? 2 : 0;
-                // (the MRP's 3D effects in the primitives' order, the GS replica's runs between them)
+                // (the MRP's 3D effects in the primitives' order, the GS replica's runs between them; those before the moby pass drawn above)
                 if (gs.fx_external() && movie_pic == nullptr && !fd.fade_held) {
                     mrp_fx_draw(gs, w, h, &gv, [&](size_t from, size_t to) {
                         if (g_render_gs2d) rac1::gs::draw(gs, w, h, fd.fb_w, fd.fb_h, has_dm ? &dm : nullptr, &gv, prim_filt, from, to);
-                    });
+                    }, pre_moby);
                 } else if (g_render_gs2d && movie_pic == nullptr && !fd.fade_held) {
-                    rac1::gs::draw(gs, w, h, fd.fb_w, fd.fb_h, has_dm ? &dm : nullptr, &gv, prim_filt);
+                    rac1::gs::draw(gs, w, h, fd.fb_w, fd.fb_h, has_dm ? &dm : nullptr, &gv, prim_filt, pre_moby);
                 }
                 glViewport(0, 0, w, h);
                 fprof.mark(6);
@@ -2965,6 +3072,28 @@ int main(int argc, char** argv) {
                 }
             }
         };
+        // a minimised window (Windows: a fullscreen window alt-tabbed out of is minimised, GLFW_AUTO_ICONIFY) has a framebuffer
+        // of 0 x 0: nothing is prepared, drawn nor presented (the renderers' buffers, captures and views would be sized from it,
+        // their scales divided by its 0; the swap of a minimised window waits for no vsync). The game goes on at 60 game frames
+        // a second, as in a window not shown (a host frame of several game frames does not draw the earlier ones either), the
+        // host sleeping until the next game frame is due; a pipelined frame waiting is dropped
+        {
+            int fb_w = 0, fb_h = 0;
+            if (!headless) glfwGetFramebufferSize(window, &fb_w, &fb_h);
+            const bool zero = (!headless && (fb_w <= 0 || fb_h <= 0 || glfwGetWindowAttrib(window, GLFW_ICONIFIED) != 0)) ||
+                              (test_zero_fb(frame) && !g_test_zero_fb_raw);
+            if (zero && !(max_frames != 0 && frame >= max_frames)) {
+                if (have_pend) {
+                    have_pend = false;
+                    mrp_world_drop_frame();
+                }
+                fprof.end_frame();
+                // (the next game frame is due when game_time reaches 0.5; the debug menu holding the game: a frame's time)
+                const double wait_s = host_paused ? 1.0 / 60.0 : std::max(0.0, 0.5 - game_time) / 60.0;
+                std::this_thread::sleep_for(std::chrono::duration<double>(std::max(wait_s, 0.001)));
+                continue;
+            }
+        }
         // the pipelined frame of the last host frame: drawn now, after this host frame's game frames (its scene built meanwhile)
         bool presented = false;
         if (have_pend) {
@@ -3089,6 +3218,7 @@ int main(int argc, char** argv) {
     rac1::vu0::fallback_report();  // (testing: RAC1_VU_FALLBACK)
     rac1::vu1::fallback_report();
     if (std::getenv("RAC1_VU0_CHAIN") != nullptr) std::fprintf(stderr, "[vu0-chain] %016llx\n", static_cast<unsigned long long>(rac1::vu0::chain_hash()));
+    rac1::platform::process_end();  // (std::_Exit runs no atexit handler)
     rac1::update_check::run_update();
     std::_Exit(0);  // the renderers' static GL objects would be freed after the context is gone
 }

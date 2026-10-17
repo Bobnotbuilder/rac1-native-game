@@ -163,6 +163,7 @@ Every hook is a call from a ported function into `advanced.cpp`, at the point wh
 | `run_jump`, `run_input`, `swing_input` (in 0x229b70) | `hero_transitions.cpp` | `advanced_rac3_running_jump`, `advanced_rac3_stop`, `advanced_strafe_flip`, `advanced_rac3_swing_exit` | the running jump's rule, the immediate stop, the strafe flip, running out of a swing |
 | `moby_skin_all` (0x2558e0) | `moby_skin.cpp` | `advanced_pose_hook` | the strafe's lower-body twist (below) |
 | `gameplay_frame` (0x297f78) | `game_frame.cpp` | `advanced_frame`, `advanced_aim_before_hero` / `_after_hero`, `advanced_aim_before_camera` / `_after_camera` | the combo table, the legs, the aim and the camera around the hero's and the camera's updates |
+| the weapons' hand updates (0x2b77f0, 0x2b2100, 0x2cc608, 0x2b87e0, 0x2bc7e8, 0x2da790 / 0x2ddf60 / 0x2ddcb8, 0x2b3058, 0x2d2158) | `pyrocitor.cpp`; the `host` entries of `tools/codegen/asm2fn_specs/*.json` | `advanced_aim_shot`, `_shot_hand`, `_frame_hand`, `advanced_aim_angles`, `advanced_aiming` | with modern aiming, the shot's direction (or frame, or yaw / pitch) on the reticle instead of the hero's facing |
 
 Novalis, Aridia and Kerwan run their own build of the hero's state code (the `*_l1.cpp` files); the
 same hooks are in those copies.
@@ -214,10 +215,23 @@ on the strafe:
   is no jolt.
 - **A reticle** at the screen's centre for every item but the wrench, through the game's own camera
   effect (`cam_effect_add`); the Blaster draws its own.
-- **Shots along the screen's centre.** The Blaster's shots aim at the first thing the screen-centre
-  ray meets within 80 units (`advanced_aim_direction`). The gloves (Bomb, Mine, Doom) reuse the
-  original's own "aim along the camera" path, which R&C1 already takes when L1 or L2 is held
-  (`advanced_camera_aim` in `bomb_glove.cpp`, `mine_glove.cpp`, `doom_glove.cpp`).
+- **Shots along the screen's centre**, up and down as well as sideways. The Blaster's shots aim at
+  the first thing the screen-centre ray meets within 80 units (`advanced_aim_direction`). The other
+  weapons that fire along the hero's facing take the same line, from their hand, in place of the
+  facing: the Pyrocitor's flame (`pyrocitor.cpp`), the Devastator's rockets, the R.Y.N.O.'s
+  missiles (both still home on their lock), the Tesla Claw's arc, the Morph-o-Ray's beam and the
+  Suck Cannon's shot (`advanced_aim_shot` / `_shot_hand`), the Suck Cannon's suction cone
+  (`advanced_aim_frame_hand`) and the Visibomb's launch (`advanced_aim_angles`), through host hooks in
+  the generated ports (the `host` entries of `tools/codegen/asm2fn_specs/devastator.json`, `ryno.json`,
+  `tesla.json`, `morph.json`, `suck_cannon.json`, `visibomb.json`). The gloves (Bomb, Mine, Doom,
+  Decoy) reuse the original's own "aim along the camera" path, which R&C1 already takes when L1 or L2
+  is held (`advanced_camera_aim` in `bomb_glove.cpp`, `mine_glove.cpp`, `doom_glove.cpp`; host hooks
+  in `decoy.json`), with the aim held through their standing throw (state 0x23) so the camera, and
+  with it the throw, is still on the reticle when the glove lets go. As in the original, leaning on a
+  wall keeps the hand's own direction and the first-person view the camera's. Left as they are: the
+  Taunter (its reach is flat: horizontal distances and a horizontal cone), the Walloper (a punch),
+  the Swingshot (it locks onto swing points), the Drone Device (no hand code: the drones pick their
+  targets), the Hydrodisplacer and the Metal Detector (no direction).
 
 ### What the RAC 3 movement measured
 

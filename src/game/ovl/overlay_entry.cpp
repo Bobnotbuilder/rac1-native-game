@@ -410,6 +410,29 @@ static void render_frame_overlay() {
     texture_block_end();
 }
 
+// orig: (helper) part of 0x001f85b8 (render_frame): the draw list 0x16dc80 (`list` 0, after the ties) or 0x16de80 (1, after the
+// shrubs) in its texture block; a function of its own so that the widened view's shadow run (mrp_lod.h mrp_lod_list_shadow) runs the
+// very same code
+static void draw_list_block(int list) {
+    packet_ref_1c24f0();
+    texture_block_begin(1);
+    mrp_fx_window(true);  // (host)
+    if (list == 0) draw_list_dc80();
+    else draw_list_de80();
+    mrp_fx_window(false);
+    texture_block_end();
+    packet_ref_1c24c0();
+}
+static void draw_list_block_dc80() { draw_list_block(0); }
+static void draw_list_block_de80() { draw_list_block(1); }
+// (host) the block run as a shadow first in a widened view (the memory put back), then for real
+static void draw_list_block_run(int list) {
+    const uint32_t cur = lwu(OV(0x001611c0));
+    mrp_lod_list_shadow(list, list == 0 ? draw_list_block_dc80 : draw_list_block_de80, cur);
+    draw_list_block(list);
+    mrp_lod_list_after(list, cur, lwu(OV(0x001611c0)));
+}
+
 // The frame's drawing, its passes into the frame packet (the GS gets the 2D, the texture
 // uploads and the fixed packets; the 3D passes, VU1 programs, are the host renderer's: TODO_PORT
 // here), then the profiler marks of the DMA waits and the fog for the next frame.
@@ -443,15 +466,7 @@ void render_frame() {
         else world_pass(world_tie_pass, 1);
     }
     packet_mark(0x02020000);
-    if (lw(EN + 0x34) != 0 && lw(OV(0x0015f42c)) != 0) {
-        packet_ref_1c24f0();
-        texture_block_begin(1);
-        mrp_fx_window(true);  // (host)
-        draw_list_dc80();
-        mrp_fx_window(false);
-        texture_block_end();
-        packet_ref_1c24c0();
-    }
+    if (lw(EN + 0x34) != 0 && lw(OV(0x0015f42c)) != 0) draw_list_block_run(0);
     prof_mark(OV(0x0015f360), 6);
     prof_mark_end(OV(0x0015f360), 6);
     if ((flags() & 8) != 0) world_pass(world_shrub_pass, 2);
@@ -462,15 +477,7 @@ void render_frame() {
         shadows_draw(0x00150000);  // $s6 as the main loop holds it (0x245c88): read by 0x1fe6d8
         texture_block_end();
     }
-    if (lw(EN + 0x34) != 0 && lw(OV(0x0015f430)) != 0) {
-        packet_ref_1c24f0();
-        texture_block_begin(1);
-        mrp_fx_window(true);  // (host)
-        draw_list_de80();
-        mrp_fx_window(false);
-        texture_block_end();
-        packet_ref_1c24c0();
-    }
+    if (lw(EN + 0x34) != 0 && lw(OV(0x0015f430)) != 0) draw_list_block_run(1);
     if ((flags() & 0x10) != 0) {
         if (g_moby_vu1_pass) {
             mrp_lod_moby_shadow(moby_pass);  // (the MRP's LOD slider / widened view, the memory put back)

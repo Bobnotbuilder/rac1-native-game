@@ -107,6 +107,29 @@ def enable_windows_colors():
 USE_COLOR = sys.stdout.isatty() and (not WINDOWS or enable_windows_colors())
 
 
+def disable_windows_quick_edit():
+    """The console's QuickEdit mode off while the setup works, back on when it ends (atexit): with it, a click in the
+    window starts a text selection and every program writing to the console (this script, the build, the game's
+    --setup) waits until the selection ends - the setup looks frozen. At the end it is back, to copy a message."""
+    try:
+        import atexit
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetStdHandle(-10)  # STD_INPUT_HANDLE
+        mode = ctypes.c_uint32()
+        if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            return
+        # ENABLE_EXTENDED_FLAGS (0x80) set for ENABLE_QUICK_EDIT_MODE's bit (0x40) to be taken
+        if kernel32.SetConsoleMode(handle, (mode.value | 0x0080) & ~0x0040):
+            atexit.register(lambda: kernel32.SetConsoleMode(handle, mode.value | 0x0080))
+    except (AttributeError, OSError):
+        pass
+
+
+if WINDOWS:
+    disable_windows_quick_edit()
+
+
 def color(code, text):
     return f"\033[{code}m{text}\033[0m" if USE_COLOR else text
 
@@ -813,7 +836,7 @@ def latest_release_tag():
             return tag
     except Exception:
         pass
-    if (ROOT / ".git").exists() and shutil.which("git"):
+    if git_problem() is None:
         subprocess.run(["git", "fetch", "--tags", "origin"], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         out = subprocess.run(["git", "tag", "-l", "v*"], cwd=ROOT, capture_output=True, text=True).stdout.splitlines()
         tags = []
@@ -838,11 +861,26 @@ def wait_for_exe():
             time.sleep(0.1)
 
 
+def git_problem():
+    """Why this folder cannot be updated with git (None: it can): no .git, no 'git' program (GitHub issue #47: a
+    clone on Windows without Git installed), or a git that cannot read the clone (for example "dubious ownership")."""
+    if not (ROOT / ".git").exists():
+        return "this folder is not a git clone"
+    if not shutil.which("git"):
+        return "'git' is not installed"
+    try:
+        r = subprocess.run(["git", "rev-parse", "--verify", "-q", "HEAD"], cwd=ROOT, capture_output=True, text=True)
+    except OSError as e:
+        return f"'git' could not be run ({e})"
+    if r.returncode != 0 or not r.stdout.strip():
+        why = (r.stderr.strip().splitlines() or ["no commit checked out"])[0]
+        return f"git cannot read this clone ({why})"
+    return None
+
+
 def update_git(channel):
     """Updates a git clone (`git fetch`, then checks out the release tag or fast-forwards main).
     Returns a restore callback on success, or None if nothing was changed."""
-    if not shutil.which("git"):
-        fail("This is a git clone (.git), but 'git' is not installed. Your current build was not changed.")
     dirty = subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,
                            capture_output=True, text=True).stdout.strip()
     if dirty:
@@ -915,16 +953,74 @@ def zip_source_files(root):
     return out
 
 
-def update_zip(channel):
-    """Updates a zip download (no .git): checks for local changes, downloads the archive, unpacks over ROOT
-    (leaving assets/, build/ and .toolchain/ alone), and returns a restore callback."""
+def git_index_paths(root):
+    """The files a git clone tracks, read from .git/index without git (index versions 2 to 4): {path: (mtime in seconds,
+    size)} as git last saw them on disk; None when it cannot be read. (The source zip unpacked over a clone without git
+    removes, as a checkout would, the tracked files the new version no longer has, and asks first when a tracked file
+    looks edited since: another size or time than git recorded.)"""
+    try:
+        data = (root / ".git" / "index").read_bytes()
+        if data[:4] != b"DIRC":
+            return None
+        version, count = struct.unpack(">II", data[4:12])
+        if version not in (2, 3, 4):
+            return None
+        pos, prev, out = 12, b"", {}
+        for _ in range(count):
+            mtime, size = struct.unpack(">I", data[pos + 8:pos + 12])[0], struct.unpack(">I", data[pos + 36:pos + 40])[0]
+            flags = struct.unpack(">H", data[pos + 60:pos + 62])[0]
+            start = pos + 62 + (2 if version >= 3 and flags & 0x4000 else 0)
+            if version == 4:  # (the path: how many bytes of the previous one to drop, then the rest)
+                c = data[start]
+                start += 1
+                drop = c & 127
+                while c & 128:
+                    c = data[start]
+                    start += 1
+                    drop = ((drop + 1) << 7) | (c & 127)
+                end = data.index(b"\0", start)
+                path = prev[:len(prev) - drop] + data[start:end]
+                pos = end + 1
+            else:
+                end = data.index(b"\0", start)
+                path = data[start:end]
+                pos += ((end - pos) + 8) & ~7
+            prev = path
+            if (flags >> 12) & 3 == 0:
+                out[path.decode("utf-8")] = (mtime, size)
+        return out
+    except (OSError, ValueError, IndexError, struct.error, UnicodeDecodeError):
+        return None
+
+
+def file_sha256(path):
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def update_zip(channel, over_git=False):
+    """Updates a zip download (no .git), or a git clone that git cannot update (`over_git`): checks for local
+    changes, downloads the archive, unpacks over ROOT (leaving assets/, build/, .toolchain/ and .git/ alone), and
+    returns a restore callback. A file is deleted only when the previous archive brought it (source_hashes; the first time
+    over a clone: when git tracks it), so files of the player's own are never removed."""
     state = load_state()
-    recorded = state.get("source_hashes")
+    recorded = state.get("source_hashes") or {}
+    tracked = git_index_paths(ROOT) if over_git and not recorded else None
     if recorded:
-        current = zip_source_files(ROOT)
-        changed = [rel for rel, h in recorded.items() if current.get(rel) not in (None, h)]
-        if changed and not ask(f"{len(changed)} source file(s) have local changes (e.g. {changed[0]}). Overwrite them?", False):
-            fail("Local changes were kept; the update was cancelled.")
+        changed = [rel for rel, h in recorded.items() if file_sha256(ROOT / rel) not in (None, h)]
+    else:  # (the first time over a clone: the files that look edited since git last wrote them)
+        changed = []
+        for rel, (mtime, size) in sorted((tracked or {}).items()):
+            try:
+                st = (ROOT / rel).stat()
+            except OSError:
+                continue
+            if st.st_size & 0xffffffff != size or int(st.st_mtime) & 0xffffffff != mtime:
+                changed.append(rel)
+    if changed and not ask(f"{len(changed)} source file(s) have local changes (e.g. {changed[0]}). Overwrite them?", False):
+        fail("Local changes were kept; the update was cancelled.")
     if channel == "stable":
         tag = latest_release_tag()
         url = f"{GITHUB_ZIP}/tags/{tag}.zip"
@@ -952,6 +1048,12 @@ def update_zip(channel):
             shutil.copyfileobj(r, f)
         with zipfile.ZipFile(archive) as zf:
             zf.extractall(unpack_dir)
+            if not WINDOWS:  # (extractall drops the Unix modes: ./setup.sh and the tools' scripts stay executable)
+                for info in zf.infolist():
+                    mode = (info.external_attr >> 16) & 0o777
+                    if mode & 0o111 and not info.is_dir():
+                        target = unpack_dir / info.filename
+                        target.chmod(target.stat().st_mode | (mode & 0o111))
     except Exception as e:
         archive.unlink(missing_ok=True)
         shutil.rmtree(unpack_dir, ignore_errors=True)
@@ -960,19 +1062,31 @@ def update_zip(channel):
     subdirs = [d for d in unpack_dir.iterdir() if d.is_dir()]
     src_root = subdirs[0] if len(subdirs) == 1 else unpack_dir
 
-    # Back up existing source files before replacing them
+    # Back up the source files about to be replaced or removed
+    new_files = list(zip_source_files(src_root).keys())
+    new_set = set(new_files)
+    # (removed: what the previous archive brought and this one no longer has; only inside the archive's folders, as
+    # the records made by 0.3.0's updater also list the player's own files in the top folder)
+    new_dirs = {rel.split("/", 1)[0] for rel in new_files if "/" in rel}
+    removed = [rel for rel in recorded if rel not in new_set and "/" in rel and rel.split("/", 1)[0] in new_dirs
+               and rel.split("/", 1)[0] not in ZIP_PROTECTED and (ROOT / rel).is_file()]
+    if tracked is not None:  # (the first time over a clone: what git tracks, as a checkout would)
+        removed = sorted(rel for rel in tracked if rel not in new_set and rel.split("/", 1)[0] not in ZIP_PROTECTED
+                         and (ROOT / rel).is_file())
+    old_files = [rel for rel in new_files if (ROOT / rel).is_file()] + removed
     backup_dir.mkdir(parents=True, exist_ok=True)
-    old_files = list(zip_source_files(ROOT).keys())
     for rel in old_files:
         dst = backup_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / rel, dst)
+    old_set = set(old_files)
     old_ver = UPDATE_VERSION_FILE.read_bytes() if UPDATE_VERSION_FILE.is_file() else None
-    new_files = list(zip_source_files(src_root).keys())
+    if over_git:
+        ver_lines.append("over-git 1")  # (cmake/version.cmake: this, not the clone's stale git commit)
 
     def restore():
         for rel in new_files:
-            if rel not in old_files:
+            if rel not in old_set:
                 (ROOT / rel).unlink(missing_ok=True)
         for rel in old_files:
             src = backup_dir / rel
@@ -987,9 +1101,8 @@ def update_zip(channel):
         shutil.rmtree(backup_dir, ignore_errors=True)
 
     try:
-        for rel in old_files:
-            if rel not in new_files:
-                (ROOT / rel).unlink(missing_ok=True)
+        for rel in removed:
+            (ROOT / rel).unlink(missing_ok=True)
         for rel in new_files:
             dst = ROOT / rel
             dst.parent.mkdir(parents=True, exist_ok=True)
@@ -1002,7 +1115,9 @@ def update_zip(channel):
         fail(f"Could not unpack the new sources ({e}). Your current build was not changed.")
     shutil.rmtree(unpack_dir, ignore_errors=True)
     state = load_state()
-    state["source_hashes"] = zip_source_files(ROOT)
+    state["source_hashes"] = {rel: file_sha256(ROOT / rel) for rel in new_files}
+    if over_git:
+        state["zip_over_git"] = True
     save_state(state)
     ok(f"Unpacked {label}.")
     return restore
@@ -1023,12 +1138,38 @@ def run_update(args):
     shutil.rmtree(gen_bak, ignore_errors=True)
     if EXE.is_file():
         shutil.copy2(EXE, exe_bak)
-    if STATE_FILE.is_file():
+    had_state = STATE_FILE.is_file()
+    if had_state:
         shutil.copy2(STATE_FILE, state_bak)
     if GEN_SRC.is_dir():
         shutil.copytree(GEN_SRC, gen_bak)
 
-    restore_sources = update_git(channel) if (ROOT / ".git").exists() else update_zip(channel)
+    restore_sources = None
+    if not (ROOT / ".git").exists():
+        restore_sources = update_zip(channel)
+    else:
+        problem = git_problem()
+        state = load_state()
+        if problem is None and state.get("zip_over_git"):
+            # (an earlier update unpacked the source zip over this clone: git sees those files as changes)
+            if subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,
+                              capture_output=True, text=True).stdout.strip():
+                problem = "an earlier update replaced this clone's files from the source zip, so git sees them as changed"
+            else:  # (the clone was put back in step with git: git updates it again)
+                state.pop("zip_over_git", None)
+                state.pop("source_hashes", None)
+                save_state(state)
+                UPDATE_VERSION_FILE.unlink(missing_ok=True)
+        if problem is None:
+            restore_sources = update_git(channel)
+        else:
+            warn(f"This folder is a git clone, but it cannot be updated with git: {problem}.")
+            print(f"      Downloading the {'release' if channel == 'stable' else 'main branch'}'s source zip from GitHub "
+                  "instead (no git needed): it replaces the source files,\n"
+                  "      and leaves assets/, build/, .git/ and any file of yours alone. "
+                  "(To update with git again later: install Git, then\n"
+                  "      `git fetch` and `git reset --hard origin/main`, or the release's tag.)", flush=True)
+            restore_sources = update_zip(channel, over_git=True)
 
     step(2, 2, "Rebuilding and updating the game's data")
     child_cmd = [sys.executable, str(ROOT / "tools/setup.py"), "--no-play"]
@@ -1048,6 +1189,8 @@ def run_update(args):
             gen_bak.replace(GEN_SRC)
         if state_bak.is_file():
             state_bak.replace(STATE_FILE)
+        elif not had_state:  # (no record before: none after, not the one the source zip's unpacking wrote)
+            STATE_FILE.unlink(missing_ok=True)
         if exe_bak.is_file():
             exe_bak.replace(EXE)
         fail("The update did not succeed; your previous build was kept as it was.")

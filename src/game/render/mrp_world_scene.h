@@ -107,6 +107,8 @@ struct SceneFrame {
     // (stage 2) draws made by the host (ties, shrubs); with RAC1_MRPW_STATIC_CHECK the comparison: the walker's instance
     // draws (tie, shrub), those the host made too, those it missed, extra host draws, and the values that differed
     uint32_t stat_draws[2] = {}, chk_walker[2] = {}, chk_found[2] = {}, chk_missing[2] = {}, chk_extra[2] = {};
+    uint32_t stat_variants = 0;                                  // (the host-made shrub far variants' quads drawn)
+    uint32_t chk_gif_frames = 0, chk_gif_bad = 0, chk_gif_quads = 0;  // (the check: frames whose far variants' stream differs)
     uint32_t chk_morph_bad = 0, chk_fog_bad = 0, chk_alpha_bad = 0, chk_rows_bad = 0;
     double chk_rows_maxrel = 0;
     std::vector<std::string> chk_notes;

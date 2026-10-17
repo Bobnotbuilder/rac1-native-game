@@ -3,6 +3,7 @@
 
 #include <game/ovl/ovl_common.h>
 #include <game/ovl/ovl_reloc.h>
+#include <game/ovl/vu0_regs.h>
 #include <game/render/mrp_world_assets.h>
 #include <runtime/kernel/ee_memory.h>
 
@@ -122,12 +123,13 @@ int32_t ftoi(float f, float k) {
 // from 0x166c80 + 0x140 / 0 / 0x10 / 0x20 / 0x80..0xb0; vf18..vf22 from 0x16ca40 + 0x220 / 0xa0 / 0xb0 / 0x1e0; the zones 0x173d00
 // copied to SPR 0x3000; the wind's table 0x1c3ef0 (SPR 0x3500 / 0x3b00) and constants 0x1c3ff0 (SPR 0x3e80 / 0x3c00), the
 // clock 0x15f3f8 (SPR 0x3ea0 / 0x3c20); the maxima *(0x160fe0) / *(0x1604a4))
-void static_note_pass(int kind, bool handle, float scale, float widen) {
+void static_note_pass(int kind, bool handle, float scale, float widen, float widen_y) {
     if (kind != 1 && kind != 2) return;
     StaticSnapshot& S = g_snap;
     S.on[kind - 1] = handle;
     S.scale = scale;
     S.widen = widen;
+    S.widen_y = widen_y;
     for (uint32_t r = 0; r < 3; ++r) S.rot[r] = rq(OV(0x00166c80u) + 0x10 * r);
     for (uint32_t r = 0; r < 4; ++r) S.a[r] = rq(OV(0x00166d00u) + 0x10 * r);
     S.cam = rq(OV(0x00166dc0u));
@@ -145,6 +147,16 @@ void static_note_pass(int kind, bool handle, float scale, float widen) {
     S.tie_max = ru(OV(0x00160fe0u));
     S.shrub_max = ru(OV(0x001604a4u));
     S.shrub_data = ru(OV(0x0016049cu));
+    if (kind == 2) {  // (the shrub far variants' inputs, 0x287c04..: vf28..vf31 from 0x166c80 + 0x40.., vf21..vf23 from 0x16ca40 + 0x220 / 0x210 / 0x1a0)
+        auto rw = [](uint32_t a) { return std::array<uint32_t, 4>{ru(a), ru(a + 4), ru(a + 8), ru(a + 12)}; };
+        for (uint32_t r = 0; r < 4; ++r) S.vm[r] = rq(OV(0x00166cc0u) + 0x10 * r);
+        S.vf22 = rq(OV(0x0016cc50u));
+        S.vf23 = rq(OV(0x0016cbe0u));
+        for (uint32_t q = 0; q < 4; ++q) S.vhdr[q] = rw(OV(0x001c2c10u) + 0x10 * q);
+        for (uint32_t q = 0; q < 3; ++q) S.vhdr2[q] = rw(OV(0x001c2be0u) + 0x10 * q);
+        for (uint32_t q = 0; q < 4; ++q) S.vtpl[q] = rw(OV(0x00160b80u) + 0x10 * q);
+        for (uint32_t q = 0; q < 8; ++q) S.vcorner[q] = rq(OV(0x001c2cb0u) + 0x10 * q);
+    }
     S.valid = true;
 }
 
@@ -276,8 +288,8 @@ struct Cull {
 // orig: (host) the tie pass's second test for an instance across the frustum's edge (0x296404..): the class's 8 box corners (record
 // +0xa0..+0x110) through the instance's matrix (rows x scale, (position - camera) x 1024) and the clip matrix 0x166d80, VCLIPW against w:
 // culled when all the corners are outside one plane (the AND of the unscaled corners' flags, cfc2 before the 0x160f90 scaling, non-zero;
-// the scaled ones only choose tie A / B). `xs`: the widening (the 4:3 clip matrix's x narrowed by it; the shadow runs kept it 4:3)
-bool box_outside(const StaticSnapshot& S, uint32_t rec, uint32_t data, float xs) {
+// the scaled ones only choose tie A / B). `xs` / `ys`: the widening (the 4:3 clip matrix's x / y narrowed by it; the shadow runs kept it 4:3)
+bool box_outside(const StaticSnapshot& S, uint32_t rec, uint32_t data, float xs, float ys) {
     float m[4][4];
     const std::array<float, 4> pos = rq(data + 0x30);
     float rows[4][3];
@@ -302,6 +314,7 @@ bool box_outside(const StaticSnapshot& S, uint32_t rec, uint32_t data, float xs)
             p[l] = acc + m[3][l];
         }
         p[0] = p[0] * xs;
+        p[1] = p[1] * ys;
         const float w = std::fabs(p[3]);
         const uint32_t fl = (p[0] > w ? 1u : 0u) | (p[0] < -w ? 2u : 0u) | (p[1] > w ? 4u : 0u) | (p[1] < -w ? 8u : 0u) | (p[2] > w ? 16u : 0u) | (p[2] < -w ? 32u : 0u);
         all &= fl;
@@ -363,6 +376,78 @@ void instance_rows(const StaticSnapshot& S, uint32_t data, uint32_t sway, bool s
 }
 }  // namespace
 
+namespace {
+// orig: (host) the shrub far variants' quads as the shrub pass writes them into its chain (0x287c04..0x288010, world_render.md 18.4): the
+// header (0x1c2c10), the opaque ones (alpha 0x80) per class, then the fading ones' header (0x1c2be0) and those (alpha & 0x7f) per class;
+// before a class's first quad its transfer (0x160b90 and the variant record's +0x10..+0x30: TEX1 / TEX0 / MIPTBP1), per quad 0x160bb0
+// (the GIF tag) and its four corners (STQ, RGBA, XYZF2). The corners as 0x287df4..0x287f4c computes them on VU0 (macro mode): d = position
+// - camera, n = d / |d|, the basis (n.x, n.y, 0), (n.y, -n.x, 0), (0, 0, 1), d x 1024 through the matrix 0x166cc0; the unit corner's y / z
+// scaled by the variant record's +4 / +8 and the instance's +0x2c halfwords / 4096 (z offset by +0xc of it) and the position's w; then
+// Q = vf22.x / w, F = clamp(w + vf23.w), X / Y / Z = xyz Q + vf23, FTOI4. The pass's DMA tags / VIF DIRECT codes are left out (the
+// walker takes the DIRECT data alone). The list's PS2 capacity (0x300 entries, SPR 0x2000..0x2c00) is not kept.
+void variant_stream(const StaticSnapshot& S, const StaticLevel& L, const std::vector<std::vector<std::pair<uint32_t, uint32_t>>>& variants, StaticFrame& f) {
+    using namespace vu0m;
+    auto& out = f.variant_gif;
+    auto f2w = [](float v) { uint32_t u; std::memcpy(&u, &v, 4); return u; };
+    auto rw = [](uint32_t a) { return std::array<uint32_t, 4>{ru(a), ru(a + 4), ru(a + 8), ru(a + 12)}; };
+    for (uint32_t q = 1; q < 4; ++q) out.push_back(S.vhdr[q]);
+    for (const uint32_t sec : {0x80u, 0x7fu}) {
+        if (sec == 0x7fu)
+            for (uint32_t q = 1; q < 3; ++q) out.push_back(S.vhdr2[q]);
+        for (size_t c = 0; c < L.shrubs.size() && c < variants.size(); ++c) {
+            if (variants[c].empty()) continue;
+            const uint32_t vrec = ru(L.shrubs[c].rec + 0x1c);
+            const std::array<float, 4> v16 = rq(vrec);
+            bool first = vrec != 0;
+            for (const auto& [idx, alpha] : variants[c]) {
+                if ((alpha & sec) == 0) continue;
+                if (first) {
+                    out.push_back(S.vtpl[1]);
+                    for (uint32_t q = 1; q < 4; ++q) out.push_back(rw(vrec + 0x10 * q));
+                    first = false;
+                }
+                out.push_back(S.vtpl[3]);
+                ++f.variants;
+                const uint32_t data = S.shrub_data + 0x40 * idx;
+                const std::array<float, 4> pos = rq(data + 0x30);
+                const uint32_t col = ru(data + 0x1c) | (alpha << 24), hw = ru(data + 0x2c);
+                const std::array<uint32_t, 4> rgba{col & 0xff, (col >> 8) & 0xff, (col >> 16) & 0xff, col >> 24};
+                const float d[3] = {sub(pos[0], S.cam[0]), sub(pos[1], S.cam[1]), sub(pos[2], S.cam[2])};
+                const float v3x = static_cast<float>(static_cast<int32_t>(hw & 0xffff)) * (1.0f / 4096.0f);
+                const float v3y = static_cast<float>(static_cast<int32_t>(hw >> 16)) * (1.0f / 4096.0f);
+                const float n2 = madd(add(mul(d[0], d[0]), mul(d[1], d[1])), 1.0f, mul(d[2], d[2]));
+                const float q = vrsqrt(1.0f, n2);
+                const float v15y = mul(mul(v16[1], v3x), pos[3]), v15z = mul(mul(v16[2], v3y), pos[3]), v15w = mul(mul(v16[3], v3y), pos[3]);
+                const float nx = mul(d[0], q), ny = mul(d[1], q);
+                Vf m[4];
+                for (int r = 0; r < 4; ++r)
+                    for (int l = 0; l < 4; ++l) m[r].v[l] = S.vm[static_cast<size_t>(r)][static_cast<size_t>(l)];
+                Vf b[4];
+                b[0] = transform(m, add(0.0f, nx), add(0.0f, ny), 0.0f, 0.0f);
+                b[1] = transform(m, add(0.0f, ny), sub(0.0f, nx), 0.0f, 0.0f);
+                b[2] = transform(m, 0.0f, 0.0f, 1.0f, 0.0f);
+                b[3] = transform(m, mul(d[0], 1024.0f), mul(d[1], 1024.0f), mul(d[2], 1024.0f), 1.0f);
+                for (uint32_t k = 0; k < 4; ++k) {
+                    const std::array<float, 4>& cn = S.vcorner[k];
+                    std::array<float, 4> st = S.vcorner[4 + k];
+                    const float cy = mul(cn[1], v15y), cz = add(mul(cn[2], v15z), v15w);
+                    Vf p = transform(b, cn[0], cy, cz, 1.0f);
+                    const float qq = div(S.vf22[0], p.v[3]);
+                    p.v[3] = vmini(vmax(add(p.v[3], S.vf23[3]), S.fog[3]), S.fog[2]);
+                    for (int l = 0; l < 3; ++l) {
+                        p.v[l] = add(mul(p.v[l], qq), S.vf23[static_cast<size_t>(l)]);
+                        st[static_cast<size_t>(l)] = mul(st[static_cast<size_t>(l)], qq);
+                    }
+                    out.push_back({f2w(st[0]), f2w(st[1]), f2w(st[2]), f2w(st[3])});
+                    out.push_back(rgba);
+                    out.push_back({vu0m::ftoi(p.v[0], 16.0f), vu0m::ftoi(p.v[1], 16.0f), vu0m::ftoi(p.v[2], 16.0f), vu0m::ftoi(p.v[3], 16.0f)});
+                }
+            }
+        }
+    }
+}
+}  // namespace
+
 // orig: (host) see mrp_world_static.h
 void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticFrame& f, bool check) {
     const StaticSnapshot& S = g_snap;
@@ -371,10 +456,12 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
     f.draws[1].clear();
     f.on[0] = f.on[1] = false;
     f.tested[0] = f.tested[1] = f.visible[0] = f.visible[1] = 0;
+    f.variant_gif.clear();
+    f.variants = 0;
     if (!L.ok || !S.valid) return;
     f.on[0] = check || S.on[0];
     f.on[1] = check || S.on[1];
-    const float s = check ? 1.0f : S.scale, widen = check ? 1.0f : S.widen;
+    const float s = check ? 1.0f : S.scale, widen = check ? 1.0f : S.widen, widen_y = check || !(widen > 1.0f) ? 1.0f : S.widen_y;
     Cull cu{};
     cu.tx = S.tan[0];
     cu.ty = S.tan[1];
@@ -384,12 +471,16 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
         cu.tx = S.tan[0] * widen;
         cu.kx = std::sqrt(1.0f + cu.tx * cu.tx);
     }
+    if (widen_y > 1.0f) {  // (the y tangent by the field of view's scale, as patch_widen)
+        cu.ty = S.tan[1] * widen_y;
+        cu.ky = std::sqrt(1.0f + cu.ty * cu.ty);
+    }
     cu.near = S.near[0] * (1.0f / 1024.0f);  // (vf19.xy x 0x3a800000)
     cu.c23x = S.c23[0] * (1.0f / 1024.0f);   // (vf23.xy x 0x3a800000)
     cu.c23y = S.c23[1] * (1.0f / 1024.0f);
     // (the box test's widening; RAC1_MRPW_STATIC_BOX43=1, testing: the 4:3 clip matrix as the shadow runs had it)
     static const bool box43 = std::getenv("RAC1_MRPW_STATIC_BOX43") != nullptr;
-    const float boxx = widen > 1.0f && !box43 ? 1.0f / widen : 1.0f;
+    const float boxx = widen > 1.0f && !box43 ? 1.0f / widen : 1.0f, boxy = widen_y > 1.0f && !box43 ? 1.0f / widen_y : 1.0f;
     // ---- ties (0x295fa0): per class record, its instances' bounds (0x20 bytes: sphere, +0x10 the instance data, +0x14 the draw
     // distance, +0x18 the zones' mask, +0x19 the zone), the LOD lists (near / mid: LOD 0, far: LOD 1, beyond: LOD 2), emitted per
     // LOD, per packet, its instances in the list's order (each new one at its head)
@@ -415,7 +506,7 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
                 float zv = 0;
                 bool clipf = false;
                 if (!cu.visible(S, sph, dist, zv, clipf)) continue;
-                if (clipf && box_outside(S, c.rec, ru(b + 0x10), boxx)) continue;
+                if (clipf && box_outside(S, c.rec, ru(b + 0x10), boxx, boxy)) continue;
                 ++f.visible[0];
                 const float d = std::max(0.0f, zv);
                 StaticInst si;
@@ -459,6 +550,8 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
     // >> 8); the opaque ones per class, the faded ones after all the classes
     if (f.on[1]) {
         std::vector<std::vector<uint32_t>> faded(L.shrubs.size());
+        // (per class its far variants' entries in the pass's order: the instance's index, the variant's alpha; SPR 0x2000 / 0x3600)
+        std::vector<std::vector<std::pair<uint32_t, uint32_t>>> variants(L.shrubs.size());
         for (const StaticShrubClass& c : L.shrubs) {
             if (c.packets.empty()) continue;
             const uint32_t flags = rh(c.rec + 0x14);
@@ -510,14 +603,12 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
                     }
                 }
                 ++f.visible[1];
+                if (valpha >= 0) variants[static_cast<size_t>(&c - L.shrubs.data())].push_back({idx, static_cast<uint32_t>(valpha)});
                 const int64_t slot = rc.shrub_slot(rc.src.shrub_cols + kShrubColourStride * idx);
                 if (slot < 0) continue;
                 StaticInst si;
                 si.slot = static_cast<uint32_t>(slot);
                 instance_rows(S, S.shrub_data + 0x40 * idx, sway, true, si.rows);
-                // (the far variant itself is a camera-facing quad the pass builds on the EE from the record +0x1c names (0x287d58..,
-                // its GIF data in the shrub range's chain): the MRP's walker draws no such stream either; noted for a later task)
-                (void)valpha;
                 if (src < 0) continue;
                 si.alpha = static_cast<uint32_t>(std::min<int64_t>(src, 0x8000)) >> 8;
                 const uint32_t at = static_cast<uint32_t>(f.insts.size());
@@ -532,6 +623,7 @@ void static_frame_build(const StaticLevel& L, const ResidentColours& rc, StaticF
         for (size_t k = 0; k < L.shrubs.size(); ++k)
             for (const StaticPacket& pk : L.shrubs[k].packets)
                 for (uint32_t at : faded[k]) f.draws[1].push_back({&pk, at});
+        variant_stream(S, L, variants, f);
     }
 }
 
@@ -579,7 +671,7 @@ CasterVolume caster_volume(const ShadowCull& c) {
     // (the view the shadows are drawn for: the renderer's projection - the cascades are fitted to it - wider than the passes' culling
     // with the field of view scaled; its sides' receivers must find their casters too)
     const float tx = c.tan_x > 0.0f ? std::max(c.tan_x, S.tan[0]) : S.tan[0] * std::max(1.0f, S.widen);
-    const float ty = c.tan_y > 0.0f ? std::max(c.tan_y, S.tan[1]) : S.tan[1];
+    const float ty = c.tan_y > 0.0f ? std::max(c.tan_y, S.tan[1]) : S.tan[1] * std::max(1.0f, S.widen_y);
     float near_d = 0.1f;
     for (int k = 0; k < 3; ++k) {
         const float far_d = c.splits[k];
@@ -646,6 +738,10 @@ void static_shadow_build(const StaticLevel& L, const ResidentColours& rc, Static
         if (widen > 1.0f) {
             cu.tx = S.tan[0] * widen;
             cu.kx = std::sqrt(1.0f + cu.tx * cu.tx);
+            if (S.widen_y > 1.0f) {
+                cu.ty = S.tan[1] * S.widen_y;
+                cu.ky = std::sqrt(1.0f + cu.ty * cu.ty);
+            }
         }
         cu.near = S.near[0] * (1.0f / 1024.0f);
         cu.c23x = S.c23[0] * (1.0f / 1024.0f);

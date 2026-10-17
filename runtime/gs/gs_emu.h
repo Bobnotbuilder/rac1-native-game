@@ -59,7 +59,7 @@ struct Primitive {
     std::shared_ptr<const TexImage> mip_tex[3];
     bool vu = false;    // kicked by a VU1 program (XGKICK, path 1): the game's projected 3D
     bool moby = false;  // kicked specifically by the moby VU1 program
-    bool wide = false;  // (host) from a substituted chain (Gs::set_chain_substitute): drawn past the frame's sides
+    bool wide = false;  // (host) from a substituted chain (Gs::add_chain_substitute): drawn past the frame's sides
     // (host) 1: from a substitute, 2: from the real range it stands for. The drawing takes the projected 3D from the
     // substitute and the 2D (the HUD, the text: the substitute's may use VRAM its texture uploads did not reach) from the real range.
     uint8_t sub = 0;
@@ -73,7 +73,7 @@ struct Primitive {
 class Gs {
 public:
     Gs();
-    void reset_frame() { prims_.clear(); tag_left_ = 0; fx_mark_ = SIZE_MAX; fx_external_ = false; scr_prim_ = -1; }
+    void reset_frame() { prims_.clear(); tag_left_ = 0; fx_mark_ = SIZE_MAX; moby_mark_ = SIZE_MAX; fx_external_ = false; scr_prim_ = -1; }
     // Host: the frame the game draws into (block `bp`, `bw` x 64 pixels wide, `h` rows, CT32; bw 0: none). The GS
     // replica draws no pixels into its memory (the host draws its primitives), so an IMAGE transfer into the frame - the game
     // putting a stored picture back as the frame, the Vendor's screens (0x2a0fc8) - is kept as a primitive of type 7 in the
@@ -94,7 +94,7 @@ public:
         std::unique_ptr<uint8_t[]> bytes;  // (grown without zeroing: copied over at once)
         size_t size = 0, cap = 0;
         std::vector<std::array<uint32_t, 3>> spans;  // (EE address, offset in bytes, length; 0xffffffff: a null pointer)
-        uint32_t sub_first = 0, sub_end = 0, sub_size = 0;  // the substitute the capture was made with (set_chain_substitute)
+        std::vector<std::array<uint32_t, 3>> subs;  // the substitutes the capture was made with (add_chain_substitute): first, end, size
     };
     void capture_chain(uint32_t tag, uint32_t end, ChainCapture& c) const;
     void vif1_chain(const ChainCapture& c);
@@ -111,25 +111,33 @@ public:
         // item models): at the range's first tag a type-8 primitive goes into the primitives' order, with the drawing state of
         // context 1 then (its FRAME the target) and fx_id = host_3d (the MRP: the moby's address)
         uint32_t host_3d = 0;
+        // (host) a range of the moby pass's draw loop (the MRP's mobys): moby_mark() is the primitives' count when the first of
+        // these is met, where the MRP's mobys go in the primitives' order
+        bool moby = false;
     };
     void set_chain_skips(std::vector<SkipRange> ranges);
+    // (host) the primitives' count when the chain met its first SkipRange::moby range (SIZE_MAX: none): what the GS replica
+    // draws before it (the draw lists that run before the moby pass, 0x1f85b8) belongs under the MRP's mobys
+    size_t moby_mark() const { return moby_mark_; }
     // Host (the widescreen's sides): the next chain's range [first, end) (its tags from the tag at `first` up to the
     // tag at `end`) is preceded by `chain`, the chain a shadow run of the same code wrote at `first` (mrp_lod.h): that chain is
     // walked first (its tags and data at [first, first + size) read from `chain`, the rest from EE memory, the skip ranges not
     // applied), its primitives marked sub 1 / `wide`; then the VU1, VIF, GIF and GS register state and the local memory it changed
     // are put back as they were before it and the real range is walked, its primitives marked sub 2 (the drawing picks: Primitive
-    // ::sub). Cleared by the next chain.
-    void set_chain_substitute(uint32_t first, uint32_t end, std::vector<uint8_t> chain);
+    // ::sub). Several (kMaxSubs at most), one per range, the ranges disjoint; substitute k's effects ranges are FxRange::sub k + 1.
+    // Cleared by the next chain.
+    static constexpr int kMaxSubs = 4;
+    void add_chain_substitute(uint32_t first, uint32_t end, std::vector<uint8_t> chain);
     uint64_t skipped_tags() const { return skipped_tags_; }
     // Host (the MRP's particles): the next chain's tags at addresses in [first, last] (inclusive; `sub`: the substitute's
-    // tags, set_chain_substitute, else the real chain's) are processed as usual - VIF codes, the VU1 programs, the GS registers -,
+    // tags, add_chain_substitute, else the real chain's) are processed as usual - VIF codes, the VU1 programs, the GS registers -,
     // their primitives marked `fx`. `external`: the MRP draws them, draw() leaves them. fx_mark(): the primitives' count when the
     // first range was met (SIZE_MAX: none), where the MRP's draw goes in the primitives' order. Cleared by the next chain.
     // `kind` (non-zero) and `id` are copied to the primitives (Primitive::fx / fx_id); the ranges may come in any order
     // and must not overlap.
     struct FxRange {
         uint32_t first = 0, last = 0;
-        bool sub = false;
+        uint8_t sub = 0;  // 0: the real chain's tags, k: substitute k - 1's (in the order add_chain_substitute was called)
         uint8_t kind = 1;
         uint32_t id = 0;
     };
@@ -188,20 +196,25 @@ private:
     std::vector<SkipRange> skip_ranges_;  // sorted by first
     std::vector<bool> skip_started_;
     bool dry_ = false;                                        // the tag in hand is in a skipped range
-    // the substitute (set_chain_substitute); while walking it addresses in it carry kSubFlag
-    uint32_t sub_first_ = 0, sub_end_ = 0;
-    std::vector<uint8_t> sub_chain_;
+    // the substitutes (add_chain_substitute); while walking one, addresses in it carry kSubFlag and its index (bits 26..28)
+    struct Sub {
+        uint32_t first = 0, end = 0;
+        std::vector<uint8_t> chain;
+        uint32_t replay_size = 0xffffffffu;  // (a capture's replay: the substitute's size it was made with)
+    };
+    std::vector<Sub> subs_;
     bool sub_wide_ = false, sub_drop_ = false;
     static constexpr uint32_t kSubFlag = 0x80000000u;
-    uint32_t sub_replay_size_ = 0xffffffffu;
+    static constexpr int kSubShift = 26;
+    static uint32_t sub_flagged(uint32_t a, int k) { return a | kSubFlag | (static_cast<uint32_t>(k) << kSubShift); }
     size_t sub_prims0_ = 0;
     struct VUndo {
         uint32_t a, n, before;
     };
     std::vector<VUndo> vundo_;  // the local memory's bytes the substitute's walk changed, as they were
     bool vundo_on_ = false;
-    uint64_t sub_dropped_ = 0;  // (a capture's replay: the substitute's size it was made with)
-    uint32_t sub_size_of() const;
+    uint64_t sub_dropped_ = 0;
+    uint32_t sub_size_of(int k) const;
     const uint8_t* sub_mem(uint32_t a) const;
     uint64_t skipped_tags_ = 0;
     uint32_t scr_bp_ = 0, scr_bw_ = 0, scr_h_ = 0;  // set_screen_area
@@ -213,7 +226,8 @@ private:
     uint8_t fx_now_ = 0;
     uint32_t fx_id_ = 0;
     size_t fx_mark_ = SIZE_MAX;
-    const FxRange* fx_tag(uint32_t addr, bool in_sub) const;
+    size_t moby_mark_ = SIZE_MAX;
+    const FxRange* fx_tag(uint32_t addr, uint8_t sub) const;
 public:
     void set_moby_kick(bool mk) { moby_kick_ = mk; }
     bool moby_kick() const { return moby_kick_; }

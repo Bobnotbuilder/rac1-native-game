@@ -173,6 +173,12 @@ double thread_cpu_ms() {
 
 bool local_time(std::time_t t, std::tm* out) { return localtime_r(&t, out) != nullptr; }
 
+// ---- The process's host settings ----
+
+void process_begin() {}
+
+void process_end() {}
+
 // ---- Debugging ----
 
 void print_backtrace(int frames) {

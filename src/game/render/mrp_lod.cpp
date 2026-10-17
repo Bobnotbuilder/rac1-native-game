@@ -50,6 +50,8 @@ void mrp_lod_snapshot() { g_frame_widen_snap = g_frame_widen; }
 namespace {
 // the widening the shadow runs give the passes' frustum (1: none): the view's, when the sides are filled
 float fill_widen() { return g_mrp_lod_widen_off || !g_mrp_wide_fill ? 1.0f : render_view_cull_widen(); }
+// the same for the y tangent (the field of view's scale)
+float fill_widen_y() { return g_mrp_lod_widen_off || !g_mrp_wide_fill ? 1.0f : render_view_cull_widen_y(); }
 }  // namespace
 
 // orig: (host) see mrp_lod.h
@@ -146,9 +148,10 @@ void patch_shrub(float s) {
 // vf24.z) and its copy 0x16cc20 (vf26 / vf27). During the update the projection is the game's own 4:3 one (the
 // host's widened one is put back before each update: render_view_projection_undo), so the shadow run widens the tangent and runs projection_setup in the
 // journal: every constant derived from the tangent follows (patching 0x16caf0 / 0x16cc20 only would leave tfrag the 4:3 radius
-// factor 0x16caf8 - the ground at the sides missing in widescreen). The y tangent is kept (the setup's host hook given
-// the game's own); the view's projections A (render_view_setup 0x1f6e48: 0x166d00 / 0x166d40, which the particles and the sky
-// project with) are not rebuilt: what the pass projects stays in the game's 4:3 frame (the sky's shadow: widen_projection).
+// factor 0x16caf8 - the ground at the sides missing in widescreen). The y tangent (the setup's host hook given the
+// game's own) is widened by the field of view's scale only (the renderer's y tangent is the game's times it); the view's
+// projections A (render_view_setup 0x1f6e48: 0x166d00 / 0x166d40, which the particles and the sky project with) are not
+// rebuilt: what the pass projects stays in the game's 4:3 frame (the sky's shadow: widen_projection).
 // The tie pass's second test (the eight corners of the instance's box through the clip matrix, 0x2963f4..) scales x by
 // 0x160f90 x before VCLIPW: divided by the widening. (Its "needs clipping" flag follows: an instance inside the widened view is
 // drawn by tie A; one across its edge by tie B, whose flagged triangles the MRP then draws whole, mrp_world_renderer.cpp.)
@@ -165,15 +168,15 @@ float sky_y_base(float) { return g_sky_y_base; }
 enum PatchType : int { kPatchNone = 0, kPatchCull = 1, kPatchWiden = 2 };
 struct ShadowPatch {
     int type = kPatchNone;
-    float w = 1.0f;
+    float w = 1.0f, wy = 1.0f;
     float t_game = 0.0f, t_patched = 0.0f;  // the tangent 0x16caf0: the game's, and the shadow's widened one
 } g_patch;
 int g_patch_host = 0;  // the host's own patching calls the setups (not hooked)
 void patch_clear() { g_patch = ShadowPatch{}; }
-void widen_tangent(float w) {
+void widen_tangent(float w, float wy = 1.0f) {
     const float t = lwc1(OV(0x0016caf0u));
     float (*const hook)(float) = g_debug_fov_y_base;
-    g_sky_y_base = hook != nullptr ? hook(t) : t;
+    g_sky_y_base = (hook != nullptr ? hook(t) : t) * wy;
     g_debug_fov_y_base = &sky_y_base;
     swc1(OV(0x0016caf0u), t * w);
     projection_setup();
@@ -182,8 +185,10 @@ void widen_tangent(float w) {
 // The frustum the passes test against: the tangent and what projection_setup derives from it, and the clip matrix 0x166d80
 // (render_view_setup 0x1f6e48: the rotation times projection_setup's 0x16cb80 rows; tfrag's vf12..vf15, the tie pass's box test,
 // with the 4:3 one tfrag dropped the ground at the sides) rebuilt; the projections A 0x166cc0..0x166d7f put back (the
-// passes' own projected output - the particles - stays in the game's 4:3 frame).
-void patch_widen(float w, int kind) {
+// passes' own projected output - the particles - stays in the game's 4:3 frame). `wy`: the y tangent's widening (the field of
+// view's scale, fill_widen_y): with the y tangent kept, a Field of View above x1.00 culled what lies in the bands above and below the
+// 4:3 frame's height.
+void patch_widen(float w, int kind, float wy) {
     static const bool old = std::getenv("RAC1_MRP_WIDEN_0338") != nullptr;  // (testing: patch only the tangent and 0x16cc20)
     if (old) {
         const float t = lwc1(OV(0x0016caf0u)) * w;
@@ -194,13 +199,13 @@ void patch_widen(float w, int kind) {
     }
     ++g_patch_host;
     const float t = lwc1(OV(0x0016caf0u));
-    widen_tangent(w);
+    widen_tangent(w, wy);
     uint8_t a[0xc0];
     std::memcpy(a, ee_ram_ptr(OV(0x00166cc0u)), sizeof a);
     render_view_setup();
     std::memcpy(ee_ram_ptr(OV(0x00166cc0u)), a, sizeof a);
     --g_patch_host;
-    g_patch = ShadowPatch{kPatchWiden, w, t, lwc1(OV(0x0016caf0u))};
+    g_patch = ShadowPatch{kPatchWiden, w, wy, t, lwc1(OV(0x0016caf0u))};
 }
 // The 3D effects' shadow: the sphere test's constants only - the tangent 0x16caf0 and the radius factor sqrt(1 + t^2)
 // at 0x16caf8 and its copy 0x16cc20 (as projection_setup computes it: measured 1.08235 for t = 0.414112) -, nothing else of the
@@ -212,18 +217,55 @@ void patch_cull(float w) {
     swc1(OV(0x0016caf0u), t);
     swc1(OV(0x0016caf8u), r);
     swc1(OV(0x0016cc20u), r);
-    g_patch = ShadowPatch{kPatchCull, w, t0, t};
+    g_patch = ShadowPatch{kPatchCull, w, 1.0f, t0, t};
 }
 // The sky (0x23d968) projects its shells itself with the frame's projection (render_view_setup 0x1f6e48: A 0x166d00 from
 // projection_setup 0x1f7980's matrices), and the MRP draws it as the directions A sees its screen points in: a 4:3 A covers
-// the 4:3 frustum only. Its shadow is run with the whole projection made from the widened tangent (the y tangent kept), the A
-// it used kept for the scene.
-void widen_projection(float w) {
-    widen_tangent(w);
+// the 4:3 frustum only. Its shadow is run with the whole projection made from the widened tangent, the A it used kept for the
+// scene. The y tangent is widened by the field of view's scale `wy` (the renderer's y tangent is the game's times it,
+// render_view_projection): with the y tangent kept, a Field of View above x1.00 drew the sky's clusters of the 4:3 height only,
+// the clear colour in bands above and below them (issue #18).
+void widen_projection(float w, float wy) {
+    widen_tangent(w, wy);
     render_view_setup();
 }
 
+// The shadow block running (mrp_lod_shadow_slot: -1 none) and the widening its draw lists' clip matrix gets
+int g_slot = -1;
+float g_slot_w = 1.0f, g_slot_wy = 1.0f;
+// The draw lists' clip matrix 0x166d80 widened (mrp_lod_draw_list_widen): its x / y columns (the matrix is applied to a row vector,
+// clip = (x y z 1) M: element [r][0] of each row makes clip x) divided by the widening, so that |x| <= w and |y| <= w hold over the
+// widened view; `saved` the matrix as it was
+struct ClipWiden {
+    bool on = false;
+    float saved[16] = {};
+} g_clip;
+void clip_widen_apply() {
+    for (uint32_t i = 0; i < 16; ++i) g_clip.saved[i] = lwc1(OV(0x00166d80u) + 4 * i);
+    for (uint32_t r = 0; r < 4; ++r) {
+        swc1(OV(0x00166d80u) + 0x10 * r, g_clip.saved[4 * r] / g_slot_w);
+        swc1(OV(0x00166d84u) + 0x10 * r, g_clip.saved[4 * r + 1] / g_slot_wy);
+    }
+}
+
 }  // namespace
+
+// orig: (host) see mrp_lod.h
+int mrp_lod_shadow_slot() { return g_slot; }
+
+// orig: (host) see mrp_lod.h
+void mrp_lod_draw_list_widen(bool begin) {
+    if (begin) {
+        if (g_slot < 0 || g_clip.on || !(g_slot_w > 1.0f || g_slot_wy > 1.0f)) return;
+        static const bool off = std::getenv("RAC1_MRP_WIDEN_LISTS") != nullptr && std::atoi(std::getenv("RAC1_MRP_WIDEN_LISTS")) == 0;  // (testing)
+        if (off) return;
+        g_clip.on = true;
+        clip_widen_apply();
+    } else if (g_clip.on) {  // (the rest of the block - the HUD, the menus' 3D - sees the game's own; the journal puts it back too)
+        for (uint32_t i = 0; i < 16; ++i) swc1(OV(0x00166d80u) + 4 * i, g_clip.saved[i]);
+        g_clip.on = false;
+    }
+}
 
 // orig: (host) see mrp_lod.h
 MrpLodSetupScope::MrpLodSetupScope(bool view) : view_(view) {
@@ -241,24 +283,25 @@ MrpLodSetupScope::~MrpLodSetupScope() {
         if (g_patch.type == kPatchCull) {
             patch_cull(g_patch.w);
         } else {
-            widen_tangent(g_patch.w);
-            g_patch = ShadowPatch{kPatchWiden, g_patch.w, t, lwc1(OV(0x0016caf0u))};
+            widen_tangent(g_patch.w, g_patch.wy);
+            g_patch = ShadowPatch{kPatchWiden, g_patch.w, g_patch.wy, t, lwc1(OV(0x0016caf0u))};
         }
     } else if (g_patch.type == kPatchWiden) {
         // render_view_setup on patch_widen's widened projection: the clip matrix 0x166d80 the widened one (the passes' tests), the rows
         // A 0x166cc0..0x166d7f (what the pass projects with) made from the game's own projection, as patch_widen keeps them
-        const float w = g_patch.w;
+        const float w = g_patch.w, wy = g_patch.wy;
         if (lwc1(OV(0x0016caf0u)) == g_patch.t_patched) swc1(OV(0x0016caf0u), g_patch.t_game);
         const float t = lwc1(OV(0x0016caf0u));
         projection_setup();
         render_view_setup();
         uint8_t a[0xc0];
         std::memcpy(a, ee_ram_ptr(OV(0x00166cc0u)), sizeof a);
-        widen_tangent(w);
+        widen_tangent(w, wy);
         render_view_setup();
         std::memcpy(ee_ram_ptr(OV(0x00166cc0u)), a, sizeof a);
-        g_patch = ShadowPatch{kPatchWiden, w, t, lwc1(OV(0x0016caf0u))};
+        g_patch = ShadowPatch{kPatchWiden, w, wy, t, lwc1(OV(0x0016caf0u))};
     }  // (kPatchCull: the projection stays the game's own, render_view_setup's output too)
+    if (view_ && g_clip.on) clip_widen_apply();  // (a draw list's callback rebuilt the view: its clip matrix widened again)
     --g_patch_host;
 }
 
@@ -273,7 +316,7 @@ void mrp_lod_frame_begin() {
     g_mrp_lod_widen_off = true;  // (the game's own culling widened: no shadow run)
     const float w = render_view_cull_widen(), t = lwc1(OV(0x0016caf0u));
     if (!(w > 1.0f)) return;
-    widen_projection(w);
+    widen_projection(w, render_view_cull_widen_y());
     render_view_note_write(lwc1(OV(0x0016caf0u)), t);
 }
 
@@ -389,7 +432,7 @@ void mrp_lod_world_shadow(int kind, void (*pass)(), uint32_t cur) {
                 const Vu0Save vu0_saved(false);
                 const auto hw_saved = eer::hwregs();
                 ee_journal_begin();
-                patch_widen(w_req, 0);
+                patch_widen(w_req, 0, fill_widen_y());
                 mrpw::tfrag_note_pass(host, s_req, w_req);
                 patch_clear();
                 g_st.pages += ee_journal_restore();
@@ -401,7 +444,7 @@ void mrp_lod_world_shadow(int kind, void (*pass)(), uint32_t cur) {
             if (host) return;
         } else {
             const bool host = asked && !selftest && mrp_world_static_lod();
-            mrpw::static_note_pass(kind, host, s_req, w_req);
+            mrpw::static_note_pass(kind, host, s_req, w_req, fill_widen_y());
             if (host) return;
         }
     }
@@ -431,8 +474,8 @@ void mrp_lod_world_shadow(int kind, void (*pass)(), uint32_t cur) {
         else if (kind == 1) patch_tie(s);
         else if (kind == 2) patch_shrub(s);
         if (widen > 1.0f) {
-            if (kind == 3) widen_projection(widen);
-            else patch_widen(widen, kind);
+            if (kind == 3) widen_projection(widen, fill_widen_y());
+            else patch_widen(widen, kind, fill_widen_y());
             ++g_st.widened[kind];
         }
     }
@@ -523,7 +566,7 @@ struct EffectsShadow {
     uint64_t runs = 0, overflow = 0, bytes_total = 0, real_total = 0, same = 0;  // (same: the shadow's chain the real block's byte for byte)
     // the frames the shadow was not run because nothing in it could differ from the real block (mrp_lod_effects_shadow); with
     // RAC1_MRP_EFFECTS_SKIP=2 (testing) run anyway: `predicted` of them, `missed` those whose chain then differed from the real block's
-    uint64_t skipped = 0, predicted = 0, missed = 0, need_glows = 0, need_particles = 0;
+    uint64_t skipped = 0, predicted = 0, missed = 0, need_glows = 0, need_particles = 0, need_lists = 0;
     bool predicted_now = false;
     double ms = 0;
     bool running = false;  // the shadow's block runs
@@ -576,9 +619,14 @@ void mrp_lod_effects_shadow(void (*pass)(), uint32_t cur) {
         }
     }
     const bool particles = !selftest && mrp_fx_particles_widen_needed(widen);
+    // the draw lists' callbacks cull against the clip matrix (mrp_lod_draw_list_widen) or the sphere test: one queued may draw
+    // more in the widened view (Novalis's water tiles L1:0x2b91c8, the levels' water grids); nothing tells which without running them
+    static const bool no_lists = std::getenv("RAC1_MRP_WIDEN_LISTS") != nullptr && std::atoi(std::getenv("RAC1_MRP_WIDEN_LISTS")) == 0;  // (testing)
+    const bool lists = !selftest && !no_lists && (lw(OV(0x0015f424u)) > 0 || lw(OV(0x0015f428u)) > 0);
     g_ps.need_glows += glows ? 1u : 0u;
     g_ps.need_particles += particles ? 1u : 0u;
-    g_ps.predicted_now = !glows && !particles && !selftest;
+    g_ps.need_lists += lists ? 1u : 0u;
+    g_ps.predicted_now = !glows && !particles && !lists && !selftest;
     if (g_ps.predicted_now && skip_mode == 1) {
         ++g_ps.skipped;
         return;
@@ -593,7 +641,12 @@ void mrp_lod_effects_shadow(void (*pass)(), uint32_t cur) {
     const uint32_t buf_b = lwu(OV(0x00173e08u)), limit = (cur >= buf_b ? buf_b : lwu(OV(0x00173e04u))) + lwu(OV(0x001611ccu));
     g_ps.running = true;
     g_ps.widen = selftest ? 1.0f : widen;
+    g_slot = kMrpLodSlotEffects;
+    g_slot_w = g_ps.widen;
+    g_slot_wy = selftest ? 1.0f : fill_widen_y();
     pass();
+    mrp_lod_draw_list_widen(false);
+    g_slot = -1;
     patch_clear();
     g_ps.running = false;
     const uint32_t end = lwu(OV(0x001611c0u));
@@ -634,15 +687,87 @@ void mrp_lod_effects_after(uint32_t cur, uint32_t real_end) {
     g_ps.real_total += real_end - cur;
 }
 
+// The draw lists' shadows (see mrp_lod.h mrp_lod_list_shadow)
+namespace {
+struct ListShadow {
+    bool pending = false, ready = false;
+    uint32_t cur = 0, end = 0;
+    std::vector<uint8_t> bytes;
+    uint64_t runs = 0, overflow = 0, same = 0, bytes_total = 0, real_total = 0;
+    double ms = 0;
+} g_ls[2];
+}  // namespace
+
 // orig: (host) see mrp_lod.h
-bool mrp_lod_effects_substitute(uint32_t& first, uint32_t& end, std::vector<uint8_t>& bytes) {
-    if (!g_ps.ready) return false;
-    g_ps.ready = false;
-    first = g_ps.cur;
-    end = g_ps.end;
-    bytes = std::move(g_ps.bytes);
-    g_ps.bytes.clear();
-    return true;
+void mrp_lod_list_shadow(int list, void (*block)(), uint32_t cur) {
+    if (list < 0 || list > 1) return;
+    ListShadow& L = g_ls[list];
+    L.pending = false;
+    if (g_mrp_lod_frame_drawn) L.ready = false;  // (a drawn frame: its own chain only)
+    if (!g_world_mrp || g_mrp_lod_widen_off || !g_mrp_lod_frame_drawn) return;
+    static const bool off = std::getenv("RAC1_MRP_WIDEN_LISTS") != nullptr && std::atoi(std::getenv("RAC1_MRP_WIDEN_LISTS")) == 0;  // (testing)
+    const float widen = fill_widen(), widen_y = fill_widen_y();
+    if (off || !(widen > 1.0f || widen_y > 1.0f) || vu0::running()) return;
+    const auto t0 = std::chrono::steady_clock::now();
+    const Vu0Save vu0_saved(true);  // (the callbacks' VU0 macro / micro work)
+    const auto hw_saved = eer::hwregs();
+    ee_journal_begin();
+    if (widen > 1.0f) patch_cull(widen);  // (the sphere tests: vf26 / vf27)
+    const uint32_t buf_b = lwu(OV(0x00173e08u)), limit = (cur >= buf_b ? buf_b : lwu(OV(0x00173e04u))) + lwu(OV(0x001611ccu));
+    g_slot = list;
+    g_slot_w = widen;
+    g_slot_wy = widen_y;
+    block();
+    mrp_lod_draw_list_widen(false);
+    g_slot = -1;
+    patch_clear();
+    const uint32_t end = lwu(OV(0x001611c0u));
+    const bool ok = end > cur && end <= limit;
+    if (ok) {
+        L.bytes.resize(end - cur);
+        std::memcpy(L.bytes.data(), ee_ram_ptr(cur), L.bytes.size());
+    }
+    g_st.pages += ee_journal_restore();
+    vu0_saved.restore();
+    eer::hwregs() = hw_saved;
+    L.ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    if (!ok) {
+        if (end != cur && L.overflow++ < 3) std::fprintf(stderr, "[lod] list %d: shadow chain %08x..%08x past the buffer's limit %08x\n", list, cur, end, limit);
+        return;
+    }
+    L.pending = true;
+    L.cur = cur;
+}
+
+// orig: (host) see mrp_lod.h
+void mrp_lod_list_after(int list, uint32_t cur, uint32_t real_end) {
+    if (list < 0 || list > 1) return;
+    ListShadow& L = g_ls[list];
+    if (!L.pending || L.cur != cur) return;
+    L.pending = false;
+    L.ready = true;
+    L.end = real_end;
+    ++L.runs;
+    L.bytes_total += L.bytes.size();
+    L.real_total += real_end - cur;
+    L.same += real_end - cur == L.bytes.size() && std::memcmp(ee_ram_ptr(cur), L.bytes.data(), L.bytes.size()) == 0 ? 1u : 0u;
+}
+
+// orig: (host) see mrp_lod.h
+void mrp_lod_substitutes(std::vector<MrpLodSubstitute>& out) {
+    out.clear();
+    for (int k = 0; k < 2; ++k) {
+        ListShadow& L = g_ls[k];
+        if (!L.ready) continue;
+        L.ready = false;
+        out.push_back(MrpLodSubstitute{k, L.cur, L.end, std::move(L.bytes)});
+        L.bytes.clear();
+    }
+    if (g_ps.ready) {
+        g_ps.ready = false;
+        out.push_back(MrpLodSubstitute{kMrpLodSlotEffects, g_ps.cur, g_ps.end, std::move(g_ps.bytes)});
+        g_ps.bytes.clear();
+    }
 }
 
 namespace {
@@ -655,8 +780,15 @@ namespace {
 // draws two to five times the 4:3 game's mobys and filled it (Novalis at LOD 100: the last mobys of the list, those near the camera
 // included, missing). The shadow run's packets go to a host region instead (EE 0x03c00000.., above the game's 32 MB, free since the
 // legacy GS ring was removed: runtime/level/host_layout.h): the cursor 0x1611c0 moved there, the work area (its 0x2000 bytes copied)
-// to 0x03ee0000, so the limit is 0x03ed0000 (3.3 MB). Inside the journal: put back after the run. RAC1_MRP_LOD_ROOM=0: off (testing).
-constexpr uint32_t kShadowPackets = 0x03c00000u, kShadowWork = 0x03ee0000u;
+// to 0x03ee0000, so the limit is 0x03ed0000 (2.8 MB; at LOD High in a 32:9 view Rilgar, Gemlik and Kalebo's landing reach it).
+// The skinning records go to a host region too: the draw loop writes one per moby drawn to the ring 0x15f5f8 (the pass's start sets
+// the ring's cursor 0x15ffd4 to it), which the game sizes for its own frame (0x15f578 = 0x1e000 bytes at the top of the packet
+// buffer, ending where the buffer ends: sub_002a0858) and never bounds. With the shadow's two to five times the mobys it ran past the
+// buffer's end into what lies above it (Kalebo's landing: the ship scene's streamed animation frames at 0x40c000.., a moby's
+// keyframe header then read back as garbage -> a pose's scratchpad address 0x700c130c, the pointer fault). The shadow's ring is
+// 0x03f40000..0x04000000 (0xc0000 bytes, above the host's texture tables; the landing used 0x2c140). Inside the journal: put back
+// after the run. RAC1_MRP_LOD_ROOM=0: off (testing).
+constexpr uint32_t kShadowPackets = 0x03c00000u, kShadowWork = 0x03ee0000u, kShadowRing = 0x03f40000u;
 void shadow_packet_room() {
     static const bool off = [] {
         const char* v = std::getenv("RAC1_MRP_LOD_ROOM");
@@ -666,6 +798,7 @@ void shadow_packet_room() {
     const uint32_t work = lwu(OV(0x0015f5fcu));
     std::memcpy(ee_ram_ptr_write(kShadowWork, 0x2000), ee_ram_ptr_read(work), 0x2000);
     sw(OV(0x0015f5fcu), kShadowWork);
+    sw(OV(0x0015f5f8u), kShadowRing);
     sw(OV(0x001611c0u), kShadowPackets);
 }
 
@@ -719,7 +852,7 @@ void mrp_lod_moby_shadow(void (*pass)()) {
     shadow_packet_room();
     patch_moby(s);
     if (widen > 1.0f) {
-        patch_widen(widen, 0);
+        patch_widen(widen, 0, fill_widen_y());
         ++g_mst.widened;
     }
     mrp_scene_shadow_begin();
@@ -773,10 +906,19 @@ void mrp_lod_report() {
     if (g_ps.runs + g_ps.skipped != 0) {
         const double n = static_cast<double>(std::max<uint64_t>(1, g_ps.runs));
         std::printf("[lod] effects: %llu shadow runs (%llu with the real block's chain byte for byte), %.3f ms each, chain %.0f bytes (the real pass's %.0f); "
-                    "%llu not run (nothing to widen); needed for glows (+0x31) %llu, particles %llu; predicted %llu, missed %llu\n",
+                    "%llu not run (nothing to widen); needed for glows (+0x31) %llu, particles %llu, draw lists %llu; predicted %llu, missed %llu\n",
                     static_cast<unsigned long long>(g_ps.runs), static_cast<unsigned long long>(g_ps.same), g_ps.ms / n, static_cast<double>(g_ps.bytes_total) / n,
                     static_cast<double>(g_ps.real_total) / n, static_cast<unsigned long long>(g_ps.skipped), static_cast<unsigned long long>(g_ps.need_glows),
-                    static_cast<unsigned long long>(g_ps.need_particles), static_cast<unsigned long long>(g_ps.predicted), static_cast<unsigned long long>(g_ps.missed));
+                    static_cast<unsigned long long>(g_ps.need_particles), static_cast<unsigned long long>(g_ps.need_lists), static_cast<unsigned long long>(g_ps.predicted),
+                    static_cast<unsigned long long>(g_ps.missed));
+    }
+    for (int k = 0; k < 2; ++k) {
+        const ListShadow& L = g_ls[k];
+        if (L.runs + L.overflow == 0) continue;
+        const double n = static_cast<double>(std::max<uint64_t>(1, L.runs));
+        std::printf("[lod] draw list %s: %llu shadow runs (%llu with the real block's chain byte for byte, %llu overflowed), %.3f ms each, chain %.0f bytes (the real block's %.0f)\n",
+                    k == 0 ? "0x16dc80" : "0x16de80", static_cast<unsigned long long>(L.runs), static_cast<unsigned long long>(L.same), static_cast<unsigned long long>(L.overflow), L.ms / n,
+                    static_cast<double>(L.bytes_total) / n, static_cast<double>(L.real_total) / n);
     }
     if (g_st.runs[0] + g_st.runs[1] + g_st.runs[2] + g_st.runs[3] + g_st.skipped_vu0 == 0) return;
     static const char* names[4] = {"tfrag", "tie", "shrub", "sky"};

@@ -83,13 +83,16 @@ struct Notes {
         vu7_cur = -1;
     }
 };
-Notes g_real, g_shadow;
+Notes g_real, g_shadow[kMrpLodSlots];  // (the shadow blocks' by slot, mrp_lod_shadow_slot)
 bool g_window = false;
 bool g_patched = false;
 float g_saved[8] = {};
 uint64_t g_covered = 0;  // (the inventory: bytes the notes covered so far)
 
-Notes& notes_now() { return mrp_lod_in_effects_shadow() ? g_shadow : g_real; }
+Notes& notes_now() {
+    const int k = mrp_lod_shadow_slot();
+    return k >= 0 && k < kMrpLodSlots ? g_shadow[k] : g_real;
+}
 
 // A producer's projection of the frame drawn: the GS's (X, Y, Z) = off + (P (pos - base, 1)).xyz x k / w with Z's part x zscale; base the
 // camera 0x166dc0 (or 0: VU1 program 7 takes world points)
@@ -548,7 +551,7 @@ void note_inputs(Notes& N, Note& n, uint32_t a, uint32_t b) {
 // orig: (host) see mrp_fx.h
 void mrp_fx_frame_begin() {
     g_real.clear();
-    g_shadow.clear();
+    for (Notes& N : g_shadow) N.clear();
     g_window = false;
 }
 
@@ -630,7 +633,7 @@ std::map<uint32_t, Inventory> g_inventory;
 // orig: (host) see mrp_fx.h
 void mrp_fx_list_call(uint32_t fn, uint32_t first, uint32_t end) {
     static uint64_t covered_at = 0;
-    if (!g_env_inventory || mrp_lod_in_effects_shadow()) return;
+    if (!g_env_inventory || mrp_lod_shadow_slot() >= 0) return;
     if (first == 0 && end == 0) {  // (a call's start)
         covered_at = g_covered;
         return;
@@ -718,12 +721,14 @@ void mrp_fx_particles_patch(bool begin) {
 }
 
 // orig: (host) see mrp_fx.h
-bool mrp_fx_chain_ranges(bool active, bool substitute, std::vector<gs::Gs::FxRange>& ranges) {
+bool mrp_fx_chain_ranges(bool active, const std::vector<int>& subs, std::vector<gs::Gs::FxRange>& ranges) {
     ranges.clear();
     Frame& F = g_frame;
     F.notes.clear();
     F.vin.clear();
-    if (!g_mrp_fx || !g_world_mrp || !active || (g_real.list.empty() && g_shadow.list.empty())) return false;
+    bool any = !g_real.list.empty();
+    for (int k : subs) any = any || (k >= 0 && k < kMrpLodSlots && !g_shadow[k].list.empty());
+    if (!g_mrp_fx || !g_world_mrp || !active || !any) return false;
     // the frame's projections
     F.views.assign(kMrpFxKinds, View{});
     const glm::dvec3 cam(lwc1(OV(0x00166dc0u)), lwc1(OV(0x00166dc4u)), lwc1(OV(0x00166dc8u)));
@@ -732,7 +737,7 @@ bool mrp_fx_chain_ranges(bool active, bool substitute, std::vector<gs::Gs::FxRan
     F.views[kMrpFxQuad] = make_view(rows_matrix(lwc1(OV(0x00160be8u))), off, lwc1(OV(0x00160bf0u)), 1.0, cam);  // (vf30.z, vf31.x)
     // (0x1fead8: X / Y + 0x8000 / 16, Z x 0x3f7fec57 + 0x16cbe8)
     F.views[kMrpFxSparkles] = make_view(rows_matrix(1024.0), glm::dvec3(2048.0, 2048.0, off.z), lwc1(OV(0x0016cc50u)), static_cast<double>(u2f(0x3f7fec57u)), cam);
-    auto add = [&](const Notes& N, bool sub) {
+    auto add = [&](const Notes& N, uint8_t sub) {
         const uint32_t vu7_base = static_cast<uint32_t>(F.views.size());
         for (const Vu7& v : N.vu7) {
             glm::dmat4 P;
@@ -759,9 +764,14 @@ bool mrp_fx_chain_ranges(bool active, bool substitute, std::vector<gs::Gs::FxRan
             ++g_st.notes[n.kind];
         }
     };
-    add(g_real, false);
-    if (substitute) add(g_shadow, true);
-    F.slots = substitute ? g_slots_shadow : g_slots_real;
+    add(g_real, 0);
+    bool fx_sub = false;
+    for (size_t i = 0; i < subs.size(); ++i) {
+        if (subs[i] < 0 || subs[i] >= kMrpLodSlots) continue;
+        add(g_shadow[subs[i]], static_cast<uint8_t>(i + 1));
+        fx_sub = fx_sub || subs[i] == kMrpLodSlotEffects;
+    }
+    F.slots = fx_sub ? g_slots_shadow : g_slots_real;
     F.cam = cam;
     return !ranges.empty();
 }
@@ -911,15 +921,18 @@ std::vector<Step> g_steps;
 }  // namespace
 
 // orig: (host) see mrp_fx.h
-void mrp_fx_draw(const gs::Gs& gs, int win_w, int win_h, const gs::Viewport* vp, const std::function<void(size_t, size_t)>& gs_draw) {
+void mrp_fx_draw(const gs::Gs& gs, int win_w, int win_h, const gs::Viewport* vp, const std::function<void(size_t, size_t)>& gs_draw, size_t from,
+                 size_t to) {
     const std::vector<gs::Primitive>& prims = gs.primitives();
+    to = std::min(to, prims.size());
+    if (from >= to) return;
     if (!gs.fx_external() || g_frame.notes.empty() || !init_gl()) {
-        if (gs_draw) gs_draw(0, prims.size());
+        if (gs_draw) gs_draw(from, to);
         return;
     }
     using clock = std::chrono::steady_clock;
     const auto t0 = clock::now();
-    ++g_st.frames;
+    if (from == 0) ++g_st.frames;
     g_v.clear();
     g_batches.clear();
     g_steps.clear();
@@ -930,12 +943,12 @@ void mrp_fx_draw(const gs::Gs& gs, int win_w, int win_h, const gs::Viewport* vp,
         for (int r = 0; r < 4; ++r) VP[c][r] = vpm[c * 4 + r];
     const bool vu_mode = g_mrp_world_projection != 0;
     uint64_t env_xyoff = 0;
-    size_t gs_from = 0;   // the start of the GS replica's run in progress
+    size_t gs_from = from;  // the start of the GS replica's run in progress
     bool in_mrp = false;  // the MRP's run in progress (its batches from g_steps.back().from)
     auto close_gs = [&](size_t at) {
         if (at > gs_from) g_steps.push_back(Step{true, gs_from, at});
     };
-    for (size_t pi = 0; pi < prims.size(); ++pi) {
+    for (size_t pi = from; pi < to; ++pi) {
         const gs::Primitive& p = prims[pi];
         // the MRP's: fx, not the real block's while the effects shadow's stands in for it (as gs::draw: those are dropped)
         if (p.fx == 0) {
@@ -1074,7 +1087,7 @@ void mrp_fx_draw(const gs::Gs& gs, int win_w, int win_h, const gs::Viewport* vp,
         g_batches.back().count += n;
     }
     if (in_mrp) g_steps.back().to = g_batches.size();
-    else close_gs(prims.size());
+    else close_gs(to);
     const auto t1 = clock::now();
     g_st.ms_build += std::chrono::duration<double, std::milli>(t1 - t0).count();
     if (g_env_debug && g_st.frames % 60 == 1)

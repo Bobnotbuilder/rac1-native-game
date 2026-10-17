@@ -226,6 +226,14 @@ float render_view_cull_widen() {
 }
 
 // orig: (host) see render_view.h
+float render_view_cull_widen_y() {
+    const float cur = ee_read<float>(OV(0x0016caf0));
+    if (!(cur > 0.0f) || g_last_w <= 0 || g_last_h <= 0) return 1.0f;
+    if (fov_write_of(cur) != nullptr) return 1.0f;  // (the host's widened value is in place)
+    return std::max(1.0f, g_view_fov_scale);
+}
+
+// orig: (host) see render_view.h
 void render_view_note_write(float written, float base) {
     g_fov_writes[g_fov_next] = {written, base, base * g_view_fov_scale};
     g_fov_next = (g_fov_next + 1) % 8;

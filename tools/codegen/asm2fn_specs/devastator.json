@@ -5,7 +5,8 @@
  "includes": [
   "game/ovl/weapons.h",
   "game/ovl/devastator.h",
-  "game/ovl/pause_menu.h"
+  "game/ovl/pause_menu.h",
+  "game/enhance/advanced.h"
  ],
  "functions": [
   {
@@ -48,7 +49,10 @@
    "addr": "2b2100",
    "name": "devastator_update",
    "ret": "void",
-   "params": "uint32_t m"
+   "params": "uint32_t m",
+   "host": {
+    "2b25dc": "advanced_aim_shot_hand(s6.w(), sp.w() + 0x70);  // enhancement: the modern aim's line (advanced.h), the original's facing otherwise"
+   }
   }
  ],
  "register_fn": "devastator_fns_register",

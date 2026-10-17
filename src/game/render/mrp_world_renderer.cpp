@@ -216,6 +216,7 @@ struct Stats {
     uint64_t tchk_walker = 0, tchk_found = 0, tchk_missing = 0, tchk_extra = 0, tchk_code = 0;
     uint64_t col_resident = 0, col_copied = 0, col_verified = 0, col_bad = 0;
     uint64_t stat_draws[2] = {}, chk_walker[2] = {}, chk_found[2] = {}, chk_missing[2] = {}, chk_extra[2] = {};
+    uint64_t stat_variants = 0, chk_gif_frames = 0, chk_gif_bad = 0, chk_gif_quads = 0;
     uint64_t chk_morph_bad = 0, chk_fog_bad = 0, chk_alpha_bad = 0, chk_rows_bad = 0;
     double chk_rows_maxrel = 0;
     std::vector<std::string> chk_notes;
@@ -1071,7 +1072,7 @@ struct GsFront {
             }
             k.bucket = r->bucket;
             k.layer = r->layer;
-            k.word |= (std::min(r->mips, 4u) - 1) << 22;
+            k.word |= (std::min(std::min(r->mips, mxl + 1), 4u) - 1) << 22;  // (the GS samples levels 0..MXL only, as the mobys')
             ++g_st.tex_ok;
             return k;
         }
@@ -1109,7 +1110,7 @@ struct GsFront {
         const TexRef& r = L.ref[table][ti];
         k.bucket = r.bucket;
         k.layer = r.layer;
-        k.word |= (std::min(r.mips, 4u) - 1) << 22;
+        k.word |= (std::min(std::min(r.mips, mxl + 1), 4u) - 1) << 22;  // (the GS samples levels 0..MXL only, as the mobys')
         ++g_st.tex_ok;
         return k;
     }
@@ -2803,6 +2804,10 @@ void mrp_world_finish_frame() {
     g_st.tchk_missing += F.scene.tchk_missing;
     g_st.tchk_extra += F.scene.tchk_extra;
     g_st.tchk_code += F.scene.tchk_code;
+    g_st.stat_variants += F.scene.stat_variants;
+    g_st.chk_gif_frames += F.scene.chk_gif_frames;
+    g_st.chk_gif_bad += F.scene.chk_gif_bad;
+    g_st.chk_gif_quads += F.scene.chk_gif_quads;
     g_st.chk_morph_bad += F.scene.chk_morph_bad;
     g_st.chk_fog_bad += F.scene.chk_fog_bad;
     g_st.chk_alpha_bad += F.scene.chk_alpha_bad;
@@ -3096,13 +3101,16 @@ void mrp_world_report() {
                 static_cast<unsigned long long>(g_st.col_resident), static_cast<unsigned long long>(g_st.col_copied), static_cast<unsigned long long>(g_st.col_verified),
                 static_cast<unsigned long long>(g_st.col_bad), static_cast<unsigned long long>(g_rcols.updates), static_cast<unsigned long long>(g_rcols.instances_changed),
                 static_cast<unsigned long long>(g_rcols.words_uploaded));
-    std::printf("[mrpw] static ties / shrubs: host draws %llu / %llu\n", static_cast<unsigned long long>(g_st.stat_draws[0]), static_cast<unsigned long long>(g_st.stat_draws[1]));
+    std::printf("[mrpw] static ties / shrubs: host draws %llu / %llu, shrub far variants' quads %llu\n", static_cast<unsigned long long>(g_st.stat_draws[0]),
+                static_cast<unsigned long long>(g_st.stat_draws[1]), static_cast<unsigned long long>(g_st.stat_variants));
     if (g_static_check) {
         for (int k = 0; k < 2; ++k)
             std::printf("[mrpw] static check %s: walker draws %llu, found %llu, missing %llu, host extra %llu\n", k == 0 ? "ties" : "shrubs", static_cast<unsigned long long>(g_st.chk_walker[k]),
                         static_cast<unsigned long long>(g_st.chk_found[k]), static_cast<unsigned long long>(g_st.chk_missing[k]), static_cast<unsigned long long>(g_st.chk_extra[k]));
         std::printf("[mrpw] static check values: morph %llu, F %llu, alpha %llu differ; rows beyond 1e-4 relative %llu (worst %.3g)\n", static_cast<unsigned long long>(g_st.chk_morph_bad),
                     static_cast<unsigned long long>(g_st.chk_fog_bad), static_cast<unsigned long long>(g_st.chk_alpha_bad), static_cast<unsigned long long>(g_st.chk_rows_bad), g_st.chk_rows_maxrel);
+        std::printf("[mrpw] static check far variants: %llu frames, %llu quads, streams differing %llu\n", static_cast<unsigned long long>(g_st.chk_gif_frames),
+                    static_cast<unsigned long long>(g_st.chk_gif_quads), static_cast<unsigned long long>(g_st.chk_gif_bad));
         for (const std::string& n : g_st.chk_notes) std::printf("[mrpw] static check: %s\n", n.c_str());
     }
     std::printf("[mrpw] tfrag: GPU path draws %llu (host-made %llu), CPU reference draws %llu; colours: mirror updates %llu, entries changed %llu, words uploaded %llu\n",

@@ -593,7 +593,10 @@ uint32_t advanced_pad_remap(uint32_t pad, uint32_t held) {
 
 // orig: (none) — enhancement (advanced.h)
 bool advanced_strafing() {
-    return g_aim_button && lbu(MOVEMENT) != 0 && lw(OV(0x0015f5c4)) == 0 && aim_state(lw(HERO + 0x2084));
+    const int32_t st = lw(HERO + 0x2084);
+    // (with the modern aim also the gloves' standing throw 0x23: the aim held through it, so the
+    // gloves' camera aim and its pitch are those of the reticle when the throw leaves the hand)
+    return g_aim_button && lbu(MOVEMENT) != 0 && lw(OV(0x0015f5c4)) == 0 && (aim_state(st) || (st == 0x23 && modern_aim()));
 }
 
 // orig: (none) — enhancement (advanced.h)
@@ -674,8 +677,9 @@ void camera_pitch_turn(uint32_t cam, float a, float px, float py, float pz) {
     swc1(cam + 0x34, py + rel.y);
     swc1(cam + 0x38, pz + rel.z);
 }
-constexpr int32_t RELEASE_FRAMES = 60;           // after the aim, the view held on it until the camera catches up
+constexpr int32_t RELEASE_FRAMES = 60;           // after the aim, the view eased from it to the camera's own heading
 int32_t g_release = 0;                           // frames of that left
+constexpr float STICK_TURN = 0.2f;               // the right stick's x past this: the player turning the camera
 
 // orig: (none) — enhancement: (x, y) of the vector at `a` turned by `c` / `s` about the up axis
 void turn_vec(uint32_t a, float c, float s) {
@@ -807,8 +811,8 @@ void advanced_aim_after_camera() {
     swc1(PAD + 0x104, g_saved_ry);
     // while aiming the camera is held on the aim. When the aim ends the follow camera's own state
     // (its points and offset, which kept following the hero) is turned onto the aim once; its
-    // springs then reach the aim's heading in about 30 frames, and until they do the view is still
-    // held on the aim (a cut back to the camera's own heading was a jolt)
+    // springs then reach the aim's heading in about 30 frames, while the view eases from the aim
+    // back to the camera's own heading (a cut back to it was a jolt)
     const bool aiming = g_aim_was && advanced_strafing();  // the heading held (strafe or aim)
     const bool modern = aiming && g_pitch_was;              // the pitch and the shoulder view too
     if (!aiming && g_release <= 0 && g_pitch_release <= 0 && g_shoulder <= 0.0f) return;
@@ -821,9 +825,19 @@ void advanced_aim_after_camera() {
     }
     if (aiming || g_release > 0) {
         const bool first = !aiming && g_release == RELEASE_FRAMES;
-        if (!aiming) --g_release;
-        const float d = angle_sub(g_aim_yaw, lwc1(CAMERA_YAW));
+        // after the aim the view eased from the aim's heading to the camera's own (holding it fully
+        // locked the right stick out of the camera for the whole release: the stick kept the
+        // camera from catching up); the right stick turning the camera lets go 4 times as fast
+        float weight = 1.0f;
+        if (!aiming) {
+            weight = static_cast<float>(g_release) / static_cast<float>(RELEASE_FRAMES);
+            weight = weight * weight * (3.0f - 2.0f * weight);  // smoothstep
+            g_release -= abs_f(g_saved_rx) < STICK_TURN ? 1 : 4;
+            if (g_release < 0) g_release = 0;
+        }
+        float d = angle_sub(g_aim_yaw, lwc1(CAMERA_YAW));
         if (!aiming && abs_f(d) < 0.005f) g_release = 0;  // caught up
+        if (!first) d = d * weight;
         if (1e-5f <= abs_f(d)) {
             // the camera turned back onto the aim's heading about the hero: its rows and its
             // position (not the follow camera's own points and offset while aiming: turning those
@@ -873,16 +887,17 @@ void advanced_aim_after_hero() {
 // orig: (none) — enhancement (advanced.h)
 bool advanced_camera_aim(uint32_t pad_held) { return (pad_held & 5u) != 0 || advanced_aiming(); }
 
-// orig: (none) — enhancement (advanced.h)
-void advanced_aim_direction(uint32_t from, uint32_t dir, float speed) {
+namespace {
+// orig: (none) — enhancement: the shot from `from` toward the point under the screen's centre (the
+// first thing the screen's centre ray meets within AIM_DISTANCE, not the hero; else that far), of
+// length `speed`
+Vec4 aim_shot(const Vec4& from, float speed) {
     // the camera's forward (the view matrix 0x166c80 transposed, as the blaster's first-person aim)
     Mat4 t;
     mat3_transpose(t, M(OV(0x00166c80)));
     Vec4 f = Vec4{0.0f, 0.0f, 1.0f, 0.0f};
     mat4_transform(f, f, t);
     vec3_set_length(f, f, 1.0f);
-    // the point under the screen's centre: the first thing the screen's centre ray meets within
-    // AIM_DISTANCE (not the hero), else that far; the shot from `from` toward it
     const Vec4 eye = V(OV(0x00166dc0));
     Vec4 aim;
     vec3_scale(aim, f, AIM_DISTANCE);
@@ -894,9 +909,54 @@ void advanced_aim_direction(uint32_t from, uint32_t dir, float speed) {
         if (2.0f < vec3_length(to)) aim = hit;  // (a hit right at the camera: ignored)
     }
     Vec4 d;
-    vec3_sub(d, aim, V(from));
+    vec3_sub(d, aim, from);
     vec3_set_length(d, d, speed);
-    V(dir) = d;
+    return d;
+}
+}  // namespace
+
+// orig: (none) — enhancement (advanced.h)
+void advanced_aim_direction(uint32_t from, uint32_t dir, float speed) { V(dir) = aim_shot(V(from), speed); }
+
+// orig: (none) — enhancement (advanced.h)
+void advanced_aim_shot(uint32_t from, uint32_t dir) {
+    if (!advanced_aiming()) return;
+    V(dir) = aim_shot(V(from), vec3_length(V(dir)));
+}
+
+// orig: (none) — enhancement (advanced.h)
+void advanced_aim_shot_hand(uint32_t hand, uint32_t dir) {
+    if (!advanced_aiming()) return;
+    Vec4 from;
+    moby_chain_point_v(hand, 0, from);
+    V(dir) = aim_shot(from, vec3_length(V(dir)));
+}
+
+// orig: (none) — enhancement (advanced.h)
+void advanced_aim_frame_hand(uint32_t hand, uint32_t rows) {
+    if (!advanced_aiming() || lh(HERO + 0x22c8) == 1) return;  // (leaning on a wall: the hand's own frame, as the original)
+    Vec4 from;
+    moby_chain_point_v(hand, 0, from);
+    const Vec4 f = aim_shot(from, 1.0f);  // forward (row 0), the side (row 1) level, up (row 2) square to both
+    Vec4 side{-f.y, f.x, 0.0f, 0.0f};
+    if (vec2_length(side) < 1e-4f) return;
+    vec3_set_length(side, side, 1.0f);
+    Vec4 up{f.y * side.z - f.z * side.y, f.z * side.x - f.x * side.z, f.x * side.y - f.y * side.x, 0.0f};
+    for (int i = 0; i < 3; ++i) {
+        const Vec4& r = i == 0 ? f : i == 1 ? side : up;
+        swc1(rows + i * 0x10, r.x);
+        swc1(rows + i * 0x10 + 4, r.y);
+        swc1(rows + i * 0x10 + 8, r.z);
+    }
+}
+
+// orig: (none) — enhancement (advanced.h)
+bool advanced_aim_angles(uint32_t from, float& yaw, float& pitch) {
+    if (!advanced_aiming()) return false;
+    const Vec4 d = aim_shot(V(from), 1.0f);
+    yaw = atan2_f(d.x, d.y);
+    pitch = -atan2_f(vec2_length(d), d.z);
+    return true;
 }
 
 // --- R&C 3's on-foot movement -------------------------------------------------------
@@ -1051,6 +1111,16 @@ bool advanced_rac3_swing_exit(uint32_t step) {
 }
 
 // orig: (none) — enhancement (advanced.h)
+int32_t advanced_rac3_swing_jump_back(int32_t back) {
+    // UYA 0x503b68 (cases 0x13 / 0x15): the look-back (t - row[+0xc]) * 2, but a fixed 8 in the
+    // throw. R&C1's row 3 has +0xc = 83, so with its jump-cancel lowered to 35 (combo_table_sync)
+    // the computed look-back stays negative until time 83 and no jump press would count. (UYA's 8 is
+    // a plain count of its 60 Hz frames: here frame-scaled, as R&C1's own look-backs - 7 at 50 Hz)
+    if (!advanced_rac3_movement() || lw(HERO + 0x2084) != 0x15) return back;
+    return frame_scale_i(8);
+}
+
+// orig: (none) — enhancement (advanced.h)
 bool advanced_rac3_wrench_out() {
     // R&C1 needs no such guard: its hero stays in the throw (0x15) until the wrench is back (row 3
     // ends at 91, reached after the catch). Leaving it early (advanced_rac3_swing_exit, the jump
@@ -1117,6 +1187,7 @@ struct ForwardFrame {      // the run's real frames, kept while the reverse ones
     uint32_t moby = 0;
     uint8_t f0 = 0, f1 = 0;
     float pos = 0.0f;
+    uint8_t shown0 = 0, shown1 = 0, clip = 0;  // the reverse frames written, and the clip they belong to
 } g_forward;
 
 // orig: (none) — enhancement: the lower body's turn and the backpedal for this frame
@@ -1147,16 +1218,23 @@ void backpedal_show() {
     if (!g_backpedal || m == 0 || lbu(m + 0x52) != lbu(m + 0x53)) return;
     const uint32_t n = lbu(m + 0x7e);  // the clip's frame count
     if (n < 2) return;
-    g_forward = {true, m, static_cast<uint8_t>(lbu(m + 0x50)), static_cast<uint8_t>(lbu(m + 0x51)), lwc1(m + 0x54)};
-    sb(m + 0x50, (n - 1 - g_forward.f0 % n) & 0xff);
-    sb(m + 0x51, (n - 1 - g_forward.f1 % n) & 0xff);
+    g_forward = {true, m, static_cast<uint8_t>(lbu(m + 0x50)), static_cast<uint8_t>(lbu(m + 0x51)), lwc1(m + 0x54), 0, 0, static_cast<uint8_t>(lbu(m + 0x53))};
+    g_forward.shown0 = static_cast<uint8_t>((n - 1 - g_forward.f0 % n) & 0xff);
+    g_forward.shown1 = static_cast<uint8_t>((n - 1 - g_forward.f1 % n) & 0xff);
+    sb(m + 0x50, g_forward.shown0);
+    sb(m + 0x51, g_forward.shown1);
 }
 
-// orig: (none) — enhancement: the run's real frames back before the hero's update
+// orig: (none) — enhancement: the run's real frames back before the hero's update. Only while the
+// moby still shows the reverse frames of the same clip: a scene that started in between (game
+// mode 2: no hero update ran, the scene poses him) has changed them, and the frames kept from
+// before it are stale (putting them back would change the game's state)
 void backpedal_restore() {
     if (!g_forward.saved) return;
     g_forward.saved = false;
     if (lwu(HERO + 0x2080) != g_forward.moby) return;
+    const uint32_t m = g_forward.moby;
+    if (lbu(m + 0x53) != g_forward.clip || lbu(m + 0x50) != g_forward.shown0 || lbu(m + 0x51) != g_forward.shown1) return;
     sb(g_forward.moby + 0x50, g_forward.f0);
     sb(g_forward.moby + 0x51, g_forward.f1);
     swc1(g_forward.moby + 0x54, g_forward.pos);
@@ -1165,6 +1243,14 @@ void backpedal_restore() {
 
 // orig: (none) — enhancement (advanced.h)
 void advanced_pose_hook(uint32_t rec) {
+    // the turn is eased by legs_update, after the hero's update: only in gameplay (game mode 0). In
+    // a scene, a menu or the ship the hero is posed by them and the turn is dropped (issue #40: a
+    // scene started while strafing kept Ratchet's lower body turned, frozen, for the whole scene)
+    if (lw(OV(0x0015f5c4)) != 0) {
+        g_leg_twist = 0.0f;
+        g_backpedal = false;
+        return;
+    }
     if (abs_f(g_leg_twist) < 0.01f || lhu(rec + 0x10) != 111) return;  // Ratchet: 111 joints
     // the joint matrices on the scratchpad (0x40 each): the pelvis 1, the legs 92..103 and the tail
     // 104..110 turned about the moby's vertical axis

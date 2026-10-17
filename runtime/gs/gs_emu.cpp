@@ -618,38 +618,43 @@ void Gs::vif_stream(const uint8_t* p, uint32_t n, bool) {
     }
 }
 
-void Gs::set_chain_substitute(uint32_t first, uint32_t end, std::vector<uint8_t> chain) {
-    sub_first_ = first & 0x01fffff0u;
-    sub_end_ = end & 0x01fffff0u;
-    sub_chain_ = std::move(chain);
-    sub_replay_size_ = 0xffffffffu;
-    if (sub_chain_.empty() || sub_first_ == 0) sub_first_ = sub_end_ = 0;
+void Gs::add_chain_substitute(uint32_t first, uint32_t end, std::vector<uint8_t> chain) {
+    Sub u;
+    u.first = first & 0x01fffff0u;
+    u.end = end & 0x01fffff0u;
+    u.chain = std::move(chain);
+    if (u.chain.empty() || u.first == 0 || static_cast<int>(subs_.size()) >= kMaxSubs) return;
+    subs_.push_back(std::move(u));
 }
-uint32_t Gs::sub_size_of() const {
-    if (sub_first_ == 0) return 0;
-    return sub_replay_size_ != 0xffffffffu ? sub_replay_size_ : static_cast<uint32_t>(sub_chain_.size());
+uint32_t Gs::sub_size_of(int k) const {
+    if (k < 0 || k >= static_cast<int>(subs_.size())) return 0;
+    const Sub& u = subs_[static_cast<size_t>(k)];
+    return u.replay_size != 0xffffffffu ? u.replay_size : static_cast<uint32_t>(u.chain.size());
 }
-// (host) EE memory, or the substitute's bytes for an address that carries kSubFlag
+// (host) EE memory, or substitute k's bytes for an address that carries kSubFlag (and k)
 const uint8_t* Gs::sub_mem(uint32_t a) const {
     if ((a & kSubFlag) == 0) return static_cast<const uint8_t*>(ee_ram_ptr_read(a));
-    const uint32_t o = (a & ~kSubFlag) - sub_first_;
-    return o < sub_chain_.size() ? sub_chain_.data() + o : nullptr;
+    const size_t k = (a >> kSubShift) & 7u;
+    if (k >= subs_.size()) return nullptr;
+    const Sub& u = subs_[k];
+    const uint32_t o = (a & 0x01ffffffu) - u.first;
+    return o < u.chain.size() ? u.chain.data() + o : nullptr;
 }
 
 // (host) see gs_emu.h
 void Gs::set_chain_fx(std::vector<FxRange> ranges, bool external) {
-    std::sort(ranges.begin(), ranges.end(), [](const FxRange& a, const FxRange& b) { return a.sub != b.sub ? b.sub : a.first < b.first; });
+    std::sort(ranges.begin(), ranges.end(), [](const FxRange& a, const FxRange& b) { return a.sub != b.sub ? a.sub < b.sub : a.first < b.first; });
     fx_ranges_ = std::move(ranges);
     fx_external_ = external && !fx_ranges_.empty();
 }
 // (the range holding the tag at `addr`, by a binary search: a frame has hundreds of them, one per effect quad)
-const Gs::FxRange* Gs::fx_tag(uint32_t addr, bool in_sub) const {
-    auto it = std::upper_bound(fx_ranges_.begin(), fx_ranges_.end(), std::make_pair(in_sub, addr), [](const std::pair<bool, uint32_t>& k, const FxRange& r) {
-        return k.first != r.sub ? r.sub : k.second < r.first;
+const Gs::FxRange* Gs::fx_tag(uint32_t addr, uint8_t sub) const {
+    auto it = std::upper_bound(fx_ranges_.begin(), fx_ranges_.end(), std::make_pair(sub, addr), [](const std::pair<uint8_t, uint32_t>& k, const FxRange& r) {
+        return k.first != r.sub ? k.first < r.sub : k.second < r.first;
     });
     if (it == fx_ranges_.begin()) return nullptr;
     --it;
-    return it->sub == in_sub && addr >= it->first && addr <= it->last ? &*it : nullptr;
+    return it->sub == sub && addr >= it->first && addr <= it->last ? &*it : nullptr;
 }
 
 void Gs::set_chain_skips(std::vector<SkipRange> ranges) {
@@ -684,20 +689,22 @@ void Gs::chain_walk(uint32_t tag, uint32_t end, Mem&& mem) {
             g.fx_now_ = 0;
         }
     } clear_skips{*this};
-    struct ClearSub {  // (host) the substitute lasts for one chain
+    struct ClearSub {  // (host) the substitutes last for one chain
         Gs& g;
         ~ClearSub() {
-            g.sub_first_ = g.sub_end_ = 0;
+            g.subs_.clear();
             g.sub_wide_ = g.sub_drop_ = g.vundo_on_ = false;
         }
     } clear_sub{*this};
     std::vector<uint32_t> stack;
     std::vector<uint8_t> buf;
     uint32_t addr = tag & 0x01fffff0u;
-    // inside the substitute: an address in [first, first + size) is the substitute's (kSubFlag)
+    // inside substitute `cur`: an address in [first, first + size) is the substitute's (kSubFlag)
     bool in_sub = false;
-    const uint32_t sub_lo = sub_first_, sub_hi = sub_first_ + sub_size_of();
-    auto sub_addr = [&](uint32_t a) { return in_sub && a >= sub_lo && a < sub_hi ? (a | kSubFlag) : a; };
+    int cur = -1;
+    uint32_t sub_lo = 0, sub_hi = 0;
+    uint32_t done = 0;  // (the substitutes walked)
+    auto sub_addr = [&](uint32_t a) { return in_sub && a >= sub_lo && a < sub_hi ? sub_flagged(a, cur) : a; };
     vu1::Vu1 vu_saved;
     struct GsSaved {  // the GS / VIF / GIF state the substitute's walk changes (its uploads into the local memory: vundo_)
         uint64_t regs[0x80];
@@ -712,7 +719,15 @@ void Gs::chain_walk(uint32_t tag, uint32_t end, Mem&& mem) {
     };
     std::unique_ptr<GsSaved> gs_saved;
     for (int guard = 0; guard < 200000; ++guard) {
-        if (sub_first_ != 0 && !in_sub && !sub_drop_ && addr == sub_first_) {  // the substitute first, from the real range's first tag
+        if (!in_sub && !sub_drop_)  // a substitute first, from the real range's first tag
+            for (int k = 0; k < static_cast<int>(subs_.size()); ++k)
+                if ((done >> k & 1u) == 0 && addr == subs_[static_cast<size_t>(k)].first) {
+                    cur = k;
+                    sub_lo = subs_[static_cast<size_t>(k)].first;
+                    sub_hi = sub_lo + sub_size_of(k);
+                    break;
+                }
+        if (cur >= 0 && !in_sub && !sub_drop_ && (done >> cur & 1u) == 0 && addr == sub_lo) {
             vu_saved = vu1::vu1_global();
             vundo_.clear();
             vundo_on_ = true;
@@ -748,13 +763,15 @@ void Gs::chain_walk(uint32_t tag, uint32_t end, Mem&& mem) {
             vif_wl_ = g.wl;
             in_sub = sub_wide_ = false;
             sub_drop_ = true;
-            addr = sub_first_;
+            addr = sub_lo;
             stack.clear();
         }
-        if (sub_drop_ && addr == sub_end_) {
+        if (sub_drop_ && addr == subs_[static_cast<size_t>(cur)].end) {
             sub_drop_ = false;
+            done |= 1u << cur;
             static const bool trace = std::getenv("RAC1_SUB_TRACE") != nullptr;  // (testing)
-            if (trace) std::fprintf(stderr, "[sub] %08x..%08x: substitute + real %zu prims, real %llu\n", sub_first_, sub_end_, prims_.size() - sub_prims0_, static_cast<unsigned long long>(sub_dropped_));
+            if (trace) std::fprintf(stderr, "[sub] %d %08x..%08x: substitute + real %zu prims, real %llu\n", cur, sub_lo, subs_[static_cast<size_t>(cur)].end, prims_.size() - sub_prims0_, static_cast<unsigned long long>(sub_dropped_));
+            cur = -1;
         }
         if (end != 0 && !in_sub && addr == (end & 0x01fffff0u)) return;  // (the substitute may reach past the real chain's end)
         const uint8_t* t = mem(sub_addr(addr), 16u);
@@ -785,7 +802,7 @@ void Gs::chain_walk(uint32_t tag, uint32_t end, Mem&& mem) {
         size_t k = 0;
         dry_ = !in_sub && tag_skipped(addr, &k);  // (the skip ranges are the real chain's)
         {  // (the MRP's effects)
-            const FxRange* fr = fx_ranges_.empty() ? nullptr : fx_tag(addr, in_sub);
+            const FxRange* fr = fx_ranges_.empty() ? nullptr : fx_tag(addr, in_sub ? static_cast<uint8_t>(cur + 1) : 0);
             fx_now_ = fr != nullptr ? fr->kind : 0;
             fx_id_ = fr != nullptr ? fr->id : 0;
         }
@@ -794,6 +811,7 @@ void Gs::chain_walk(uint32_t tag, uint32_t end, Mem&& mem) {
             ++skipped_tags_;
             if (!skip_started_[k]) {  // the range's VU1 program starts, once
                 skip_started_[k] = true;
+                if (skip_ranges_[k].moby && moby_mark_ == SIZE_MAX) moby_mark_ = prims_.size();
                 if (skip_ranges_[k].host_3d != 0) {  // the host's 3D in the primitives' order, with context 1's state now
                     if (scr_prim_ >= 0) screen_picture();
                     Primitive p;
@@ -870,9 +888,8 @@ void Gs::capture_chain(uint32_t tag, uint32_t end, ChainCapture& c) const {
     c.end = end;
     c.size = 0;
     c.spans.clear();
-    c.sub_first = sub_first_;
-    c.sub_end = sub_end_;
-    c.sub_size = sub_size_of();
+    c.subs.clear();
+    for (int k = 0; k < static_cast<int>(subs_.size()); ++k) c.subs.push_back({subs_[static_cast<size_t>(k)].first, subs_[static_cast<size_t>(k)].end, sub_size_of(k)});
     auto take = [&c, this](uint32_t a, uint32_t len) -> const uint8_t* {
         const uint8_t* src = sub_mem(a);
         const size_t at = c.size;
@@ -893,20 +910,31 @@ void Gs::capture_chain(uint32_t tag, uint32_t end, ChainCapture& c) const {
     uint32_t addr = tag & 0x01fffff0u;
     // the substitute walked as chain_walk walks it (the same addresses asked for, in the same order)
     bool in_sub = false, drop = false;
-    const uint32_t sub_lo = sub_first_, sub_hi = sub_first_ + sub_size_of();
-    auto sub_addr = [&](uint32_t a) { return in_sub && a >= sub_lo && a < sub_hi ? (a | kSubFlag) : a; };
+    int cur = -1;
+    uint32_t sub_lo = 0, sub_hi = 0, done = 0;
+    auto sub_addr = [&](uint32_t a) { return in_sub && a >= sub_lo && a < sub_hi ? sub_flagged(a, cur) : a; };
     for (int guard = 0; guard < 200000; ++guard) {
-        if (sub_first_ != 0 && !in_sub && !drop && addr == sub_first_) {
-            in_sub = true;
-            stack.clear();
-        }
+        if (!in_sub && !drop)
+            for (int k = 0; k < static_cast<int>(subs_.size()); ++k)
+                if ((done >> k & 1u) == 0 && addr == subs_[static_cast<size_t>(k)].first) {
+                    cur = k;
+                    sub_lo = subs_[static_cast<size_t>(k)].first;
+                    sub_hi = sub_lo + sub_size_of(k);
+                    in_sub = true;
+                    stack.clear();
+                    break;
+                }
         if (in_sub && addr == sub_hi) {
             in_sub = false;
             drop = true;
-            addr = sub_first_;
+            addr = sub_lo;
             stack.clear();
         }
-        if (drop && addr == sub_end_) drop = false;
+        if (drop && addr == subs_[static_cast<size_t>(cur)].end) {
+            drop = false;
+            done |= 1u << cur;
+            cur = -1;
+        }
         if (end != 0 && !in_sub && addr == (end & 0x01fffff0u)) return;  // (the substitute may reach past the real chain's end)
         const uint8_t* t = take(sub_addr(addr), 16u);
         if (t == nullptr) return;
@@ -936,9 +964,14 @@ void Gs::capture_chain(uint32_t tag, uint32_t end, ChainCapture& c) const {
 // vif1_chain on a capture (any thread: no EE memory read)
 void Gs::vif1_chain(const ChainCapture& c) {
     size_t at = 0;
-    sub_first_ = c.sub_first;  // (the substitute's addresses as the capture saw them; its bytes are in the capture)
-    sub_end_ = c.sub_end;
-    sub_replay_size_ = c.sub_size;
+    subs_.clear();  // (the substitutes' addresses as the capture saw them; their bytes are in the capture)
+    for (const auto& u : c.subs) {
+        Sub v;
+        v.first = u[0];
+        v.end = u[1];
+        v.replay_size = u[2];
+        subs_.push_back(std::move(v));
+    }
     chain_walk(c.tag, c.end, [&c, &at](uint32_t a, uint32_t) -> const uint8_t* {
         if (at < c.spans.size() && c.spans[at][0] == a) {
             const auto& sp = c.spans[at++];

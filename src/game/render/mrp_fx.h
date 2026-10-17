@@ -89,13 +89,15 @@ void mrp_fx_particles_patch(bool begin);
 bool mrp_fx_particles_widen_needed(float widen);
 
 // orig: (host) per host frame, in the chain's stage (the game's thread, after the update): the GS replica's effects ranges for the
-// chain about to be walked (`substitute`: the effects shadow's chain is walked in place of the real block) and the projections the
-// producers used, kept for the drawing. `active`: a frame whose world the MRP draws. Returns false when the replica draws the
-// effects itself this frame.
-bool mrp_fx_chain_ranges(bool active, bool substitute, std::vector<gs::Gs::FxRange>& ranges);
+// chain about to be walked (`subs`: the shadow blocks whose chains are walked in place of the real blocks, mrp_lod_shadow_slot's slots,
+// in the order given to gs::Gs::add_chain_substitute) and the projections the producers used, kept for the drawing. `active`: a frame
+// whose world the MRP draws. Returns false when the replica draws the effects itself this frame.
+bool mrp_fx_chain_ranges(bool active, const std::vector<int>& subs, std::vector<gs::Gs::FxRange>& ranges);
 // orig: (host) the frame's primitives drawn in their order (the GS replica's chain joined): the runs of the MRP's (fx) by the MRP, the
 // runs between them by `gs_draw(from, to)` (the GS replica's gs::draw over those primitives); into the bound framebuffer, viewport `vp`
-void mrp_fx_draw(const gs::Gs& gs, int win_w, int win_h, const gs::Viewport* vp, const std::function<void(size_t, size_t)>& gs_draw);
+// (`from` / `to`: only the primitives [from, to): the ones before the moby pass go under the MRP's mobys, Gs::moby_mark)
+void mrp_fx_draw(const gs::Gs& gs, int win_w, int win_h, const gs::Viewport* vp, const std::function<void(size_t, size_t)>& gs_draw, size_t from = 0,
+                 size_t to = SIZE_MAX);
 // orig: (host) testing (RAC1_MRP_FX_KICKCHECK=1): a start of the particle program (`hash`) on the GS replica's VU1 (`vu`: a vu1::Vu1)
 // run on the VU interpreter from a copy of the same state as well, its kicks and data memory compared with the port's; true when it ran
 // the program (the port, its kicks to `kick`)

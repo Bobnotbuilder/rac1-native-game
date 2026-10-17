@@ -1,13 +1,13 @@
 # Environment variables
 
-rac1-native reads a number of `RAC1_*` environment variables. This page lists all of them: 279 in
+rac1-native reads a number of `RAC1_*` environment variables. This page lists all of them: 282 in
 total, in three groups.
 
 | Group | Count | Who it is for |
 |---|---|---|
 | [Player](#player-variables) | 18 | Settings a player may want to change: files, window, audio, the ISO |
-| [Debugging](#debugging-variables) | 205 | Developers: profilers, overlays, switching a renderer or an optimisation on or off to compare |
-| [Automated testing](#automated-testing-variables) | 56 | Scripted and headless runs: frame counts, screenshots, simulated input, self-checks |
+| [Debugging](#debugging-variables) | 207 | Developers: profilers, overlays, switching a renderer or an optimisation on or off to compare |
+| [Automated testing](#automated-testing-variables) | 57 | Scripted and headless runs: frame counts, screenshots, simulated input, self-checks |
 
 The oracle (`build/tests/ovl_oracle`) reads variables of its own (`ORACLE_*`, `RAC1_ORACLE_DUMPS`): see
 [The oracle](oracle.md).
@@ -96,7 +96,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_MOBY_DEBUG` | any value = on; default off | Prints the hero moby's joint count, first joint and model matrix every frame in the old host moby drawing path. |
 | `RAC1_MOBY_DIFF` | any value = on; default off | Compares the GPU moby renderer's draw state (prim, texture, clamp registers) with the GS's own for each draw and reports mismatches; it also turns the moby skip optimisation off. |
 | `RAC1_MOBY_GPU` | nonzero = use the GPU moby renderer; 0 = off; default off (the modern pipeline is used instead) | Selects the older GPU-based moby renderer in place of the default modern pipeline for mobys. |
-| `RAC1_MOBY_LIST` | any value = on; default off | Prints a list of the mobys in the level's moby pool (with their update function addresses) once after the level starts. |
+| `RAC1_MOBY_LIST` | any value = on; default off | Once after the level starts, prints the mobys in the level's moby pool whose update function has no port, the particle types whose update (the table 0x1b1e80) has no port, and the level's live cameras; at the end of a run, the live mobys near the hero. |
 | `RAC1_MOBY_MRP` | nonzero = modern pipeline for mobys, 0 = faithful path; default follows RAC1_MRP (on) | Chooses whether mobys are drawn by the modern rendering pipeline or by the faithful path, independently of the world. |
 | `RAC1_MOBY_NEW_TRACE` | any value = on; default off | Prints each moby that appears for the first time and how it gets drawn. |
 | `RAC1_MOBY_TRACE` | any value = on; default off | Prints every packet kicked to the GPU moby renderer (GIF tag fields) for inspection. |
@@ -166,6 +166,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_MRP_WIDEN_0338` | any value = on; default off | Uses an earlier, simpler widescreen culling patch (only the tangent and one constant) instead of the current one, to compare. |
 | `RAC1_MRP_WIDEN_EFFECTS` | 0 = off; default on | Switches off the widescreen widening of the effects (particles and similar) so they are culled as in 4:3. |
 | `RAC1_MRP_WIDEN_GLOWS` | 0 = off; default on | Switches off the widening of the glows and other drawn-list objects at the sides of a widescreen view, to compare. |
+| `RAC1_MRP_WIDEN_LISTS` | 0 = off; default on | Switches off the widening of the draw lists' callbacks (the levels' water, lava and sand-sea surfaces, culled against the 4:3 clip matrix) at the sides of a widened view, to compare. |
 | `RAC1_MUSIC_TRACE` | set (any value) = on; default off | Prints the music streams' state (sequence step, tracks, music and dialogue slots) each frame it changes. |
 | `RAC1_OVERSCAN` | 0 = full frame, 1 = the TV's area, or `left,right,top,bottom` in pixels; unset = the Graphics page's Overscan row | Overrides the 2D overscan crop. |
 | `RAC1_OWN_OVERLAY` | 0 = run every level on Veldin's overlay image; anything else or unset = each level on its own overlay | For comparison, makes every level run on the first level's overlay instead of its own. |
@@ -219,6 +220,8 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_SND_TRACE` | any value = on; default off | Prints a trace of the sound-bank (989snd) events the game sends to the emulated IOP sound driver. |
 | `RAC1_STALL_LOG` | milliseconds as a number; default off (-1) | Logs every game step (a game frame or a blocking loop's frame) that takes longer than the given number of milliseconds, with the vsyncs it spanned. |
 | `RAC1_SUB_TRACE` | any value = on; default off | Prints, for each substituted draw range, how many substitute and real primitives the GS emulation kept or dropped. |
+| `RAC1_SUN_COVER` | 0 = off; default on | The modern lighting's check of how much of the view sees the sun (the sun's shadows fade out in a view covered from it, such as a room). 0 keeps the zone's sun everywhere, to compare. See [Lighting](lighting.md). |
+| `RAC1_SUN_COVER_TRACE` | set (any value) = on; default off | Every 60 frames prints how much of the view sees the sun, the sky's share and the sun's weight scale that follows from it. |
 | `RAC1_SUN_DIR` | three comma-separated floats "x,y,z"; unset = the level's own sun direction | Overrides the direction of the sun used by the modern lighting and shadows (normalised; ignored if near zero length). |
 | `RAC1_SUN_LEVEL` | set (any value) = on; default off | The modern lighting's sun always uses the level's light set 0 (the old way) instead of the light set the hero is lit with. See [Lighting](lighting.md). |
 | `RAC1_SUN_TRACE` | set (any value) = on; default off | Prints the light sets the hero is lit with, for the modern lighting's sun. See [Lighting](lighting.md). |
@@ -307,6 +310,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_RAMDUMP` | frame,filename | At the given frame writes the whole 32 MB of EE RAM plus the scratchpad to the file, for offline comparison. |
 | `RAC1_RAMHASH` | file path; unset = off | After each game frame appends per-page hashes of EE RAM and scratchpad to the file, so two runs can be compared. |
 | `RAC1_REALTIME` | 1 = on; default off | A headless run steps the game as a window does: 60 game frames a second of the wall clock, several in one host frame when the host is slower, the stalls not caught up; with RAC1_FPS_CAP (the host frames' rate), RAC1_PACE_GAME=0 (a cap above 60, as VSync at 75 Hz), RAC1_HOST_DELAY_MS and RAC1_AUDIO_DEVICE=null it measures the game's speed and the sound's queue as a player's machine would. Prints `[pace]` (game steps a second) at the end. |
+| `RAC1_SEQ_PEEK` | `<address>[:<n>]` entries separated by commas (decimal or 0x hex); default off | During a simulated-input script, at each RAC1_SEQ_TRACE line prints n signed halfwords (default 2) of EE memory from each address. |
 | `RAC1_SEQ_TRACE` | integer n; default 0 (off) | During a simulated-input script, every n frames prints the hero state, position, game mode, level and bolts. |
 | `RAC1_SEQ_WATCH` | integer moby class; default off | During a simulated-input script, traces every moby of that class each frame (state, flags, position, first pvar words), plus the hero-freeze word and the active camera. |
 | `RAC1_SHOTS` | comma-separated list of frame numbers, e.g. 100,300; default none | Saves a screenshot shot_<frame>.ppm in the current directory when each listed game frame is shown, and prints a line with the game state at that frame. |
@@ -314,6 +318,7 @@ The variables are read in `src/` and `runtime/` (search for `"RAC1_` to find the
 | `RAC1_SIM_HOST` | comma-separated host input names (keys, mouse buttons, mouse axes); unset = none | Supplies the host-device inputs that the "h" keys of a menu: or title: RAC1_SIM_INPUT script press, in order. Unrecognised names are reported and skipped. |
 | `RAC1_SIM_INPUT` | script name: forward, jump, dive, turn, attack, throw, hud, quick, fire, shoot, hold, holdwalk, look, start, ship, shipskip, vendor, menu:<keys>, title:<keys> or seq:<script>; default unset = real input | Simulates the pad with a scripted input pattern. Also makes the run ignore physical gamepads so it is deterministic. |
 | `RAC1_STEPS` | integer >= 1; default 1 | In a headless run, the number of game frames run per host frame (exercises the catch-up path of a windowed run). Ignored in windowed runs. |
+| `RAC1_TEST_ZERO_FB` | <first>,<last>[,raw] game frames (last exclusive); unset = off | The host frames of those frames see a framebuffer of 0 x 0, as a minimised window's (on Windows a fullscreen window alt-tabbed out of): nothing is drawn or presented and the game goes on at 60 frames a second. With `raw` the renderers get the 0 x 0 size instead (the behaviour before the minimised window was skipped). |
 | `RAC1_TITLE_HOST` | 0 or 1; unset = the title scene is drawn through the normal chain (modern or faithful) | 1 draws the title screen's scene with the older host renderers instead; 0 forces the normal chain. |
 | `RAC1_TITLE_WAIT` | integer frames; default 60 | With a RAC1_SIM_INPUT title: script, how many frames after the title appears before Start is pressed. |
 | `RAC1_UNLOCK_PLANETS` | comma-separated level numbers, e.g. 2,3,4; unset = none | At the first gameplay frame, makes those planets reachable from the ship by calling the game's own unlock routine, so the galactic map shows them. |

@@ -5,7 +5,8 @@
  "includes": [
   "game/ovl/weapons.h",
   "game/ovl/ryno.h",
-  "game/ovl/pause_menu.h"
+  "game/ovl/pause_menu.h",
+  "game/enhance/advanced.h"
  ],
  "functions": [
   {
@@ -33,7 +34,10 @@
     "2ccb7c",
     "2cce94",
     "2cceb0"
-   ]
+   ],
+   "host": {
+    "2ccc30": "advanced_aim_shot_hand(s3.w(), sp.w() + 0x80);  // enhancement: the modern aim's line (advanced.h), the original's facing otherwise"
+   }
   }
  ],
  "register_fn": "ryno_fns_register",
