@@ -57,6 +57,8 @@ constexpr VariantRow kVeldinFinale[] = {
     {0x00229b70, 0x0022e8f8, 0x6a30}, // hero_input_update
     {0x00233210, 0x00236830, 0x18},  // hero_mobys_set_flag1
     {0x00233248, 0x00236848, 0x20},  // hero_mobys_clear_flag1
+    // the same code as Veldin's (the matcher could not place it): the Goodies page's Skill Points text panel, called through its widget (batch 411)
+    {0x0027fd38, 0x00281cc0, 0x19c},  // special_text_draw
 };
 }  // namespace
 

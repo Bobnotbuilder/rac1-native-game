@@ -107,6 +107,12 @@ bool menu_page_widget_call(uint32_t fn, uint32_t w, int32_t a1, int32_t& r) {
         case 0x00277be8: r = icon_list_draw(w); return true;
         case 0x0027f240: r = weapons_help_focus_in(w); return true;
         case 0x0027f308: r = gadgets_help_focus_in(w); return true;
+        case 0x00277e28: r = cheats_list_focus_in(w); return true;
+        case 0x0027f970: r = level_movies_focus_in(w); return true;
+        case 0x0027f9b0: r = sketchbook_update(w); return true;
+        case 0x0027fa98: r = epilogue_update(w); return true;
+        case 0x0027fba0: r = epilogue_arrows_draw(w); return true;
+        case 0x0027fd38: r = skill_points_text_draw(w); return true;
         default:
             if (end_menu_widget_call(ovl_code_to_veldin(fn), w, a1, r)) return true;  // (the menu at the end of the game: end_menu_tr.cpp)
             return galactic_map_widget_call(fn, w, a1, r);  // (the ship's galactic map)
@@ -115,7 +121,8 @@ bool menu_page_widget_call(uint32_t fn, uint32_t w, int32_t a1, int32_t& r) {
 
 // A label's update: when focused, Start / Select / L1 close the menu (1, unless +0x124),
 // triangle goes to the parent page (or -1, closing, on a root page without +0x124).
-// orig: 0x002779c8
+// (Eudora's, Rilgar's and the finale's other copies, the same instructions: this port, proved by batch 411.)
+// orig: 0x002779c8 L4:0x0026acf8 L5:0x002a1cd0 L18:0x00279950
 int32_t menu_label_update(uint32_t w) {
     if (focused() != w) return 0;
     if ((lwu(PAD + 0x1c4) & 0xd00) != 0 && lw(MS + 0x124) == 0) return 1;

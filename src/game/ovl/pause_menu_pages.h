@@ -30,6 +30,14 @@ int32_t menu_buf_ready(uint32_t buf);         // orig: 0x00283c68
 void disc_read_break();                       // orig: 0x00265f00
 uint64_t image_upload(uint32_t img);          // orig: 0x00245a20
 
+// --- the Goodies page's (state 9) sub-pages (pause_menu_special.cpp) ---------------------------------
+int32_t cheats_list_focus_in(uint32_t w);          // orig: 0x00277e28
+int32_t level_movies_focus_in(uint32_t w);  // orig: 0x0027f970
+int32_t sketchbook_update(uint32_t w);         // orig: 0x0027f9b0
+int32_t epilogue_update(uint32_t w);         // orig: 0x0027fa98
+int32_t epilogue_arrows_draw(uint32_t w);           // orig: 0x0027fba0
+int32_t skill_points_text_draw(uint32_t w);             // orig: 0x0027fd38
+
 // --- Options' sub-pages (pause_menu_options.cpp) ---------------------------------------------
 void text_small(int32_t x, int32_t y, uint64_t colour, uint32_t s, int32_t n);  // orig: 0x001fb370
 void text_box_small(uint32_t b, uint64_t colour, uint32_t s, int32_t n);       // orig: 0x001fc438

@@ -28,16 +28,16 @@ PACKAGES = [
      "with the two helpers they call. Every level's particle table lists them; the earlier fix showed that ported level "
      "code spawns some of them."),
     ("P3", "Menu widget functions outside the dispatch",
-     "Widget functions of the pause menu, the planet map, the save / load pages and the end-of-game menu that the "
-     "game's page data names but the port's widget dispatch (pause_menu.cpp, pause_menu_widgets.cpp, end_menu.cpp) "
-     "does not handle: a page that uses one logs `menu widget function` and does nothing there. Each level also has its "
-     "own build of a help page's and a label's functions (the same instructions as Veldin's, other data) that the "
-     "Veldin port runs. The tour walked the pause menu's pages on 13 levels without meeting one; the save, end-of-game "
-     "and planet map pages are still to walk. Small functions."),
+     "Widget functions that the game's page data names but the port's widget dispatch (pause_menu.cpp, "
+     "pause_menu_widgets.cpp, end_menu.cpp) did not handle. Those of the pause menu's Goodies page (shown once the game "
+     "is finished) are ported (pause_menu_special.cpp, batch 411); the levels' own copies of a help page's focus-in and "
+     "of a label's update are proved the same as the Veldin ports that run in their place (batch 411); the title's "
+     "pages that every overlay carries and two widgets no page lists are `unopened` (below)."),
     ("P4", "The levels' own builds the Veldin port stands in for",
      "Functions a level builds differently from Veldin, reached by direct calls from ported code that runs the Veldin "
-     "port instead. Kerwan's rail search is the one with a visible risk (grind rails on Kerwan); compare each with the "
-     "per-level oracle and add a variants row and a port where they differ."),
+     "port instead: each compared with the level's own copy by the per-level oracle (batch 410). Kerwan's rail search "
+     "differs and has its own port (find_rail_l3_v); Aridia's and Kerwan's cutscene extras and Gemlik's hit record "
+     "are proved the same as the Veldin ports (their annotations list the levels' addresses)."),
     ("P5", "Quitting to the title",
      "Quit from the pause menu ends the program instead of going back to the title: the boot data's read (0x243d38) "
      "and the boot module's restart are not ported (docs/status.md lists it)."),
@@ -146,7 +146,7 @@ def write(out, doc, a):
         else:
             tag = nt[0] if nt else None
             state = {"host": "host", "debug": "debug", "inline": "ported", "false": "false",
-                     "inprogress": "inprogress"}.get(tag, "left")
+                     "inprogress": "inprogress", "unopened": "unopened"}.get(tag, "left")
         U.append(dict(uid=uid, rows=rows, rep=rep, bad=bad, note=nt, size=size, state=state,
                       ported_somewhere=any(r["status"] == "ported" for r in rows),
                       runtime=sorted(set().union(*[ev.get(r["image"] + ":" + r["addr"], set()) for r in rows]))))
@@ -199,6 +199,8 @@ def write(out, doc, a):
                      ("left", "**reached, not ported: the work left**"),
                      ("host", "reached, replaced by host code on purpose (hardware, DMA, GS, kernel, movie library)"),
                      ("debug", "reached, debug features of the original (not turned on in the retail game)"),
+                     ("unopened", "named only by menu data that no code opens there (the title's pages carried in the "
+                                  "levels' overlays, widgets no page lists)"),
                      ("false", "not functions (data words that look like code pointers)"),
                      ("dead", "not connected: no copy reached (cut content, dead code)")]:
         w("| %s | %d | %s |" % (label, st[k], kb(stb[k])))
@@ -313,13 +315,15 @@ def write(out, doc, a):
     # replaced / debug
     w("## Reached, not to port")
     w("")
-    w("Replaced by host code or the runtime layer on purpose, or development features of the original that the retail "
-      "game never turns on (a port of them would be an optional extra, see [Enhancements](enhancements.md)).")
+    w("Replaced by host code or the runtime layer on purpose, development features of the original that the retail "
+      "game never turns on (a port of them would be an optional extra, see [Enhancements](enhancements.md)), or named "
+      "only by menu data that nothing opens where they are (`unopened`: checked by following the menu's pages from the "
+      "states the code opens).")
     w("")
     w("| Function | Size | Copies | Kind | What |")
     w("|---|---:|---:|---|---|")
     groups = collections.OrderedDict()
-    for u in sorted([u for u in U if u["state"] in ("host", "debug")], key=lambda u: (u["rep"]["image"], u["rep"]["addr"])):
+    for u in sorted([u for u in U if u["state"] in ("host", "debug", "unopened")], key=lambda u: (u["rep"]["image"], u["rep"]["addr"])):
         key = u["note"][2] if u["note"] else ""
         groups.setdefault((u["state"], key), []).append(u)
     for (state, key), us in groups.items():

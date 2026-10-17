@@ -36,6 +36,10 @@ constexpr VariantRow kKerwan[] = {
     {0x00217970, 0x0020ef60, 0x6690},  // hero_state_update
     {0x002223f8, 0x00216648, 0x3b48},  // hero_set_state
     {0x00229b70, 0x0021c668, 0x4eb0},  // hero_input_update
+    // its own build of the rail search (find_rail_l3_v: other thresholds; the Veldin function dispatches to it)
+    {0x0020cd08, 0x00205830, 0x200},  // find_rail
+    // its cutscene_level_extras holds only Veldin's level 3 branch (scene 5's sparks, the same instructions): Veldin's port runs (batch 410)
+    {0x0023e268, 0x0022c728, 0x190},  // cutscene_level_extras
     // the same code as Veldin's (the matcher could not place them: the next function's first words trail the Veldin
     // size; checked word by word, the relocations aside); the Veldin port runs
     {0x00259fe8, 0x00248a50, 0x128},  // floor_light_add

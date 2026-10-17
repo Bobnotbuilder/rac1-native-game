@@ -209,6 +209,7 @@ add_library(rac1_game STATIC
     ovl/pause_menu_items.cpp
     ovl/pause_menu_models.cpp
     ovl/pause_menu_quick.cpp
+    ovl/pause_menu_special.cpp
     ovl/planet_map.cpp
     ovl/planet_map_draw.cpp
     ovl/planet_missions.cpp

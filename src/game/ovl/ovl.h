@@ -290,6 +290,7 @@ void hero_moby_update();                                 // orig: 0x00208820
 void hero_land_fx(int32_t puffs, int32_t sparks, int32_t ring);  // orig: 0x00209ca8
 int32_t find_rail_v(const Vec4& pos, uint32_t* path_out, Vec4& point, int32_t* idx, float* dist, int32_t* loop_out, uint32_t skip, uint32_t only);  // orig: 0x0020cd08
 int32_t find_rail(uint32_t pos, uint32_t path_out, uint32_t point, uint32_t idx, uint32_t dist, uint32_t loop_out, uint32_t skip, uint32_t only);  // orig: 0x0020cd08
+int32_t find_rail_l3_v(const Vec4& pos, uint32_t* path_out, Vec4& point, int32_t* idx, float* dist, int32_t* loop_out, uint32_t skip, uint32_t only);  // orig: L3:0x00205830
 int32_t path_closest_point_v(uint32_t path, const Vec4& p, Vec4& out, int32_t* idx, float* dist, int32_t loop, float range, float step, float h);  // orig: 0x0025df68
 int32_t path_closest_point(uint32_t path, uint32_t p, uint32_t out, int32_t* idx, float* dist, int32_t loop, float range, float step, float h);  // orig: 0x0025df68
 void spawn_particle_1c_v(const Vec4& pos, const Mat4* mat, float speed);  // orig: 0x0026de90

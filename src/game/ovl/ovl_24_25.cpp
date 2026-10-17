@@ -879,8 +879,9 @@ int32_t sub_00256de0(uint32_t pos, float* t, int32_t* idx) {
     return 1;
 }
 
-// orig: 0x00259bc8 — record an event for moby in the 64-entry ring 0x178100 (next index
-// *(0x173e54)), unless its current entry is stronger than `strength`.
+// orig: 0x00259bc8 L13:0x00265c30 — record an event for moby in the 64-entry ring 0x178100 (next index
+// *(0x173e54)), unless its current entry is stronger than `strength`. (Gemlik's build, its own ring and counter: the same
+// instructions, proved by batch 410.)
 void sub_00259bc8_v(uint32_t moby, uint32_t a, uint32_t b, uint32_t pos, const Vec4& dir, float strength) {
     const uint32_t RING = OV(0x00178100), NEXT = OV(0x00173e54);
     const uint32_t s = lwu(NEXT);
