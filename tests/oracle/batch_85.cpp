@@ -59,8 +59,10 @@ void batch_85() {
                       }}};
     // the callees left TODO_PORT: the kernel's vsync wait, thread priority and vsync callback, the
     // DMA kick, the card's machine, the state table, the GS display registers, the fade
+    // (the level exit's: DMA handlers; its boot module read back 0x243d38 and the flight's drawing 0x2900a0 run on both
+    // sides, ported: batches 420 and 143)
     g_extra_noop_hooks = {0x00122298, 0x001188e0, 0x001188a0, 0x00122e68, OVF(0x002a08c8), OVF(0x001f8540), OVF(0x0023af30),
-                          0x001187d0, 0x001190f8, OVF(0x00243d38), OVF(0x002900a0)};  // (the level exit's: DMA handlers, boot data, the flight's drawing)
+                          0x001187d0, 0x001190f8};
     // 989snd's IOP server (batch 84's), the stream system's disc reads done
     auto result = [](uint32_t id, uint32_t a0) -> uint32_t {
         const uint32_t h = (id * 0x9e3779b1u) ^ (a0 * 0x85ebca6bu);
@@ -205,6 +207,10 @@ void batch_85() {
             }
         return uint64_t{0};
     });
+    // the segment records' w lanes (Veldin 0x1efc70's sqc2 of VU0 registers into 0x173e80..): the flight's drawing the exits
+    // above ran leaves other VU0 registers in the interpreter than the port's, which the screens' segment tests below store
+    // (as batches 142 / 160)
+    for (uint32_t a = OV(0x00173e80); a < OV(0x00173fc0); a += 0x10) g_ignored_words.push_back(a + 0xc);
 
 
     // ---- the memory card (task 0301) ----

@@ -323,6 +323,9 @@ void update_menu_main_install() {
 // orig: (none) — enhancement: the Updates page's address (graphics_menu_back)
 uint32_t updates_page() { return U_PAGE; }
 
+// orig: (none) — enhancement: the root page's Updates button, its widget in slot 5 once installed (graphics_menu_back)
+uint32_t updates_root_widget() { return U_ROOT_WIDGET; }
+
 // orig: (none) — enhancement: a row on the Updates page changed (Cross or Left/Right)
 bool update_menu_setting_changed(uint32_t byte) {
     if (byte == U_STEP_CHECK) {

@@ -611,6 +611,7 @@ uint32_t graphics_text(int32_t id) {
 }
 
 uint32_t updates_page();
+uint32_t updates_root_widget();
 void update_menu_main_install();
 
 // orig: (none) — enhancement (graphics.h)
@@ -636,7 +637,9 @@ void graphics_set_monitors(std::vector<std::string> names) {
 // orig: (none) — enhancement (graphics.h)
 void graphics_menu_back(uint32_t cur, uint32_t to, uint32_t mobys) {
     if (cur == 0 || to == 0) return;
-    if (to == ROOT_PAGE && lwu(mobys + 5 * 4) != 0) {  // (the Updates button in slot 5 of the root page)
+    // (the Updates button in slot 5 of the root page, when it is there: not with the enhancements off, where slot 5 is
+    // the original's and the game's own code alone moves its moby)
+    if (to == ROOT_PAGE && lwu(ROOT_PAGE + 0x44 + 5 * 4) == updates_root_widget() && lwu(mobys + 5 * 4) != 0) {
         const uint32_t m5 = lwu(mobys + 5 * 4);
         const uint32_t seq5 = lwu(lwu(m5 + 0x24) + 0x48 + 0x13 * 4);
         moby_set_anim(m5, 0x13, static_cast<int32_t>(lbu(seq5 + 0x10)) - 1);
