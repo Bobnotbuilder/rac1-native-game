@@ -1,6 +1,6 @@
 // The game's start before the first level: the boot module of SCUS_971.99 (its
-// code 0x1e8d00..0x23d360, the same as the disc's globals/frontbin.elf; called the boot module
-// below) checks the memory card (its pictures), plays the intro movie, shows the copyright, runs
+// code 0x1e8d00..0x23d360; called the boot module below; the disc's frontbin, read back when the
+// game quits to the title, is another build of it, see boot_return_start) checks the memory card (its pictures), plays the intro movie, shows the copyright, runs
 // the title screen (its own scene, logo, "press start", music) and its main menu, then leaves
 // through its copy of the level exit to the chosen level.
 //
@@ -17,6 +17,10 @@ namespace rac1 {
 
 // The boot module's start (its image loaded, the translation set to it, the host's IOP up).
 void boot_start();
+// The quit to the title: the boot module read back from the disc (the level exit's 0x243d38) started
+// (its image loaded, the translation set to it): its main without the boot's pictures and intro
+// movie, then the title loop.
+void boot_return_start();
 // One game frame of the boot. False once the title loop is left (0x15f5b0, by New Game / Load
 // Game / the debug menu): the next level then in 0x15f600, the current level -1 (as the boot
 // module leaves it for its level exit 0x231ff0 = the overlays' 0x292e08).

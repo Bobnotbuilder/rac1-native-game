@@ -241,10 +241,13 @@ def write(out, doc, a):
     w("")
     lat = [u for u in U if u["note"] and u["note"][0] == "latent" and u["state"] == "left"]
     lat += [u for u in U if u["state"] == "left" and u not in lat and u["runtime"]]
-    w("| Function | Size | Where | What | Seen in the tour |")
-    w("|---|---:|---|---|---|")
-    for u in sorted(lat, key=lambda u: (u["note"][1] if u["note"] and u["note"][1] else "P9", u["rep"]["addr"])):
-        w(row_of(u, ev))
+    if not lat:
+        w("None: every function the tour met or a note marks as latent is ported.")
+    else:
+        w("| Function | Size | Where | What | Seen in the tour |")
+        w("|---|---:|---|---|---|")
+        for u in sorted(lat, key=lambda u: (u["note"][1] if u["note"] and u["note"][1] else "P9", u["rep"]["addr"])):
+            w(row_of(u, ev))
     w("")
     w("The [moby] and [particle] lines of RAC1_MOBY_LIST and the TODO_PORT lines the tour logged are in "
       "`assets/generated/inventory/runtime_todo.csv`; the live mobys with no port, per level:")

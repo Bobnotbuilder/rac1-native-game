@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Match the boot module (the code SCUS_971.99 runs before the first level: the boot, the
-intro movie, the title and its main menu; the disc's globals/frontbin.elf is the same image)
+intro movie, the title and its main menu; the disc's frontbin, read back on quitting to the title, is
+another build of it: the same data and functions but its main and title loop, its code moved)
 against Veldin's overlay, both ways, as tools/overlay_match does for the levels.
 
 The boot module occupies SCUS_971.99's sections .lit / .bss / .data / lvl.* / .text
@@ -110,8 +111,28 @@ def main():
     (out / "front.txt").write_text("\n".join(lines) + "\n")
     print("\n".join(l for l in lines if l.startswith("#")))
     # Veldin -> the boot module, as for a level
+    om.DROP_COLLISIONS = True
     om.compare(V, F, "front", out, None)
-    (out / "levelfront.txt").replace(out / "front_reloc.txt")
+    # the boot module's functions whose Veldin span runs past their copy's end (Veldin's next function starts later: its
+    # padding, or code the boot module does not have): the Veldin -> boot module matching misses them; the boot module's
+    # own matching (above, its spans) found them: added, with the shorter span
+    rel = [l for l in (out / "levelfront.txt").read_text().split("\n") if l]
+    have_v, have_f = set(), set()
+    for line in rel:
+        p = line.split()
+        if len(p) >= 4 and p[0] == "fn":
+            have_v.add(int(p[1], 16))
+            have_f.add(int(p[2], 16))
+    vstarts = V.function_starts()
+    vspan = {x: e - x for x, e in zip(vstarts, vstarts[1:] + [V.code_end])}
+    added = ["fn %08x %08x %x" % (v, f, min(vspan.get(v, sizes[f]), sizes[f]))
+             for f, v in sorted(fmap.items(), key=lambda t: t[1]) if v not in have_v and f not in have_f]
+    if added:
+        fns = sorted([l for l in rel if l.startswith("fn ")] + added)
+        rel = [l for l in rel if not l.startswith("fn ") and not l.startswith("data ")] + fns + [l for l in rel if l.startswith("data ")]
+        print("# the boot module's functions added from its own matching: %d" % len(added))
+    (out / "front_reloc.txt").write_text("\n".join(rel) + "\n")
+    (out / "levelfront.txt").unlink()
 
 
 if __name__ == "__main__":

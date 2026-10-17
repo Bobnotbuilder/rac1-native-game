@@ -191,6 +191,48 @@ class Overlay:
         return sorted(s)
 
 
+BASE_END = 0x15EF00  # the boot executable's core and globals: the same addresses in every image
+DROP_COLLISIONS = False  # (set by front_match.py)
+
+
+def same_strict(V, i, L, j, n):
+    """Two bodies with the same masked words alike beyond the mask (the tie-break between copies that differ only in a
+    masked field, e.g. two flag tests, or a structure's field): the offsets of the loads / stores / addiu whose base
+    holds no address built by a lui (a structure's fields: not relocated) the same, and the addresses into the boot
+    executable (below 0x15ef00: its globals, the game's flags, its library calls) the same."""
+    if i < 0 or j < 0 or i + n > len(V.code) or j + n > len(L.code):
+        return False
+    hv, hl = {}, {}
+    for k in range(n):
+        x, y = V.code[i + k], L.code[j + k]
+        if V.masked[i + k] != L.masked[j + k]:
+            return False
+        op, rs, rt = x >> 26, (x >> 21) & 31, (x >> 16) & 31
+        if op == 3:
+            tx, ty = (x & 0x3FFFFFF) << 2, (y & 0x3FFFFFF) << 2
+            if (tx < BASE_END or ty < BASE_END) and tx != ty:
+                return False
+        elif op == 0x0F:
+            hv[rt], hl[rt] = (x & 0xFFFF) << 16, (y & 0xFFFF) << 16
+            continue
+        elif (op in MEM or op in ADDI) and rs != SP:
+            if rs == GP:
+                ax, ay = (GP_VALUE + sx16(x)) & 0xFFFFFFFF, (GP_VALUE + sx16(y)) & 0xFFFFFFFF
+            elif rs in hv and rs in hl:
+                ax, ay = (hv[rs] + sx16(x)) & 0xFFFFFFFF, (hl[rs] + sx16(y)) & 0xFFFFFFFF
+            elif (x & 0xFFFF) != (y & 0xFFFF):
+                return False
+            else:
+                ax = ay = None
+            if ax is not None and (ax < BASE_END or ay < BASE_END) and ax != ay:
+                return False
+        d = gpr_written(x)
+        if d is not None:
+            hv.pop(d, None)
+            hl.pop(d, None)
+    return True
+
+
 def match(V, L, starts, K=6):
     """Veldin function -> level address, for the functions found once in level code."""
     idx = collections.defaultdict(list)
@@ -241,6 +283,9 @@ def match(V, L, starts, K=6):
         k = bisect.bisect_left(keys, a)
         near = {fmap[keys[j]] - keys[j] for j in (k - 1, k) if 0 <= j < len(keys)}
         pick = [c for c in cands if c - a in near]
+        if len(pick) > 1:
+            i, n = (a - V.code_base) // 4, span[a] // 4
+            pick = [c for c in pick if same_strict(V, i, L, (c - L.code_base) // 4, n)] or pick
         if len(pick) == 1:
             fmap[a] = pick[0]
     # the functions too short to place on their own (or not found): at a matched neighbour's
@@ -251,13 +296,30 @@ def match(V, L, starts, K=6):
             continue
         i, n = (a - V.code_base) // 4, (e - a) // 4
         k = bisect.bisect_left(keys, a)
-        for d in sorted({fmap[keys[j]] - keys[j] for j in (k - 1, k) if 0 <= j < len(keys)}):
-            j = (a + d - L.code_base) // 4
-            if 0 <= j and j + n <= len(L.masked) and L.masked[j:j + n] == V.masked[i:i + n]:
-                fmap[a] = a + d
-                if L.code[j:j + n] == V.code[i:i + n]:
-                    exact += 1
-                break
+        ds = [d for d in sorted({fmap[keys[j]] - keys[j] for j in (k - 1, k) if 0 <= j < len(keys)})
+              if 0 <= (a + d - L.code_base) // 4 and (a + d - L.code_base) // 4 + n <= len(L.masked)
+              and L.masked[(a + d - L.code_base) // 4:(a + d - L.code_base) // 4 + n] == V.masked[i:i + n]]
+        # (two displacements fit: the copy alike beyond the mask, e.g. the one testing the same flag)
+        ds = [d for d in ds if same_strict(V, i, L, (a + d - L.code_base) // 4, n)] or ds
+        if ds:
+            j = (a + ds[0] - L.code_base) // 4
+            fmap[a] = a + ds[0]
+            if L.code[j:j + n] == V.code[i:i + n]:
+                exact += 1
+    # two functions placed on the same copy (identical masked bodies, one of them not in the level: e.g. a pair that
+    # differs in a field's offset): the copy keeps the one alike beyond the mask, when only one is (the boot module's
+    # map only, front_match.py: the levels' maps keep both, as the runtime's translation was proved with them)
+    by = collections.defaultdict(list)
+    for a, b in (fmap.items() if DROP_COLLISIONS else ()):
+        by[b].append(a)
+    for b, aa in by.items():
+        if len(aa) < 2:
+            continue
+        keep = [a for a in aa if same_strict(V, (a - V.code_base) // 4, L, (b - L.code_base) // 4, span[a] // 4)]
+        if len(keep) == 1:
+            for a in aa:
+                if a != keep[0]:
+                    del fmap[a]
     missing = [a for a in missing if a not in fmap]
     sizes = {a: e - a for a, e in zip(starts, ends)}
     return fmap, exact, amb, missing, sizes
