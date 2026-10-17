@@ -13,6 +13,7 @@
 #include <game/ovl/ovl_common.h>
 #include <game/ovl/pause_menu_pages.h>
 #include <game/ovl/screen_fade.h>
+#include <game/ovl/shared_fx_tr.h>
 #include <game/ovl/umbris_call.h>
 #include <game/ovl/oltanis_mobys.h>
 #include <game/ovl/variants_l14.h>
@@ -306,7 +307,8 @@ void cutscene_end() {
 // engines (0x2935b8); level 2, the class 0x1b1 mobys flagged 0x800; level 3 scene 5 frames
 // 900..1100, four sparks from the second moby's chain points (0x26ced0, not ported); level 7
 // scene 4, the ship (0x214, second moby) with its engines; level 14 scene 0 frames 0x1c..0x21,
-// the first moby's effect (0x23e008, not ported) and its draw 0x23db30; level 15 scenes 3 / 4,
+// the first moby's effect 0x23e008 and its draw 0x23db30 (shared_fx_tr.cpp; Oltanis runs its own
+// build of this function, so only a level 14 without it would reach them); level 15 scenes 3 / 4,
 // the mobys' lights.
 // orig: 0x0023e268
 void cutscene_level_extras() {
@@ -351,7 +353,7 @@ void cutscene_level_extras() {
     if (lw(0x0015ed84) == 0xe && lw(SC + 0x30) == 0) {
         const uint32_t m = lwu(SC + 0x17c);
         if (m != 0 && static_cast<uint32_t>(lw(SC + 0x34) - 0x1c) < 6u) {
-            TODO_PORT(0x0023e008, "level 14 scene 0 effect")(m);
+            cutscene_l14_effect_tr(m);
             sub_001f93e0(OVF(0x0023db30), m);
         }
     }

@@ -207,6 +207,10 @@ int32_t camera_type_call(uint32_t fn, uint32_t cam, uint32_t other) {
 
 // orig: (helper) jalr to one of the end-of-update callbacks queued at 0x168ff0
 void camera_callback_call(uint32_t fn) {
+    if (on_aridia() && fn == L2_ADDR(0x002fa770)) {  // Aridia's own callback (queued by the camera hook 0x2fa710)
+        cam_callback_2fa770_l2(0);
+        return;
+    }
     if (on_eudora() && fn == L4_ADDR(0x002f04a8)) {  // Eudora's own callback (queued by the camera hook 0x2f0448)
         eud_cam_callback_l4(0);
         return;

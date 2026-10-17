@@ -278,6 +278,8 @@ void sandmouse_glow_l2(uint32_t a0_in);
 
 //@gen cam_mode_hook_2fa710_l2
 
+//@gen cam_callback_2fa770_l2
+
 //@gen lv2_2ea7d0_l2
 
 //@gen lv2_2ea8b0_l2

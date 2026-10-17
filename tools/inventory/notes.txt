@@ -1,0 +1,130 @@
+# What we know about the functions the port does not run: our own words, read by tools/inventory/port_inventory.py doc.
+#
+# <image>:<address>[-<end>] <tag> [<package>] <description>
+#   image: L0..L18 (a level's overlay, L0 Veldin's, the reference), front (the boot module), core (the boot executable's
+#   libraries); a range covers the functions that start in it. A note applies to every copy of the function's body.
+#   tag:
+#     host        replaced by host code or the runtime layer on purpose (hardware, DMA, GS packets, the kernel): not to port
+#     debug       a development feature of the original (a debug camera or mode the retail game never turns on)
+#     inline      covered by its callers' ports (written into them, or a helper with a register ABI)
+#     inprogress  being ported on another branch
+#     latent      reached in a normal playthrough and not ported: a bug a player can meet
+#     check       reachable through a table or a pointer, not seen in the headless tour: to verify
+#     wire        ported for another level (the same code): only the registration / variants row is missing
+#     review      the level's own build differs from the Veldin port that runs in its place: to compare (per-level oracle)
+#     false       not a function (a data word that looks like a code pointer, a jump table's case)
+#     cut         cut content: nothing reaches it (see the cut content section)
+#   package: P1..P9 (the proposed work packages, docs/port-inventory.md)
+#
+# Addresses, sizes and our descriptions only: never the game's code or text.
+
+# ---- the overlay engine (Veldin's addresses: each level has a copy) ----------------------------------------------
+L0:001efbd0 inline the level collision tree's walk (a helper with its own register convention, written into the segment / sphere / capsule collision ports)
+L0:002678c0 inline alloc_particle's body (0x2678b8 sets the type argument and falls into it; the callers' ports call alloc_particle)
+L0:001f3770 debug draws the debug strings queued by the game (GS packets)
+L0:001f3a70 debug a helper of the debug free camera
+L0:001f3aa0 debug the debug free camera: moves the view with the face buttons (a development mode of the game frame)
+L0:001f4490 debug the debug free camera's target, copied from the hero's position
+L0:001f4598 debug the overlay's development mode (game mode -1): its update
+L0:001f58e0 debug the overlay's development mode (game mode -1): its draw
+L0:001f6da8 host reports a DMA channel timeout on screen (the host has no DMA timeouts)
+L0:001f80d0 host the GS start: display and draw environments (the host's renderer sets them)
+L0:001f8540 host writes the GS display registers (the host's window)
+L0:001f9f78 host builds the screen effects' GS list (the host's renderer draws the effects)
+L0:002005e8 host the GS memory set-up (frame / z buffers, texture pages) for the host's renderer
+L0:00200f18 host sends the display packet through the kernel's DMA
+L0:0024d6d0 host waits for a DMA channel (hardware)
+L0:0024dba0 host waits for the decompression's DMA (wad_decompress)
+L0:0024dbc0 host a DMA wait loop of wad_decompress
+L0:00267148 host reads the pad's packet from the SIO2 driver (the host's input builds it)
+L0:00295bf8 host the ties' end (the PAL display mode's path)
+L0:00295c50 host the ties' lighting (the PAL display mode's path)
+L0:00295d48 host the ties' VU1 packets (the PAL display mode's path; the host's MRP draws the ties)
+L0:002a08c8 host kicks a DMA packet (hardware)
+L0:002a1228 host installs the DMA interrupt handlers (the kernel)
+L0:002a1328 host removes the DMA interrupt handlers (the kernel)
+L0:002ee0e0-002f0cd0 host the movie player library (the IPU / MPEG decoder the overlay links): replaced by src/game/lib/movie_player.cpp and runtime/ipu
+L0:00243d38 latent P5 quitting to the title: reads the boot data back from the disc (the port ends the program instead)
+L0:0023a2d0 latent P1 the Metal Detector's HUD (HUD slot 7, camera 0x753a): its draw, a pointer hero_camera_7_update hands to the HUD (ported: hud_slot7_tr.cpp, every level; batch 400)
+L0:001fb470 latent P1 the large text box draw, called by the Metal Detector's HUD (ported with it: hud_slot7_tr.cpp)
+L0:0023db30 wire P8 level 14's scene 0 effect draw (cutscene_level_extras): Oltanis runs its own build; Veldin's ported too (shared_fx_tr.cpp, batch 401)
+L0:0023e008 wire P8 level 14's scene 0 effect (cutscene_level_extras): Oltanis runs its own build; Veldin's ported too (shared_fx_tr.cpp, batch 401)
+L0:00262360 inprogress P2 a helper of particle type 0x36's update
+L0:0025c230 inprogress P2 a helper of particle type 0x14's update
+L0:002694f8 inprogress P2 particle type 0x03's update
+L0:0026a418 inprogress P2 particle type 0x07's update (the same code as type 0x05's, which is ported)
+L0:0026a6f0 inprogress P2 particle type 0x09's update
+L0:0026c3c8 inprogress P2 particle type 0x11's update
+L0:0026c860 inprogress P2 particle type 0x14's update
+L0:0026d470 inprogress P2 particle type 0x18's update
+L0:0026e3a8 inprogress P2 particle type 0x1d's update
+L0:0026e670 inprogress P2 particle type 0x1e's update
+L0:0026f048 inprogress P2 particle type 0x21's update (type 0x3f's is the same code)
+L0:0026f898 inprogress P2 particle type 0x24's update
+L0:0026fa00 inprogress P2 particle type 0x25's update
+L0:0026fb00 inprogress P2 particle type 0x26's update
+L0:00270758 inprogress P2 particle type 0x2a's spawner (called by its own update)
+L0:00270948 inprogress P2 particle type 0x2a's update
+L0:00272438 inprogress P2 particle type 0x36's update
+L0:002738b0 inprogress P2 particle type 0x3f's update
+L0:002756f0 inprogress P2 particle type 0x4b's update
+L0:00275810 inprogress P2 particle type 0x4c's update
+L0:00277df8 check P3 a pause menu widget function (the widget table at 0x1b8970), not in the widget dispatch
+V:00277df8 check P3 a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch
+L0:00277e28 check P3 a pause menu widget function (0x1b7d20), not in the widget dispatch
+L0:0027d240 check P3 a planet map widget function (0x1b630c), not in the widget dispatch
+L0:0027f970 check P3 a save / load page widget function (0x1b8680), not in the widget dispatch
+L0:0027f9b0 check P3 a save / load page widget function (0x1b77d0), not in the widget dispatch
+L0:0027fa98 check P3 a save / load page widget function (0x1b7598), not in the widget dispatch
+L0:0027fba0 check P3 an end-of-game menu widget function (0x1b7544 / 0x1b759c), not in the widget dispatch
+L0:0027fd38 check P3 an end-of-game menu widget function (0x1b6e24), not in the widget dispatch
+L0:00280590 check P3 an end-of-game menu widget function (0x1b73b4), not in the widget dispatch
+L0:00250030 false a data word that points into the middle of a function (8 bytes)
+L0:0020d61c false a jump table's case of 0x20d5d0 (the per-kind parameter, its table at 0x1e7c40), after the function's first return: ported with it (sub_0020d5d0)
+# the levels' own builds the port stands in for (the Veldin port runs; the level's code differs)
+L3:00205830 review P4 Kerwan's build of the rail search (find_rail, 0x20cd08): without the thresholds Veldin's build changes in two sub-states and with the hero's 0x1ca flag; the Veldin port runs on Kerwan's grind rails
+L3:0022c728 review P4 Kerwan's build of the cutscenes' level extras (0x23e268): its own scene 5 sparks branch; the Veldin port runs (its level 3 branch, the sparks 0x26ced0 a TODO_PORT)
+L2:002400c8 review P4 Aridia's build of the cutscenes' level extras (0x23e268): only its own branch; the Veldin port runs (its level 2 branch)
+L13:00265c30 review P4 Gemlik's second copy of 0x259bc8 (the same instructions, other data): reached through a code pointer, the Veldin port runs
+V:0027a6e0 review P3 a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs
+V:002779c8 review P3 a level's own build of a pause menu label's update (the same instructions as Veldin's menu_label_update 0x2779c8, other data): the Veldin port runs
+# the levels' own code
+L2:002fa770 wire P8 Aridia's camera end-of-update callback, queued by its camera hook 0x2fa710 (ported: aridia_classes_tr.cpp, batch 401)
+L18:002d6280 check P6 class 568's hook +0x14 (table 0x1f3498): the carried moby's reset after its explosion (ported: veldin_finale_classes_tr_6.cpp, batch 401)
+L18:002fcd00 check P6 class 1906's hook +0x14 (table 0x1f34c8): the carried moby's reset after its explosion (ported: veldin_finale_classes_tr_6.cpp, batch 401)
+L9:00270018 false a branch target inside a function (after its early return at 0x270010), named only by halfword pairs of Gaspar's data (0x1c0464 ..): not a function (the development repository's gaspar_classes.md lists it as a false positive)
+L14:00260020 false named only by halfword pairs of Oltanis's data (0x1c09c8, 0x1c0a00): the code there (after the return at 0x260014) is Veldin's 0x257b20, which nothing references either
+L5:0023b400 check P6 a function only Rilgar's data points to (Kalebo's copy too)
+L2:0020ff20 false named only by a colour of Aridia's data (0x15f88c: 0x0020ff20 among RGBA words): the code is a math helper nothing calls, as Veldin's 0x1feee8
+L7:002c0100 false a data word equal to a code address (8 bytes)
+L7:00320030 false a data word equal to a code address (8 bytes)
+L9:00310024 false a data word equal to a code address
+L11:00310024 false a data word equal to a code address (4 bytes)
+# the boot module
+front:001e9168 host the boot module's debug font (its GS upload)
+front:001e9338 host the boot module's debug font set-up
+front:00201520 host loads the IOP modules listed in the boot data (the host's IOP)
+front:00217048 host the boot module's copy of 0x266ed0 (an IOP / sound start-up step)
+front:00232ce0 host the boot module's copy of 0x293af8 (a kernel step of the start)
+front:00207ae8 wire P7 a map reveal condition's copy in the boot module (its table 0x1a0004 ..; the boot module reveals no map, nothing calls it): Veldin's 0x249d60, which front_reloc.txt pairs with 0x2079c8 (an identical body, another flag), so the boot module's translation misses it
+front:0021ca98 review P7 the boot module's help page focus-in (other data than Veldin's)
+
+# ---- not connected: what we know (cut content) ---------------------------------------------------------------------
+L8:002e3870 cut a 5.4 KB function after the Bolt Thief's (class 452) update, with its own state switch: nothing points to it; its callees (0x26a0f8, 0x2e4db8, 0x2e4e90) and the draw 0x2e5188 (ported, registered) are reached only from it. A second, unused behaviour of the class?
+L8:002e4db8 cut a helper only the unused 0x2e3870 calls
+L8:002e4e90 cut a helper only the unused 0x2e3870 calls
+L8:0026a0f8 cut a camera-like helper only the unused 0x2e3870 calls
+L8:002e5188 cut the draw the unused 0x2e3870 queues (ported anyway: bat_class452_draw_l8)
+L0:00202d78-002046c8 cut a group every level carries and nothing calls (the variants tables name them the texture loader and the tie / shrub / sky render): an older render path, left linked
+V:00202d78 cut a level's copy of the unused group at 0x202d78..0x2046c8 (the texture loader)
+V:00203338 cut a level's copy of the unused group at 0x202d78..0x2046c8 (a tie render function)
+V:00203730 cut a level's copy of the unused group at 0x202d78..0x2046c8 (a tie render function)
+V:00203e00 cut a level's copy of the unused group at 0x202d78..0x2046c8 (a shrub render function)
+V:002040e0 cut a level's copy of the unused group at 0x202d78..0x2046c8
+V:002043b0 cut a level's copy of the unused group at 0x202d78..0x2046c8
+V:00204428 cut a level's copy of the unused group at 0x202d78..0x2046c8
+L7:0030dcf0 cut a draw of the Snagglebeast's class 1046 that nothing references (ported anyway: umb_class1046_draw_l7)
+L18:002ea1f8 cut a 924-byte function of the Veldin finale that nothing references
+L9:00303fc8 cut a 516-byte function of Gaspar's class code that nothing references
+front:0022ab98 cut a 724-byte function of the title's sky that nothing references
+front:00218a60 cut a 688-byte function of the boot module that nothing references
