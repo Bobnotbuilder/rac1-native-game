@@ -1020,6 +1020,24 @@ bool level_enter(bool files_read) {
     return true;
 }
 
+// Quitting to the title (the pause menu's Quit): after the level exit (its read of the boot module,
+// 0x243d38) the overlay's main returns to the base ELF's main loop, whose overlay load (0x12d8f8)
+// copies the boot module read back over the level's overlay and jumps to its entry. The host loads
+// the boot module's own image in its place (front_image_load: see boot_return_start), the ports
+// relocated onto it, and starts it: the title, its main menu, a new game or a loaded one from
+// there as at the boot.
+// orig: (host) the base ELF's main loop between the overlay and the boot module read back
+bool title_return() {
+    if (!front_image_load()) {
+        std::fprintf(stderr, "rac1-native: cannot read the boot module from %s\n", disc_boot_elf_path().c_str());
+        return false;
+    }
+    ovl_reloc_set_level(OVL_FRONT);
+    boot_return_start();
+    std::printf("[orig] quit to the title: the boot module started again\n");
+    return true;
+}
+
 void save_ppm(const char* path, int w, int h) {
     std::vector<unsigned char> px(static_cast<size_t>(w) * h * 3);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);  // rows packed (a window width * 3 not a multiple of 4 overran px)
@@ -2295,7 +2313,7 @@ int main(int argc, char** argv) {
                             std::printf("[orig] level exit to %d: the story's cards and movies\n", lw(OV(0x0015f5c0)));
                             level_prefetch(lw(OV(0x0015f5c0)));
                             break;
-                        case LevelExit::Quit: running = false; break;
+                        case LevelExit::Quit: running = title_return(); break;
                     }
                 }
             });

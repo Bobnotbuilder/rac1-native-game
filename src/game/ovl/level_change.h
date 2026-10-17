@@ -18,6 +18,7 @@ bool level_change_request(int32_t force, int32_t level);                     // 
 
 // --- the level exit (level_exit.cpp) ---
 int32_t cd_read_request(uint32_t buf, uint32_t lsn, uint32_t n);              // orig: 0x00265f40
+int32_t front_read_back();                                                    // orig: 0x00243d38
 int32_t level_load_step();                                                    // orig: 0x00243db0
 void pad_update();                                                            // orig: 0x00267898
 void dma_handlers_remove();                                                   // orig: 0x002a11b8

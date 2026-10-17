@@ -16,20 +16,20 @@ The scan reads the disc through the generators' helpers (`tools/overlay_match`, 
 
 ## Totals
 
-Without the core libraries (below): **43524 function copies** in the boot module and the 19 overlays, **4245 unique functions** (4005 families: a function and its other builds). PAL: the region table lists 762 functions the PAL build changed (they run as the North American port; see [Setup](setup.md#the-european-pal-disc)).
+Without the core libraries (below): **43524 function copies** in the boot module and the 19 overlays, **4247 unique functions** (4007 families: a function and its other builds). PAL: the region table lists 762 functions the PAL build changed (they run as the North American port; see [Setup](setup.md#the-european-pal-disc)).
 
 | Unique functions | Count | Bytes |
 |---|---:|---:|
-| ported (including the empty ones and those covered inline by their callers) | 3920 | 3482.0 KB |
+| ported (including the empty ones and those covered inline by their callers) | 3930 | 3484.7 KB |
 | reached, not ported: in progress on another branch | 0 | 0 B |
-| **reached, not ported: the work left** | 13 | 3.0 KB |
+| **reached, not ported: the work left** | 1 | 44 B |
 | reached, replaced by host code on purpose (hardware, DMA, GS, kernel, movie library) | 92 | 16.5 KB |
 | reached, debug features of the original (not turned on in the retail game) | 5 | 12.9 KB |
 | named only by menu data that no code opens there (the title's pages carried in the levels' overlays, widgets no page lists) | 14 | 1008 B |
-| not functions (data words that look like code pointers) | 5 | 104 B |
+| not functions (data words that look like code pointers) | 9 | 468 B |
 | not connected: no copy reached (cut content, dead code) | 196 | 27.6 KB |
 
-Of the 13 left, 5 are only a missing wiring (the same code is ported for another level), 1 are a level's own build that a Veldin port stands in for, 7 have no port at all.
+Of the 1 left, 0 are only a missing wiring (the same code is ported for another level), 1 are a level's own build that a Veldin port stands in for, 0 have no port at all.
 
 ### Per image
 
@@ -38,36 +38,32 @@ Per copy: an image's functions, the share ported, the copies reached and not por
 | Image | Functions | Ported | Reached, not ported | Not connected here | PAL-changed functions |
 |---|---:|---:|---:|---:|---:|
 | core core libraries | 658 | 82 (12%) | 468 (101.9 KB) | 109 |  |
-| front boot module | 1039 | 833 (80%) | 99 (17.6 KB) | 144 | 35 |
-| L0 Veldin | 2129 | 1895 (89%) | 103 (31.9 KB) | 138 | 38 |
-| L1 Novalis | 2239 | 2006 (90%) | 101 (30.7 KB) | 140 | 38 |
-| L2 Aridia | 2185 | 1950 (89%) | 103 (30.8 KB) | 140 | 38 |
-| L3 Kerwan | 2205 | 1972 (89%) | 101 (30.7 KB) | 140 | 38 |
-| L4 Eudora | 2208 | 1975 (89%) | 101 (30.7 KB) | 139 | 38 |
-| L5 Rilgar | 2263 | 2028 (90%) | 100 (30.5 KB) | 144 | 39 |
-| L6 Blarg (Nebula G34) | 2243 | 2012 (90%) | 101 (30.7 KB) | 137 | 39 |
-| L7 Umbris | 2240 | 2005 (90%) | 103 (30.7 KB) | 141 | 39 |
-| L8 Batalia | 2265 | 2022 (89%) | 99 (29.7 KB) | 153 | 38 |
-| L9 Gaspar | 2181 | 1939 (89%) | 103 (31.0 KB) | 147 | 38 |
-| L10 Orxon | 2223 | 1994 (90%) | 101 (30.7 KB) | 135 | 38 |
-| L11 Pokitaru | 2250 | 2014 (90%) | 102 (30.7 KB) | 142 | 38 |
-| L12 Hoven | 2228 | 2000 (90%) | 101 (30.7 KB) | 135 | 38 |
-| L13 Gemlik Base | 2279 | 2046 (90%) | 101 (30.7 KB) | 140 | 39 |
-| L14 Oltanis | 2324 | 2086 (90%) | 102 (30.7 KB) | 144 | 38 |
-| L15 Quartu | 2262 | 2028 (90%) | 100 (30.6 KB) | 141 | 38 |
-| L16 Kalebo III | 2242 | 2012 (90%) | 99 (30.5 KB) | 138 | 38 |
-| L17 Drek's fleet | 2251 | 2015 (90%) | 100 (29.7 KB) | 143 | 38 |
-| L18 Veldin (finale) | 2268 | 2038 (90%) | 102 (29.9 KB) | 135 | 39 |
+| front boot module | 1039 | 835 (80%) | 97 (17.5 KB) | 144 | 35 |
+| L0 Veldin | 2129 | 1899 (89%) | 99 (29.6 KB) | 138 | 38 |
+| L1 Novalis | 2239 | 2009 (90%) | 98 (29.6 KB) | 140 | 38 |
+| L2 Aridia | 2185 | 1954 (89%) | 99 (29.6 KB) | 140 | 38 |
+| L3 Kerwan | 2205 | 1975 (90%) | 98 (29.6 KB) | 140 | 38 |
+| L4 Eudora | 2208 | 1978 (90%) | 98 (29.6 KB) | 139 | 38 |
+| L5 Rilgar | 2263 | 2030 (90%) | 98 (29.5 KB) | 144 | 39 |
+| L6 Blarg (Nebula G34) | 2243 | 2015 (90%) | 98 (29.6 KB) | 137 | 39 |
+| L7 Umbris | 2240 | 2008 (90%) | 100 (29.6 KB) | 141 | 39 |
+| L8 Batalia | 2265 | 2023 (89%) | 98 (29.6 KB) | 153 | 38 |
+| L9 Gaspar | 2181 | 1942 (89%) | 100 (29.9 KB) | 147 | 38 |
+| L10 Orxon | 2223 | 1997 (90%) | 98 (29.6 KB) | 135 | 38 |
+| L11 Pokitaru | 2250 | 2017 (90%) | 99 (29.6 KB) | 142 | 38 |
+| L12 Hoven | 2228 | 2003 (90%) | 98 (29.6 KB) | 135 | 38 |
+| L13 Gemlik Base | 2279 | 2049 (90%) | 98 (29.6 KB) | 140 | 39 |
+| L14 Oltanis | 2324 | 2089 (90%) | 99 (29.6 KB) | 144 | 38 |
+| L15 Quartu | 2262 | 2030 (90%) | 98 (29.6 KB) | 141 | 38 |
+| L16 Kalebo III | 2242 | 2014 (90%) | 97 (29.5 KB) | 138 | 38 |
+| L17 Drek's fleet | 2251 | 2016 (90%) | 99 (29.6 KB) | 143 | 38 |
+| L18 Veldin (finale) | 2268 | 2041 (90%) | 99 (29.6 KB) | 135 | 39 |
 
 ## Latent bugs: reached in a normal playthrough, not ported
 
 These are the ones a player can hit (as the particle updates were). The runtime evidence comes from the headless tour (five runs per level: walking, the wrench, firing, the pause menu's pages, the Metal Detector near a buried treasure; the title's menus). The levels' starts only: a level whose arrival scene outlasts the run's script (Novalis, Umbris, Batalia, Hoven, Gemlik, Oltanis) did not open its pause menu.
 
-| Function | Size | Where | What | Seen in the tour |
-|---|---:|---|---|---|
-| L0:0x001fb470 | 124 B | 13 images | the large text box draw, called by the Metal Detector's HUD (the small / medium ones are ported) |  |
-| L0:0x0023a2d0 | 880 B | 16 images | the Metal Detector's HUD (HUD slot 7, camera 0x753a): its draw, a pointer hero_camera_7_update hands to the HUD; ported for Batalia and Drek's fleet only | TODO_PORT |
-| L0:0x00243d38 | 120 B | 20 images | quitting to the title: reads the boot data back from the disc (the port ends the program instead) |  |
+None: every function the tour met or a note marks as latent is ported.
 
 The [moby] and [particle] lines of RAC1_MOBY_LIST and the TODO_PORT lines the tour logged are in `assets/generated/inventory/runtime_todo.csv`; the live mobys with no port, per level:
 
@@ -83,29 +79,11 @@ TODO_PORT lines of the tour other than the host's own stubs (vsync, DMA, display
 - `0x20ac58` (front: the overlays' 0x24cf10): front
 - `0x20b418` (front: the overlays' 0x24d6d0): front: waits for a DMA channel (hardware)
 - `0x217048` (front: the overlays' 0x266ed0): front: the boot module's copy of 0x266ed0 (an IOP / sound start-up step)
-- `0x229010` (moby callback): L3: the Metal Detector's HUD (HUD slot 7, camera 0x753a)
-- `0x22a438` (moby callback): L15: the Metal Detector's HUD (HUD slot 7, camera 0x753a)
-- `0x22d8b0` (moby callback): L4: the Metal Detector's HUD (HUD slot 7, camera 0x753a)
 - `0x232ce0` (front: the overlays' 0x293af8): L0, front: the boot module's copy of 0x293af8 (a kernel step of the start)
-- `0x235d80` (moby callback): L16: the Metal Detector's HUD (HUD slot 7, camera 0x753a)
-- `0x23c500` (moby callback): L2: the Metal Detector's HUD (HUD slot 7, camera 0x753a)
-- `0x249b80` (moby callback): L6: the Metal Detector's HUD (HUD slot 7, camera 0x753a)
-- `0x2530b0` (moby callback): L12: the Metal Detector's HUD (HUD slot 7, camera 0x753a)
-- `0x260270` (moby callback): L11: the Metal Detector's HUD (HUD slot 7, camera 0x753a)
-- `0x263670` (moby callback): L5: the Metal Detector's HUD (HUD slot 7, camera 0x753a)
 
 ## The work left, in packages
 
 Ordered by what a player meets first. Each row is one unique function (its Veldin copy when it has one; `images` lists where a copy is reached and not ported).
-
-### P1. The Metal Detector's HUD on every level (2 functions, 1004 B)
-
-Latent bug. The Metal Detector's on-screen display (HUD slot 7, the camera 0x753a) draws through a function each level carries in the same build; only Batalia and Drek's fleet register it. Once the player owns the Metal Detector, its display does not draw on the other planets: the tour's `detector` runs (the item given, the hero put by a buried-treasure marker) logged the TODO_PORT on nine levels. One port of Veldin's copy, translated, serves every level; the text box it calls (0x1fb470) comes with it. Playtest: with the Metal Detector, use it on Gaspar, Orxon, Pokitaru.
-
-| Function | Size | Where | What | Seen in the tour |
-|---|---:|---|---|---|
-| L0:0x001fb470 | 124 B | 13 images | the large text box draw, called by the Metal Detector's HUD (the small / medium ones are ported) |  |
-| L0:0x0023a2d0 | 880 B | 16 images | the Metal Detector's HUD (HUD slot 7, camera 0x753a): its draw, a pointer hero_camera_7_update hands to the HUD; ported for Batalia and Drek's fleet only | TODO_PORT |
 
 ### P3. Menu widget functions outside the dispatch (1 functions, 44 B)
 
@@ -114,44 +92,6 @@ Widget functions that the game's page data names but the port's widget dispatch 
 | Function | Size | Where | What | Seen in the tour |
 |---|---:|---|---|---|
 | front:0x0021ca98 | 44 B | front | the boot module's copy of a help page's focus-in (the same instructions as items_help_focus_in 0x27a6e0, the boot module's tables): the Veldin port runs through the boot module's translation; not checked by the oracle (its boot-module mode, batch 89, does not cover it), and the title's menus were not seen to open a page that uses it |  |
-
-### P5. Quitting to the title (1 functions, 120 B)
-
-Quit from the pause menu ends the program instead of going back to the title: the boot data's read (0x243d38) and the boot module's restart are not ported (docs/status.md lists it).
-
-| Function | Size | Where | What | Seen in the tour |
-|---|---:|---|---|---|
-| L0:0x00243d38 | 120 B | 20 images | quitting to the title: reads the boot data back from the disc (the port ends the program instead) |  |
-
-### P6. Level functions only data points to (6 functions, 572 B)
-
-Small functions of single levels that only the level's data points to (class hooks, table entries) and that no run has met: port them with their tables when a playtest or an oracle subject reaches them.
-
-| Function | Size | Where | What | Seen in the tour |
-|---|---:|---|---|---|
-| L0:0x0020d61c | 60 B | 17 images | a hero state table's entry (the table at 0x1e7c40), not seen called |  |
-| L14:0x00260020 | 48 B | L14 | Oltanis's copy of 0x257b20 (other data), only its data points to it |  |
-| L18:0x002d6280 | 104 B | L18 | a class hook of the Veldin finale (overlay section 3, after the class rows), not seen called |  |
-| L18:0x002fcd00 | 104 B | L18 | a class hook of the Veldin finale (overlay section 3, after the class rows), not seen called |  |
-| L2:0x0020ff20 | 40 B | L2 | a math helper only Aridia's data points to |  |
-| L9:0x00270018 | 216 B | L9 | a function only Gaspar's data points to, not seen called |  |
-
-### P7. The boot module's own leftovers (1 functions, 16 B)
-
-Copies in the boot module (the title) of shared functions with other data, and its start-up steps the host replaces.
-
-| Function | Size | Where | What | Seen in the tour |
-|---|---:|---|---|---|
-| front:0x00207ae8 | 16 B | front | a map reveal condition's copy in the boot module (data only) |  |
-
-### P8. Registrations only (2 functions, 1.3 KB)
-
-Functions ported for the level where they run (or the same code ported for another level) whose other copies nothing reaches in practice: a registration closes them.
-
-| Function | Size | Where | What | Seen in the tour |
-|---|---:|---|---|---|
-| L0:0x0023db30 | 1.2 KB | L0 | level 14's scene 0 effect draw (cutscene_level_extras): ported on Oltanis, where it runs; Veldin's copy never runs it |  |
-| L2:0x002fa770 | 84 B | L2 | a camera mode hook of Aridia (the same code as Kerwan's / Eudora's ported camera callback) |  |
 
 ## Reached, not to port
 

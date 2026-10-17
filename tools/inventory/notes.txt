@@ -45,7 +45,6 @@ L0:002a08c8 host kicks a DMA packet (hardware)
 L0:002a1228 host installs the DMA interrupt handlers (the kernel)
 L0:002a1328 host removes the DMA interrupt handlers (the kernel)
 L0:002ee0e0-002f0cd0 host the movie player library (the IPU / MPEG decoder the overlay links): replaced by src/game/lib/movie_player.cpp and runtime/ipu
-L0:00243d38 latent P5 quitting to the title: reads the boot data back from the disc (the port ends the program instead)
 L0:0023a2d0 latent P1 the Metal Detector's HUD (HUD slot 7, camera 0x753a): its draw, a pointer hero_camera_7_update hands to the HUD (ported: hud_slot7_tr.cpp, every level; batch 400)
 L0:001fb470 latent P1 the large text box draw, called by the Metal Detector's HUD (ported with it: hud_slot7_tr.cpp)
 L0:0023db30 wire P8 level 14's scene 0 effect draw (cutscene_level_extras): Oltanis runs its own build; Veldin's ported too (shared_fx_tr.cpp, batch 401)
@@ -108,7 +107,6 @@ front:001e9338 host the boot module's debug font set-up
 front:00201520 host loads the IOP modules listed in the boot data (the host's IOP)
 front:00217048 host the boot module's copy of 0x266ed0 (an IOP / sound start-up step)
 front:00232ce0 host the boot module's copy of 0x293af8 (a kernel step of the start)
-front:00207ae8 wire P7 a map reveal condition's copy in the boot module (its table 0x1a0004 ..; the boot module reveals no map, nothing calls it): Veldin's 0x249d60, which front_reloc.txt pairs with 0x2079c8 (an identical body, another flag), so the boot module's translation misses it
 front:0021ca98 review P7 the boot module's help page focus-in (other data than Veldin's)
 
 # ---- not connected: what we know (cut content) ---------------------------------------------------------------------

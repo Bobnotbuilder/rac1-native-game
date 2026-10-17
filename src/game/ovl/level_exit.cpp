@@ -46,6 +46,23 @@ int32_t cd_read_request(uint32_t buf, uint32_t lsn, uint32_t n) {
     return 1;
 }
 
+// Quitting to the title: the boot module read back from the disc (the table of contents' +0x4f8 /
+// +0x4fc: its sector and sector count; the disc's frontbin) below 0x1ff8000, its size rounded up
+// to 4 KiB with room for a 0x60-byte header before it; the header's address is the overlay
+// header 0x15ee4c and its first word 0x60 (the offset of the module's sections from it), the
+// read started behind it. The base ELF's overlay load (0x12d8f8) copies the module's sections
+// once the overlay's main has returned. 1.
+// orig: 0x00243d38
+int32_t front_read_back() {
+    constexpr uint32_t TOC = 0x00137b80;
+    const uint32_t h = (0x01ff7ff0u - (((lwu(TOC + 0x4fc) << 11) + 0x1057u) & 0xfffff000u)) & 0xfffffff0u;
+    sw(0x0015ee4c, h);
+    sw(h, 0x60);
+    const uint32_t hdr = lwu(0x0015ee4c);
+    cd_read_request(hdr + lwu(hdr), lwu(TOC + 0x4f8), lwu(TOC + 0x4fc));
+    return 1;
+}
+
 // One step of the next level's load (step 0x15ee48), when no read is in progress (a read that
 // takes over 0x2d0 frames in spindle mode 1, or that failed, is stopped and its step done again):
 // 0 the level data, 1 the armor, 2 the gameplay data read below 0x1ff8000 (the same layout as at
@@ -627,9 +644,10 @@ void exit_to_loading_screen() {
 // The level exit up to its loops: the next level's armor (0x13e056: 1 / 2 after the story's
 // points 0x13dd48 / 0x13dd4e or from level 8 / 14 on), the level's sounds, music and bank
 // released, the fog of the hero data cleared, the background black. Leaving the game (next level
-// *(0x15f5c0) < 0): the card's save waited for, the boot data's read (0x243d38), done
-// (LevelExit::Quit). The story's cards and movies between some levels (Veldin's start, Veldin to
-// Novalis, to Eudora, from Umbris, to Oltanis Orbit, from Oltanis, to Kalebo III): on a new game's
+// *(0x15f5c0) < 0, the pause menu's Quit): the card's save waited for, the boot module read back
+// from the disc (0x243d38), done (LevelExit::Quit: the host starts the boot module read back, the
+// title). The story's cards and movies between some levels (Veldin's start, Veldin to Novalis, to
+// Eudora, from Umbris, to Oltanis Orbit, from Oltanis, to Kalebo III): on a new game's
 // Veldin and the first Veldin -> Novalis the last card loads the next level (LevelExit::Movie);
 // else after them the level left is marked done, the next level made current, the loading screen
 // set up and the level's header read (LevelExit::Load when there was no card or movie). The cards
@@ -676,7 +694,7 @@ LevelExit level_exit_start() {
             TODO_PORT(0x0024b690, "the memory card's state machine: the level exit's wait for the card skipped")();
         fade(frame_scale_i(6));
         sw(0x0015ed84, lwu(OV(0x0015f5c0)));
-        TODO_PORT(0x00243d38, "the boot data's read (back to the title)")();
+        front_read_back();
         cd_sync(0);
         sb(0x001516db, 0);
         dma_handlers_remove();
