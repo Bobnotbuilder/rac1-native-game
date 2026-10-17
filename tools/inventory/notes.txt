@@ -14,6 +14,7 @@
 #     review      the level's own build differs from the Veldin port that runs in its place: to compare (per-level oracle)
 #     false       not a function (a data word that looks like a code pointer, a jump table's case)
 #     cut         cut content: nothing reaches it (see the cut content section)
+#     unopened    named only by menu data that no code opens where it is (the title's pages in the levels' overlays, widgets no page lists)
 #   package: P1..P9 (the proposed work packages, docs/port-inventory.md)
 #
 # Addresses, sizes and our descriptions only: never the game's code or text.
@@ -69,25 +70,26 @@ L0:00272438 inprogress P2 particle type 0x36's update
 L0:002738b0 inprogress P2 particle type 0x3f's update
 L0:002756f0 inprogress P2 particle type 0x4b's update
 L0:00275810 inprogress P2 particle type 0x4c's update
-L0:00277df8 check P3 a pause menu widget function (the widget table at 0x1b8970), not in the widget dispatch
-V:00277df8 check P3 a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch
-L0:00277e28 check P3 a pause menu widget function (0x1b7d20), not in the widget dispatch
-L0:0027d240 check P3 a planet map widget function (0x1b630c), not in the widget dispatch
-L0:0027f970 check P3 a save / load page widget function (0x1b8680), not in the widget dispatch
-L0:0027f9b0 check P3 a save / load page widget function (0x1b77d0), not in the widget dispatch
-L0:0027fa98 check P3 a save / load page widget function (0x1b7598), not in the widget dispatch
-L0:0027fba0 check P3 an end-of-game menu widget function (0x1b7544 / 0x1b759c), not in the widget dispatch
-L0:0027fd38 check P3 an end-of-game menu widget function (0x1b6e24), not in the widget dispatch
-L0:00280590 check P3 an end-of-game menu widget function (0x1b73b4), not in the widget dispatch
+L0:00277df8 unopened P3 the title main menu's Options list focus-in (the boot module's title_options_list_focus_in, front:0x21a1b0), on the page 0x1b8888 (state 0x2f) under the main menu page 0x1b86c8 (state 0x2e) that every overlay carries: only the boot module sets the menu state 0x2d that opens it
+V:00277df8 unopened P3 a level's copy of the title main menu's Options list focus-in (0x277df8, the same instructions, other data): its page is never opened on a level
+L0:00277e28 check P3 the Goodies page's Cheats list focus-in (page 0x26, widget 0x1b7d18): ported, cheats_list_focus_in (batch 411)
+L0:0027d240 unopened P3 the draw of a widget (0x1b6308, after the ship page 0x1b6088's widgets) that no page lists and no code builds
+L0:0027f970 check P3 the Goodies page's In-Level Movies list focus-in (page 0x28, widget 0x1b8678): ported, level_movies_focus_in (batch 411)
+L0:0027f9b0 check P3 the Goodies page's Sketchbook update (page 0x29, widget 0x1b77d0): ported, sketchbook_update (batch 411)
+L0:0027fa98 check P3 the Goodies page's Epilogue update (page 0x2a, widget 0x1b7598): ported, epilogue_update (batch 411)
+L0:0027fba0 check P3 the Goodies page's Epilogue arrows draw (page 0x2a, widgets 0x1b7540 / 0x1b7598): ported, epilogue_arrows_draw (batch 411)
+L0:0027fd38 check P3 the Goodies page's Skill Points text panel draw (page 0x24, widget 0x1b6e20): ported, skill_points_text_draw (batch 411)
+L0:00280590 unopened P3 the draw of a widget (0x1b73b0, after the end menu page 0x1b71f0's widgets) that no page lists and no code builds
 L0:00250030 false a data word that points into the middle of a function (8 bytes)
 L0:0020d61c check P6 a hero state table's entry (the table at 0x1e7c40), not seen called
 # the levels' own builds the port stands in for (the Veldin port runs; the level's code differs)
-L3:00205830 review P4 Kerwan's build of the rail search (find_rail, 0x20cd08): without the thresholds Veldin's build changes in two sub-states and with the hero's 0x1ca flag; the Veldin port runs on Kerwan's grind rails
-L3:0022c728 review P4 Kerwan's build of the cutscenes' level extras (0x23e268): its own scene 5 sparks branch; the Veldin port runs (its level 3 branch, the sparks 0x26ced0 a TODO_PORT)
-L2:002400c8 review P4 Aridia's build of the cutscenes' level extras (0x23e268): only its own branch; the Veldin port runs (its level 2 branch)
-L13:00265c30 review P4 Gemlik's second copy of 0x259bc8 (the same instructions, other data): reached through a code pointer, the Veldin port runs
-V:0027a6e0 review P3 a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs
-V:002779c8 review P3 a level's own build of a pause menu label's update (the same instructions as Veldin's menu_label_update 0x2779c8, other data): the Veldin port runs
+L3:00205830 review P4 Kerwan's build of the rail search (find_rail, 0x20cd08): one pair of thresholds (1.7 in xy, 1.5 in z) for Veldin's sub-state / PLAYER+0x1ca ones; its own port find_rail_l3_v (batch 410)
+L3:0022c728 review P4 Kerwan's build of the cutscenes' level extras (0x23e268): only its scene 5 sparks branch, the same instructions as the Veldin port's level 3 branch (the sparks now spawned): proved by batch 410
+L2:002400c8 review P4 Aridia's build of the cutscenes' level extras (0x23e268): only its level 2 branch, the Veldin port's: proved by batch 410
+L13:00265c30 review P4 Gemlik's build of the hit record 0x259bc8 (the same instructions, its own ring and counter): the Veldin port, proved by batch 410
+front:0021ca98 review P3 the boot module's copy of a help page's focus-in (the same instructions as items_help_focus_in 0x27a6e0, the boot module's tables): the Veldin port runs through the boot module's translation; not checked by the oracle (its boot-module mode, batch 89, does not cover it), and the title's menus were not seen to open a page that uses it
+V:0027a6e0 review P3 a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs; proved on each level by batch 411
+V:002779c8 review P3 a level's own build of a pause menu label's update (the same instructions as Veldin's menu_label_update 0x2779c8, other data): the Veldin port runs; proved by batch 411
 # the levels' own code
 L2:002fa770 wire P8 a camera mode hook of Aridia (the same code as Kerwan's / Eudora's ported camera callback)
 L18:002d6280 check P6 a class hook of the Veldin finale (overlay section 3, after the class rows), not seen called

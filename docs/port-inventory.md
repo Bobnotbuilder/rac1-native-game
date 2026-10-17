@@ -20,15 +20,16 @@ Without the core libraries (below): **43524 function copies** in the boot module
 
 | Unique functions | Count | Bytes |
 |---|---:|---:|
-| ported (including the empty ones and those covered inline by their callers) | 3878 | 3469.0 KB |
-| reached, not ported: in progress on another branch | 18 | 9.1 KB |
-| **reached, not ported: the work left** | 51 | 7.8 KB |
+| ported (including the empty ones and those covered inline by their callers) | 3920 | 3482.0 KB |
+| reached, not ported: in progress on another branch | 0 | 0 B |
+| **reached, not ported: the work left** | 13 | 3.0 KB |
 | reached, replaced by host code on purpose (hardware, DMA, GS, kernel, movie library) | 92 | 16.5 KB |
 | reached, debug features of the original (not turned on in the retail game) | 5 | 12.9 KB |
+| named only by menu data that no code opens there (the title's pages carried in the levels' overlays, widgets no page lists) | 14 | 1008 B |
 | not functions (data words that look like code pointers) | 5 | 104 B |
 | not connected: no copy reached (cut content, dead code) | 196 | 27.6 KB |
 
-Of the 51 left, 5 are only a missing wiring (the same code is ported for another level), 19 are a level's own build that a Veldin port stands in for, 27 have no port at all.
+Of the 13 left, 5 are only a missing wiring (the same code is ported for another level), 1 are a level's own build that a Veldin port stands in for, 7 have no port at all.
 
 ### Per image
 
@@ -37,26 +38,26 @@ Per copy: an image's functions, the share ported, the copies reached and not por
 | Image | Functions | Ported | Reached, not ported | Not connected here | PAL-changed functions |
 |---|---:|---:|---:|---:|---:|
 | core core libraries | 658 | 82 (12%) | 468 (101.9 KB) | 109 |  |
-| front boot module | 1039 | 827 (80%) | 105 (19.2 KB) | 144 | 35 |
-| L0 Veldin | 2129 | 1870 (88%) | 128 (42.7 KB) | 138 | 38 |
-| L1 Novalis | 2239 | 1980 (88%) | 127 (41.6 KB) | 140 | 38 |
-| L2 Aridia | 2185 | 1923 (88%) | 130 (41.8 KB) | 140 | 38 |
-| L3 Kerwan | 2205 | 1944 (88%) | 129 (42.4 KB) | 140 | 38 |
-| L4 Eudora | 2208 | 1948 (88%) | 128 (41.7 KB) | 139 | 38 |
-| L5 Rilgar | 2263 | 2001 (88%) | 127 (41.5 KB) | 144 | 39 |
-| L6 Blarg (Nebula G34) | 2243 | 1986 (89%) | 127 (41.6 KB) | 137 | 39 |
-| L7 Umbris | 2240 | 1979 (88%) | 129 (41.6 KB) | 141 | 39 |
-| L8 Batalia | 2265 | 1996 (88%) | 125 (40.6 KB) | 153 | 38 |
-| L9 Gaspar | 2181 | 1913 (88%) | 129 (41.8 KB) | 147 | 38 |
-| L10 Orxon | 2223 | 1969 (89%) | 126 (41.3 KB) | 135 | 38 |
-| L11 Pokitaru | 2250 | 1988 (88%) | 128 (41.6 KB) | 142 | 38 |
-| L12 Hoven | 2228 | 1974 (89%) | 127 (41.6 KB) | 135 | 38 |
-| L13 Gemlik Base | 2279 | 2019 (89%) | 128 (41.9 KB) | 140 | 39 |
-| L14 Oltanis | 2324 | 2060 (89%) | 128 (41.6 KB) | 144 | 38 |
-| L15 Quartu | 2262 | 2002 (89%) | 126 (41.4 KB) | 141 | 38 |
-| L16 Kalebo III | 2242 | 1986 (89%) | 125 (41.4 KB) | 138 | 38 |
-| L17 Drek's fleet | 2251 | 1989 (88%) | 126 (40.6 KB) | 143 | 38 |
-| L18 Veldin (finale) | 2268 | 2011 (89%) | 129 (40.9 KB) | 135 | 39 |
+| front boot module | 1039 | 833 (80%) | 99 (17.6 KB) | 144 | 35 |
+| L0 Veldin | 2129 | 1895 (89%) | 103 (31.9 KB) | 138 | 38 |
+| L1 Novalis | 2239 | 2006 (90%) | 101 (30.7 KB) | 140 | 38 |
+| L2 Aridia | 2185 | 1950 (89%) | 103 (30.8 KB) | 140 | 38 |
+| L3 Kerwan | 2205 | 1972 (89%) | 101 (30.7 KB) | 140 | 38 |
+| L4 Eudora | 2208 | 1975 (89%) | 101 (30.7 KB) | 139 | 38 |
+| L5 Rilgar | 2263 | 2028 (90%) | 100 (30.5 KB) | 144 | 39 |
+| L6 Blarg (Nebula G34) | 2243 | 2012 (90%) | 101 (30.7 KB) | 137 | 39 |
+| L7 Umbris | 2240 | 2005 (90%) | 103 (30.7 KB) | 141 | 39 |
+| L8 Batalia | 2265 | 2022 (89%) | 99 (29.7 KB) | 153 | 38 |
+| L9 Gaspar | 2181 | 1939 (89%) | 103 (31.0 KB) | 147 | 38 |
+| L10 Orxon | 2223 | 1994 (90%) | 101 (30.7 KB) | 135 | 38 |
+| L11 Pokitaru | 2250 | 2014 (90%) | 102 (30.7 KB) | 142 | 38 |
+| L12 Hoven | 2228 | 2000 (90%) | 101 (30.7 KB) | 135 | 38 |
+| L13 Gemlik Base | 2279 | 2046 (90%) | 101 (30.7 KB) | 140 | 39 |
+| L14 Oltanis | 2324 | 2086 (90%) | 102 (30.7 KB) | 144 | 38 |
+| L15 Quartu | 2262 | 2028 (90%) | 100 (30.6 KB) | 141 | 38 |
+| L16 Kalebo III | 2242 | 2012 (90%) | 99 (30.5 KB) | 138 | 38 |
+| L17 Drek's fleet | 2251 | 2015 (90%) | 100 (29.7 KB) | 143 | 38 |
+| L18 Veldin (finale) | 2268 | 2038 (90%) | 102 (29.9 KB) | 135 | 39 |
 
 ## Latent bugs: reached in a normal playthrough, not ported
 
@@ -106,83 +107,13 @@ Latent bug. The Metal Detector's on-screen display (HUD slot 7, the camera 0x753
 | L0:0x001fb470 | 124 B | 13 images | the large text box draw, called by the Metal Detector's HUD (the small / medium ones are ported) |  |
 | L0:0x0023a2d0 | 880 B | 16 images | the Metal Detector's HUD (HUD slot 7, camera 0x753a): its draw, a pointer hero_camera_7_update hands to the HUD; ported for Batalia and Drek's fleet only | TODO_PORT |
 
-### P2. The particle types without a port (18 functions, 9.1 KB)
+### P3. Menu widget functions outside the dispatch (1 functions, 44 B)
 
-In progress on the branch fix/particles-unported (17 types and the spawner 0x270758, regen group veldin_particles), with the two helpers they call. Every level's particle table lists them; the earlier fix showed that ported level code spawns some of them.
-
-| Function | Size | Where | What | Seen in the tour |
-|---|---:|---|---|---|
-| L0:0x0025c230 | 124 B | 19 images | a helper of particle type 0x14's update |  |
-| L0:0x00262360 | 288 B | 18 images | a helper of particle type 0x36's update |  |
-| L0:0x002694f8 | 1.1 KB | 19 images | particle type 0x03's update | particle type 0x03 |
-| L0:0x0026a418 | 176 B | 19 images | particle type 0x07's update (the same code as type 0x05's, which is ported) | particle type 0x07 |
-| L0:0x0026a6f0 | 392 B | 19 images | particle type 0x09's update | particle type 0x09 |
-| L0:0x0026c860 | 844 B | 19 images | particle type 0x14's update | particle type 0x14 |
-| L0:0x0026d470 | 292 B | 19 images | particle type 0x18's update | particle type 0x18 |
-| L0:0x0026e3a8 | 712 B | 19 images | particle type 0x1d's update | particle type 0x1d |
-| L0:0x0026e670 | 1.3 KB | 19 images | particle type 0x1e's update | particle type 0x1e |
-| L0:0x0026f048 | 56 B | 19 images | particle type 0x21's update (type 0x3f's is the same code) | particle type 0x21; particle type 0x3f |
-| L0:0x0026f898 | 352 B | 19 images | particle type 0x24's update | particle type 0x24 |
-| L0:0x0026fa00 | 252 B | 19 images | particle type 0x25's update | particle type 0x25 |
-| L0:0x0026fb00 | 312 B | 19 images | particle type 0x26's update | particle type 0x26 |
-| L0:0x00270758 | 496 B | 19 images | particle type 0x2a's spawner (called by its own update) |  |
-| L0:0x00270948 | 1.8 KB | 19 images | particle type 0x2a's update | particle type 0x2a |
-| L0:0x00272438 | 412 B | 19 images | particle type 0x36's update | particle type 0x36 |
-| L0:0x002756f0 | 288 B | 19 images | particle type 0x4b's update | particle type 0x4b |
-| L0:0x00275810 | 68 B | 19 images | particle type 0x4c's update | particle type 0x4c |
-
-### P3. Menu widget functions outside the dispatch (35 functions, 3.5 KB)
-
-Widget functions of the pause menu, the planet map, the save / load pages and the end-of-game menu that the game's page data names but the port's widget dispatch (pause_menu.cpp, pause_menu_widgets.cpp, end_menu.cpp) does not handle: a page that uses one logs `menu widget function` and does nothing there. Each level also has its own build of a help page's and a label's functions (the same instructions as Veldin's, other data) that the Veldin port runs. The tour walked the pause menu's pages on 13 levels without meeting one; the save, end-of-game and planet map pages are still to walk. Small functions.
+Widget functions that the game's page data names but the port's widget dispatch (pause_menu.cpp, pause_menu_widgets.cpp, end_menu.cpp) did not handle. Those of the pause menu's Goodies page (shown once the game is finished) are ported (pause_menu_special.cpp, batch 411); the levels' own copies of a help page's focus-in and of a label's update are proved the same as the Veldin ports that run in their place (batch 411); the title's pages that every overlay carries and two widgets no page lists are `unopened` (below).
 
 | Function | Size | Where | What | Seen in the tour |
 |---|---:|---|---|---|
-| L0:0x00277df8 | 44 B | L0 | a pause menu widget function (the widget table at 0x1b8970), not in the widget dispatch |  |
-| L0:0x00277e28 | 292 B | 20 images | a pause menu widget function (0x1b7d20), not in the widget dispatch |  |
-| L0:0x0027d240 | 144 B | 20 images | a planet map widget function (0x1b630c), not in the widget dispatch |  |
-| L0:0x0027f970 | 60 B | 20 images | a save / load page widget function (0x1b8680), not in the widget dispatch |  |
-| L0:0x0027f9b0 | 228 B | 20 images | a save / load page widget function (0x1b77d0), not in the widget dispatch |  |
-| L0:0x0027fa98 | 264 B | 20 images | a save / load page widget function (0x1b7598), not in the widget dispatch |  |
-| L0:0x0027fba0 | 408 B | 20 images | an end-of-game menu widget function (0x1b7544 / 0x1b759c), not in the widget dispatch |  |
-| L0:0x0027fd38 | 412 B | 20 images | an end-of-game menu widget function (0x1b6e24), not in the widget dispatch |  |
-| L0:0x00280590 | 336 B | 20 images | an end-of-game menu widget function (0x1b73b4), not in the widget dispatch |  |
-| L1:0x0028dbb8 | 44 B | 5 images | a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch |  |
-| L1:0x002904a0 | 44 B | 5 images | a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs |  |
-| L11:0x0029d180 | 44 B | L11, L18 | a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch |  |
-| L11:0x0029fa68 | 44 B | L11, L18 | a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs |  |
-| L13:0x00283f78 | 44 B | L13 | a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch |  |
-| L13:0x00286860 | 44 B | L13 | a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs |  |
-| L14:0x00280588 | 44 B | L14 | a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch |  |
-| L14:0x00282e70 | 44 B | L14 | a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs |  |
-| L17:0x00271ea8 | 44 B | L17 | a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch |  |
-| L17:0x00274790 | 44 B | L17 | a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs |  |
-| L18:0x00279950 | 140 B | L18 | a level's own build of a pause menu label's update (the same instructions as Veldin's menu_label_update 0x2779c8, other data): the Veldin port runs |  |
-| L2:0x00279310 | 44 B | L2, L15 | a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch |  |
-| L2:0x0027bbf8 | 44 B | L2, L15 | a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs |  |
-| L3:0x00266a68 | 44 B | L3 | a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch |  |
-| L3:0x00269350 | 44 B | L3 | a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs |  |
-| L4:0x0026acf8 | 140 B | L4 | a level's own build of a pause menu label's update (the same instructions as Veldin's menu_label_update 0x2779c8, other data): the Veldin port runs |  |
-| L4:0x0026b128 | 44 B | L4, L9 | a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch |  |
-| L4:0x0026da10 | 44 B | L4, L9 | a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs |  |
-| L5:0x002a1cd0 | 140 B | L5 | a level's own build of a pause menu label's update (the same instructions as Veldin's menu_label_update 0x2779c8, other data): the Veldin port runs |  |
-| L6:0x00286bd8 | 44 B | L6 | a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch |  |
-| L6:0x002894c0 | 44 B | L6 | a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs |  |
-| L7:0x002a0818 | 44 B | L7 | a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch |  |
-| L7:0x002a3100 | 44 B | L7 | a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs |  |
-| L8:0x00282548 | 44 B | L8 | a level's own build of the pause menu widget function 0x277df8 (the same instructions, other data), not in the widget dispatch |  |
-| L8:0x00284e30 | 44 B | L8 | a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs |  |
-| front:0x0021ca98 | 44 B | front | a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs |  |
-
-### P4. The levels' own builds the Veldin port stands in for (4 functions, 1.3 KB)
-
-Functions a level builds differently from Veldin, reached by direct calls from ported code that runs the Veldin port instead. Kerwan's rail search is the one with a visible risk (grind rails on Kerwan); compare each with the per-level oracle and add a variants row and a port where they differ.
-
-| Function | Size | Where | What | Seen in the tour |
-|---|---:|---|---|---|
-| L13:0x00265c30 | 312 B | L13 | Gemlik's second copy of 0x259bc8 (the same instructions, other data): reached through a code pointer, the Veldin port runs |  |
-| L2:0x002400c8 | 104 B | L2 | Aridia's build of the cutscenes' level extras (0x23e268): only its own branch; the Veldin port runs (its level 2 branch) |  |
-| L3:0x00205830 | 512 B | L3 | Kerwan's build of the rail search (find_rail, 0x20cd08): without the thresholds Veldin's build changes in two sub-states and with the hero's 0x1ca flag; the Veldin port runs on Kerwan's grind rails |  |
-| L3:0x0022c728 | 400 B | L3 | Kerwan's build of the cutscenes' level extras (0x23e268): its own scene 5 sparks branch; the Veldin port runs (its level 3 branch, the sparks 0x26ced0 a TODO_PORT) |  |
+| front:0x0021ca98 | 44 B | front | the boot module's copy of a help page's focus-in (the same instructions as items_help_focus_in 0x27a6e0, the boot module's tables): the Veldin port runs through the boot module's translation; not checked by the oracle (its boot-module mode, batch 89, does not cover it), and the title's menus were not seen to open a page that uses it |  |
 
 ### P5. Quitting to the title (1 functions, 120 B)
 
@@ -224,7 +155,7 @@ Functions ported for the level where they run (or the same code ported for anoth
 
 ## Reached, not to port
 
-Replaced by host code or the runtime layer on purpose, or development features of the original that the retail game never turns on (a port of them would be an optional extra, see [Enhancements](enhancements.md)).
+Replaced by host code or the runtime layer on purpose, development features of the original that the retail game never turns on (a port of them would be an optional extra, see [Enhancements](enhancements.md)), or named only by menu data that nothing opens where they are (`unopened`: checked by following the menu's pages from the states the code opens).
 
 | Function | Size | Copies | Kind | What |
 |---|---:|---:|---|---|
@@ -243,12 +174,16 @@ Replaced by host code or the runtime layer on purpose, or development features o
 | L0:0x0024dba0 | 32 B | 20 | host | waits for the decompression's DMA (wad_decompress) |
 | L0:0x0024dbc0 | 40 B | 20 | host | a DMA wait loop of wad_decompress |
 | L0:0x00267148 | 100 B | 20 | host | reads the pad's packet from the SIO2 driver (the host's input builds it) |
+| L0:0x00277df8 | 44 B | 1 | unopened | the title main menu's Options list focus-in (the boot module's title_options_list_focus_in, front:0x21a1b0), on the page 0x1b8888 (state 0x2f) under the main menu page 0x1b86c8 (state 0x2e) that every overlay carries: only the boot module sets the menu state 0x2d that opens it |
+| L0:0x0027d240 | 144 B | 20 | unopened | the draw of a widget (0x1b6308, after the ship page 0x1b6088's widgets) that no page lists and no code builds |
+| L0:0x00280590 | 336 B | 20 | unopened | the draw of a widget (0x1b73b0, after the end menu page 0x1b71f0's widgets) that no page lists and no code builds |
 | L0:0x00295bf8 | 84 B | 20 | host | the ties' end (the PAL display mode's path) |
 | L0:0x00295c50 | 44 B | 20 | host | the ties' lighting (the PAL display mode's path) |
 | L0:0x00295d48 | 600 B | 20 | host | the ties' VU1 packets (the PAL display mode's path; the host's MRP draws the ties) |
 | L0:0x002a08c8 | 272 B | 20 | host | kicks a DMA packet (hardware) |
 | L0:0x002a1228 | 252 B | 20 | host | installs the DMA interrupt handlers (the kernel) |
 | L0:0x002ee0e0 .. 0x002f0c48 (72 functions) | 10.6 KB | 20 | host | the movie player library (the IPU / MPEG decoder the overlay links): replaced by src/game/lib/movie_player.cpp and runtime/ipu |
+| L1:0x0028dbb8 .. 0x00282548 (11 functions) | 484 B | 5 | unopened | a level's copy of the title main menu's Options list focus-in (0x277df8, the same instructions, other data): its page is never opened on a level |
 | front:0x001e9168 | 464 B | 20 | host | the boot module's debug font (its GS upload) |
 | front:0x001e9338 | 108 B | 20 | host | the boot module's debug font set-up |
 | front:0x00201520 | 180 B | 20 | host | loads the IOP modules listed in the boot data (the host's IOP) |

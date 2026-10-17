@@ -151,6 +151,8 @@ shared code every level runs:
 | 15, 17 and 18 | 370 (the particle types 0x1f and 0x50: Giant Clank's streaks, Drek's fleet's laser beams) |
 | 16 | 371 (Kalebo III's classes on the race's dumps, the racers finished) |
 | 18 | 372 (the hero's frame in level 18's water) |
+| 0, 2, 3, 10 and 13 | 410 (the levels' own builds of the rail search, the cutscenes' level extras and the hit record) |
+| 0 .. 18 | 411 (the pause menu's Special page widgets; the levels' copies of two shared widget functions) |
 
 For a quick check after a small change, level 0's 63, 79, 118 and 141 are the usual minimum.
 

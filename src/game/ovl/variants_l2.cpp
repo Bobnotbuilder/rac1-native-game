@@ -52,6 +52,8 @@ constexpr VariantRow kAridia[] = {
     {0x002e8648, 0x002f6548, 0x28},  // cam0_set_flag116
     {0x002eaa30, 0x002f89b0, 0x68},  // uid5_set_pvar_90
     {0x002ec678, 0x002fa6a8, 0x30},  // cam7_step
+    // level 2's cutscene_level_extras holds only Veldin's level 2 branch (the same instructions): Veldin's port runs (batch 410)
+    {0x0023e268, 0x002400c8, 0x68},  // cutscene_level_extras
 };
 }  // namespace
 
