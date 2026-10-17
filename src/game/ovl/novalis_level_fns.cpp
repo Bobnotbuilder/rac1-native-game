@@ -96,6 +96,7 @@ void shared_fx_tr_register() {
     ovl_register_moby_fn(0x00237200, help_panel_draw_tr);
     ovl_register_moby_fn(0x00272838, particle_38_update);
     ovl_register_moby_fn(0x002728e8, particle_39_update);
+    ovl_register_moby_fn(0x0023db30, cutscene_l14_effect_draw_tr);  // (queued by cutscene_level_extras's level 14 branch)
 }
 
 }  // namespace rac1

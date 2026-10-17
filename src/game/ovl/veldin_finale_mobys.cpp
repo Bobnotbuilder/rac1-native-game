@@ -86,6 +86,9 @@ void veldin_finale_moby_fns_register() {
     ovl_register_level_moby_fn(VELDIN_FINALE, L18_ADDR(0x002fcbb0), vf_hook_2fcbb0_m);
     ovl_register_level_moby_fn(VELDIN_FINALE, L18_ADDR(0x002fcc50), vf_hook_2fcc50_m);
     ovl_register_level_moby_fn(VELDIN_FINALE, L18_ADDR(0x002fcca0), vf_hook_2fcca0_m);
+    // (the classes' hook +0x14: the carried moby's reset after its explosion, explode_and_reset 0x2dc938, through the moby dispatch)
+    ovl_register_level_moby_fn(VELDIN_FINALE, L18_ADDR(0x002d6280), vf_hook_2d6280_l18);
+    ovl_register_level_moby_fn(VELDIN_FINALE, L18_ADDR(0x002fcd00), vf_hook_2fcd00_l18);
     ovl_register_level_moby_fn(VELDIN_FINALE, L18_ADDR(0x002d5768), vf_cb_2d5768_l18);
     ovl_register_level_moby_fn(VELDIN_FINALE, L18_ADDR(0x002d8098), vf_cb_2d8098_l18);
     ovl_register_level_moby_fn(VELDIN_FINALE, L18_ADDR(0x002d98e8), vf_cb_2d98e8_l18);

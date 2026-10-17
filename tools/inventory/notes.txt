@@ -45,10 +45,10 @@ L0:002a1228 host installs the DMA interrupt handlers (the kernel)
 L0:002a1328 host removes the DMA interrupt handlers (the kernel)
 L0:002ee0e0-002f0cd0 host the movie player library (the IPU / MPEG decoder the overlay links): replaced by src/game/lib/movie_player.cpp and runtime/ipu
 L0:00243d38 latent P5 quitting to the title: reads the boot data back from the disc (the port ends the program instead)
-L0:0023a2d0 latent P1 the Metal Detector's HUD (HUD slot 7, camera 0x753a): its draw, a pointer hero_camera_7_update hands to the HUD; ported for Batalia and Drek's fleet only
-L0:001fb470 latent P1 the large text box draw, called by the Metal Detector's HUD (the small / medium ones are ported)
-L0:0023db30 wire P8 level 14's scene 0 effect draw (cutscene_level_extras): ported on Oltanis, where it runs; Veldin's copy never runs it
-L0:0023e008 wire P8 level 14's scene 0 effect (cutscene_level_extras): ported on Oltanis, where it runs
+L0:0023a2d0 latent P1 the Metal Detector's HUD (HUD slot 7, camera 0x753a): its draw, a pointer hero_camera_7_update hands to the HUD (ported: hud_slot7_tr.cpp, every level; batch 400)
+L0:001fb470 latent P1 the large text box draw, called by the Metal Detector's HUD (ported with it: hud_slot7_tr.cpp)
+L0:0023db30 wire P8 level 14's scene 0 effect draw (cutscene_level_extras): Oltanis runs its own build; Veldin's ported too (shared_fx_tr.cpp, batch 401)
+L0:0023e008 wire P8 level 14's scene 0 effect (cutscene_level_extras): Oltanis runs its own build; Veldin's ported too (shared_fx_tr.cpp, batch 401)
 L0:00262360 inprogress P2 a helper of particle type 0x36's update
 L0:0025c230 inprogress P2 a helper of particle type 0x14's update
 L0:002694f8 inprogress P2 particle type 0x03's update
@@ -80,7 +80,7 @@ L0:0027fba0 check P3 an end-of-game menu widget function (0x1b7544 / 0x1b759c), 
 L0:0027fd38 check P3 an end-of-game menu widget function (0x1b6e24), not in the widget dispatch
 L0:00280590 check P3 an end-of-game menu widget function (0x1b73b4), not in the widget dispatch
 L0:00250030 false a data word that points into the middle of a function (8 bytes)
-L0:0020d61c check P6 a hero state table's entry (the table at 0x1e7c40), not seen called
+L0:0020d61c false a jump table's case of 0x20d5d0 (the per-kind parameter, its table at 0x1e7c40), after the function's first return: ported with it (sub_0020d5d0)
 # the levels' own builds the port stands in for (the Veldin port runs; the level's code differs)
 L3:00205830 review P4 Kerwan's build of the rail search (find_rail, 0x20cd08): without the thresholds Veldin's build changes in two sub-states and with the hero's 0x1ca flag; the Veldin port runs on Kerwan's grind rails
 L3:0022c728 review P4 Kerwan's build of the cutscenes' level extras (0x23e268): its own scene 5 sparks branch; the Veldin port runs (its level 3 branch, the sparks 0x26ced0 a TODO_PORT)
@@ -89,13 +89,13 @@ L13:00265c30 review P4 Gemlik's second copy of 0x259bc8 (the same instructions, 
 V:0027a6e0 review P3 a level's own build of a help page's focus-in (the same instructions as Veldin's items_help_focus_in 0x27a6e0, other data): the Veldin port runs, through the code pointer pairs
 V:002779c8 review P3 a level's own build of a pause menu label's update (the same instructions as Veldin's menu_label_update 0x2779c8, other data): the Veldin port runs
 # the levels' own code
-L2:002fa770 wire P8 a camera mode hook of Aridia (the same code as Kerwan's / Eudora's ported camera callback)
-L18:002d6280 check P6 a class hook of the Veldin finale (overlay section 3, after the class rows), not seen called
-L18:002fcd00 check P6 a class hook of the Veldin finale (overlay section 3, after the class rows), not seen called
-L9:00270018 check P6 a function only Gaspar's data points to, not seen called
-L14:00260020 check P6 Oltanis's copy of 0x257b20 (other data), only its data points to it
+L2:002fa770 wire P8 Aridia's camera end-of-update callback, queued by its camera hook 0x2fa710 (ported: aridia_classes_tr.cpp, batch 401)
+L18:002d6280 check P6 class 568's hook +0x14 (table 0x1f3498): the carried moby's reset after its explosion (ported: veldin_finale_classes_tr_6.cpp, batch 401)
+L18:002fcd00 check P6 class 1906's hook +0x14 (table 0x1f34c8): the carried moby's reset after its explosion (ported: veldin_finale_classes_tr_6.cpp, batch 401)
+L9:00270018 false a branch target inside a function (after its early return at 0x270010), named only by halfword pairs of Gaspar's data (0x1c0464 ..): not a function (the development repository's gaspar_classes.md lists it as a false positive)
+L14:00260020 false named only by halfword pairs of Oltanis's data (0x1c09c8, 0x1c0a00): the code there (after the return at 0x260014) is Veldin's 0x257b20, which nothing references either
 L5:0023b400 check P6 a function only Rilgar's data points to (Kalebo's copy too)
-L2:0020ff20 check P6 a math helper only Aridia's data points to
+L2:0020ff20 false named only by a colour of Aridia's data (0x15f88c: 0x0020ff20 among RGBA words): the code is a math helper nothing calls, as Veldin's 0x1feee8
 L7:002c0100 false a data word equal to a code address (8 bytes)
 L7:00320030 false a data word equal to a code address (8 bytes)
 L9:00310024 false a data word equal to a code address
@@ -106,7 +106,7 @@ front:001e9338 host the boot module's debug font set-up
 front:00201520 host loads the IOP modules listed in the boot data (the host's IOP)
 front:00217048 host the boot module's copy of 0x266ed0 (an IOP / sound start-up step)
 front:00232ce0 host the boot module's copy of 0x293af8 (a kernel step of the start)
-front:00207ae8 wire P7 a map reveal condition's copy in the boot module (data only)
+front:00207ae8 wire P7 a map reveal condition's copy in the boot module (its table 0x1a0004 ..; the boot module reveals no map, nothing calls it): Veldin's 0x249d60, which front_reloc.txt pairs with 0x2079c8 (an identical body, another flag), so the boot module's translation misses it
 front:0021ca98 review P7 the boot module's help page focus-in (other data than Veldin's)
 
 # ---- not connected: what we know (cut content) ---------------------------------------------------------------------
