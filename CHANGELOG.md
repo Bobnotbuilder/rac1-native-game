@@ -3,6 +3,55 @@
 What changed in each release. Releases are source only: you build the game with `./setup.sh`
 (`setup.cmd` on Windows) from your own disc. Issue numbers refer to this repository's issues.
 
+## 0.4.0
+
+Bug fixes from the 0.3.0 reports, and almost all of the game's code is now ported: of the code the
+game runs, one function is left (see the [port inventory](docs/port-inventory.md)). Tested on Linux
+only so far; the planets after Orxon still need more playtesting.
+
+### Crashes
+- **Quartu:** the crash under water when the air meter runs low (very likely #48's at the Box
+  Breaker path): the game asks for a sound that does not exist, which the PS2 ignores.
+- **Kalebo III:** the crash during the landing scene in widescreen with a raised level of detail.
+
+### Gameplay
+- **Modern aiming** aims up and down with every weapon that fires in a direction (Devastator,
+  R.Y.N.O., Visibomb, Pyrocitor, Tesla Claw, Morph-o-Ray, Suck Cannon), and the gloves' throws land
+  nearer or farther with the aim (#48).
+- **RAC 3 movement:** jumping during a standing wrench throw (#50).
+- The camera no longer locks for a second after a strafe (#56, thanks to MJorink).
+- Giant Clank's triangle attack no longer leaves streaks behind (#51); the laser beams on Drek's
+  fleet move instead of hanging frozen (#53). Every particle type of the game is now ported.
+- Kerwan's hanging cables are caught as in the original (Kerwan's own rail search).
+- The Metal Detector's display now shows on every planet, not only Batalia and Drek's fleet.
+- **Quit Game** now goes back to the title screen and its main menu, as the original, instead of
+  closing the game.
+- A cutscene started while strafing no longer keeps Ratchet in the strafe pose (#40).
+- The pause menu's **Goodies** pages after finishing the game: Cheats, In-Level Movies, the
+  Sketchbook, the Epilogue and the Skill Points text.
+
+### Graphics
+- **Widescreen (16:9, 32:9):** the water, lava and sand sea are no longer cut at the 4:3 sides (#6);
+  thin far objects (Gaspar's antennas and spires, far plants) are no longer missing at a raised
+  level of detail or in widescreen.
+- Force fields, Quartu's Hologuise gates and Orxon's O2 barriers are see-through and tinted instead
+  of black (#52).
+- The Vendor's screens on Aridia, Eudora, Umbris and Oltanis (the Tesla Claw page) (#47, #48).
+- Hoven: the ice cube around Ratchet is whole again (#48).
+- A high Field of View no longer clips the sky (a black band at the top, Pokitaru's sky after
+  surfacing), and the ship menu's planets are no longer drawn as squares.
+- The starry sky in the loading screen's flight after Load Game from the title, with the lighting on.
+- **Modern lighting** on Batalia to the Veldin finale: rooms and corridors no longer go dark under
+  the roof's shadow; false lamps on Gaspar and Orxon removed.
+- A **Monitor** row on the Graphics page, to choose the screen for fullscreen (#44, thanks to CDCast).
+
+### Windows and the updater
+- **Update now** without git: a clone that git cannot update is updated from the source zip,
+  keeping your own files (#47). (Players on 0.3.0 without git need to update by hand once.)
+- Windows: a click in the console no longer freezes the game (QuickEdit off), the frame timing is
+  more precise, and alt-tab from fullscreen / a minimized window no longer breaks the picture (#41).
+- Window sizes down to 640x480 (#46).
+
 ## 0.3.0
 
 **Every planet of the game is ported**, up to the final fight with Drek, the credits and the end

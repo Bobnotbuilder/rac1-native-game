@@ -64,11 +64,16 @@ to build and play, plus the documentation.
 ## After Milestone 1
 
 **The rest of the game is ported (0.3.0):** levels 8 to 18, up to the final fight, the credits and
-the end menu. What comes next, in no fixed order:
+the end menu. **0.4.0** was a round of fixes for the bugs reported on 0.3.0, and the
+[Port inventory](port-inventory.md): every function of the disc's code sorted into ported, left to
+port and never reached, and the code it found left to port, ported (one function remains). What
+comes next, in no fixed order:
 
 - **Playtesting and polishing** the planets after Orxon, and the fixes that come from it.
-- **Shared stubs:** the remaining `TODO_PORT` stubs every level reaches.
+- **The last items of the inventory:** the one function left, and, as optional enhancements, the
+  cut content and development features it lists (see [Port inventory](port-inventory.md)).
 - **The renderer:** the HUD, menus and remaining effects drawn natively, the mobys' shadow meshes.
+- **Testing on more machines:** the European PAL disc, and Windows.
 
 Ideas for later, from the project's list of [enhancements](enhancements.md) (each one optional and
 off by default when it changes the game):

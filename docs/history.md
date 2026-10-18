@@ -134,6 +134,13 @@ October with Milestone 1 (0.1.0). In the next days came the European PAL disc on
 Veldin finale with the credits and the end menu (0.3.0), together with a large performance update and
 an in-game updater. The new planets still await a full playtest.
 
+**16 to 18 October: fixes and the code left to port.** The bug reports on 0.3.0 were worked
+through: the crashes on Quartu and Kalebo III, modern aiming, the camera after a strafe, the
+widescreen edges, the Vendors' screens and the modern lighting on the later planets. A port inventory
+sorted every function of the disc's code into ported, left to port and never reached, and the code
+it found left to port was ported, Quit Game back to the title screen among it, until one function
+remained (0.4.0). A playtest of the later planets on Linux went well; they still need more.
+
 ## What came of it
 
 - Five months of trying became one rule: nothing is invented, and every port is checked against the

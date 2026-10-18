@@ -1,9 +1,11 @@
 # rac1-native
 
-> **Current state (0.3.0):** every planet of the game is now ported, from Veldin to the final fight
-> with Drek, the credits and the end menu. Up to Orxon the game has been played through; the planets
-> after it (Pokitaru to the Veldin finale) are new and have **not been fully tested yet**: expect bugs
-> and glitches, and some polishing work is still to do. So far it has been tested on Linux only.
+> **Current state (0.4.0):** every planet of the game is ported, from Veldin to the final fight with
+> Drek, the credits and the end menu, and of the game's code the game runs, one function is left to
+> port. This release fixes the bugs reported on 0.3.0 (the crashes on Quartu and Kalebo III, modern
+> aiming, several graphics glitches), and Quit Game now goes back to the title screen. Up to Orxon
+> the game has been played through; the planets after it have been playtested further, but they
+> still need more playtesting: expect bugs and glitches there. So far it has been tested on Linux only (Windows is experimental).
 > See [Status](docs/status.md).
 
 A native PC port of **Ratchet & Clank** (PlayStation 2, 2002), for Linux, and experimentally for Windows.
@@ -20,14 +22,17 @@ changing how the game behaves.
 
 ## Status
 
-**Every planet of the game is ported (0.3.0).** Veldin, Novalis, Aridia, Kerwan, Eudora, Rilgar,
-Blarg / Nebula G34 and Umbris (Milestone 1) and then Batalia, Gaspar and Orxon have been played
-through, apart from a few small bugs and glitches. Pokitaru, Hoven, Gemlik Base, Oltanis, Quartu,
-Kalebo III, Drek's fleet and the Veldin finale, with the credits and the end menu, are ported and
-proved against the original code, and checked in automated runs, but have not been fully played by
-hand yet. The port as a whole still needs polishing. See [Status](docs/status.md) (which also maps
-the names the code uses for the levels to the names in the game), the [Roadmap](docs/roadmap.md) and
-the [History](docs/history.md).
+**Every planet of the game is ported (0.3.0), and almost all of its code (0.4.0).** Veldin, Novalis,
+Aridia, Kerwan, Eudora, Rilgar, Blarg / Nebula G34 and Umbris (Milestone 1) and then Batalia, Gaspar
+and Orxon have been played through, apart from a few small bugs and glitches. Pokitaru, Hoven,
+Gemlik Base, Oltanis, Quartu, Kalebo III, Drek's fleet and the Veldin finale, with the credits and
+the end menu, are ported and proved against the original code, and checked in automated runs. 0.4.0
+fixes the bugs reported on 0.3.0 (see the [Changelog](CHANGELOG.md)), and a playtest of the current
+state on Linux went well, but the planets after Orxon still need more playtesting by players. Of
+the code the game runs, one function is left to port (see the [Port inventory](docs/port-inventory.md)).
+The port as a whole still needs polishing. See [Status](docs/status.md) (which also maps the names
+the code uses for the levels to the names in the game), the [Roadmap](docs/roadmap.md) and the
+[History](docs/history.md).
 
 ### Tested on
 
