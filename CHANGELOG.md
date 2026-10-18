@@ -6,8 +6,9 @@ What changed in each release. Releases are source only: you build the game with 
 ## 0.4.0
 
 Bug fixes from the 0.3.0 reports, and almost all of the game's code is now ported: of the code the
-game runs, one function is left (see the [port inventory](docs/port-inventory.md)). Tested on Linux
-only so far; the planets after Orxon still need more playtesting.
+game runs, one function is left (see the [port inventory](docs/port-inventory.md)). The whole game
+has been played through to the end on it, and the start of a New Game+ checked; tested on Linux only
+so far.
 
 ### Crashes
 - **Quartu:** the crash under water when the air meter runs low (very likely #48's at the Box

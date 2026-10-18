@@ -139,7 +139,8 @@ through: the crashes on Quartu and Kalebo III, modern aiming, the camera after a
 widescreen edges, the Vendors' screens and the modern lighting on the later planets. A port inventory
 sorted every function of the disc's code into ported, left to port and never reached, and the code
 it found left to port was ported, Quit Game back to the title screen among it, until one function
-remained (0.4.0). A playtest of the later planets on Linux went well; they still need more.
+remained (0.4.0). Then the whole game was played through by hand to the end, for the first time on
+the port, and the start of a New Game+ checked.
 
 ## What came of it
 
