@@ -11,6 +11,7 @@ defaults:
 jobs:
   apple-runtime:
     runs-on: xcode-27
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Private preparation metadata contracts (no disc)
@@ -27,6 +28,9 @@ jobs:
           cmake -S ios/portability -B build-apple -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_BUILD_TYPE=RelWithDebInfo
           cmake --build build-apple --parallel 2 2>&1 | tee evidence/apple-build.log
           ctest --test-dir build-apple --output-on-failure 2>&1 | tee evidence/apple-tests.log
+          build-apple/rac1_vu0_simd_test | tee evidence/vu0-neon-reference.log
+          # Measured with this fixture on the untouched upstream SSE path (Intel, strict FP).
+          grep -q 'VU0_SIMD_REFERENCE_DIGEST=806184f7d1d9edb5' evidence/vu0-neon-reference.log
       - name: Compile actual iPhone ARM64 runtime objects
         run: |
           cmake -S ios/portability -B build-device -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO

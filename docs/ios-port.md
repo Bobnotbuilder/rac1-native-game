@@ -12,6 +12,11 @@ This is NOT ReRAC. No changes to ReRAC or GameStudio engines are required.
 - ARM64 FPCR flush-to-zero in the existing PS2 float setup, retaining toward-zero rounding.
   Strict compiler flags and runtime tests are mandatory; an old compiler warning about unsupported
   rounding must not be ignored as proof of fidelity.
+- A narrow, independently written native NEON adapter for the SSE operations used by
+  `vu0_regs.h`, enabled only through the Apple ARM64 include path. The original game helper
+  header is unchanged. Differential fixtures exercise all 16 write masks, operand clamping,
+  MAC/status flags, arithmetic, signed zero and shuffles against upstream scalar helpers;
+  the same test can run against the untouched SSE implementation on x86.
 - The existing platform file interface on Apple, app-owned Documents saves and Application
   Support settings, offset reads, maps, thread CPU diagnostics, explicit failure for subprocesses.
 - Apple GameController extended-gamepad snapshots into the existing `HostState`, including sticks,
