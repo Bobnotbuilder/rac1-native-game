@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+defaults:
+  run:
+    shell: bash
 jobs:
   apple-runtime:
     runs-on: xcode-27
@@ -31,6 +34,7 @@ jobs:
           xcrun ar -t build-device/librac1_apple_runtime.a | tee evidence/device-objects.txt
       - name: Compile Metal for device and run source-derived contracts on host GPU
         run: |
+          xcodebuild -downloadComponent MetalToolchain
           xcrun --sdk iphoneos metal -fno-fast-math -c src/game/render/metal/gs_fragment.metal -o build-device/gs_fragment.air
           xcrun --sdk iphoneos metallib build-device/gs_fragment.air -o build-device/gs_fragment.metallib
           xcrun --sdk macosx metal -fno-fast-math -c src/game/render/metal/gs_fragment.metal -o build-apple/gs_fragment.air
