@@ -11,7 +11,7 @@
 
 namespace {
 uint32_t bits(float v) { uint32_t u; std::memcpy(&u, &v, sizeof u); return u; }
-float value(uint32_t u) { float v; std::memcpy(&v, &u, sizeof v); return v; }
+float from_bits(uint32_t u) { float v; std::memcpy(&v, &u, sizeof v); return v; }
 void fp_test() {
     rac1::ps2fpu::enter_ee_rounding();
     assert(std::fegetround() == FE_TOWARDZERO);
@@ -22,10 +22,10 @@ void fp_test() {
     assert(bits(value) == 0x3f8ccccb);
     while (value > 0) value = value - step;
     assert(value > -1e-6f && value < 0);
-    volatile float tiny = value(1);
+    volatile float tiny = from_bits(1);
     volatile float one = 1;
     assert(bits(one - tiny) == bits(one)); // input denormal must be zero, not a one-ULP subtraction
-    volatile float normal = value(0x00800000);
+    volatile float normal = from_bits(0x00800000);
     volatile float half = 0.5f;
     assert(bits(normal * half) == 0); // output subnormal must flush too
     volatile float a = 1, b = 10;
