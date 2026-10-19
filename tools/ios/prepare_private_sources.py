@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -43,10 +44,35 @@ def load_setup():
     return module
 
 
+def verify_generated_state(setup):
+    files = setup.generated_files()
+    if not files or len(files) != len(set(files)):
+        raise RuntimeError("Empty or duplicate upstream generated-source inventory")
+    for name in files:
+        relative = Path(name)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise RuntimeError("Invalid upstream generated-source path")
+        if not (setup.CODE_ROOT / relative).is_file():
+            raise RuntimeError("Incomplete generated-source inventory; do not compile a partial game")
+    if not setup.code_current():
+        raise RuntimeError("Upstream generated-source fingerprint verification failed")
+    return files
+
+
+def prepare_or_verify(setup, iso, jobs, verify_existing):
+    # A completed run can be attested at a later integration revision without restarting codegen.
+    # Never rewrite the upstream manifest/fingerprint to make an out-of-date generation pass.
+    if not verify_existing:
+        setup.prepare_code(iso, set(), jobs)
+    return verify_generated_state(setup)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--iso", type=Path, required=True)
     parser.add_argument("--source-revision", required=True)
+    parser.add_argument("--verify-existing", action="store_true",
+                        help="Verify the complete current upstream generation; NEVER rerun generators")
     # Four-GB Intel host: deliberately one compiler/generator job unless the caller opts in.
     parser.add_argument("--jobs", type=int, default=1, choices=range(1, 5))
     args = parser.parse_args()
@@ -62,20 +88,32 @@ def main():
             digest.update(block)
     # Reuse upstream extraction, map matching, generators and input fingerprint; no new decompiler.
     os.environ["RAC1_ISO"] = str(iso)
-    setup.prepare_code(iso, set(), args.jobs)
-    if not setup.code_current():
-        raise RuntimeError("Upstream generated-source fingerprint verification failed")
+    generated = prepare_or_verify(setup, iso, args.jobs, args.verify_existing)
+    hashes = {}
+    for name in generated:
+        content_hash = hashlib.sha256()
+        with (setup.CODE_ROOT / name).open("rb") as stream:
+            for block in iter(lambda: stream.read(1 << 20), b""):
+                content_hash.update(block)
+        hashes[name] = content_hash.hexdigest()
     receipt = {
         "schema_version": 1, "source_revision": revision, "disc_serial": "SCUS-97199",
         "preparation_script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
         "disc_size": iso.stat().st_size, "disc_sha256": digest.hexdigest(),
         "codegen_fingerprint": setup.code_sources_fingerprint(),
-        "generated_files": len(setup.generated_files()), "jobs": args.jobs,
+        "generated_files": len(generated), "jobs": args.jobs,
+        "verification_only": args.verify_existing,
+        "generated_source_hashes": hashes,
         "generated_sources_current": True,
         "game_linked": False, "oracle_run": False, "ios_playable": False,
         "privacy": "LOCAL_ONLY_DO_NOT_UPLOAD",
     }
     output = ROOT / "assets/ios-private-preparation.json"
+    if output.exists():
+        previous = hashlib.sha256(output.read_bytes()).hexdigest()[:16]
+        backup = output.with_name(f"ios-private-preparation.{previous}.json")
+        if not backup.exists():
+            shutil.copy2(output, backup)
     temporary = output.with_suffix(".json.part")
     temporary.write_text(json.dumps(receipt, indent=2) + "\n")
     temporary.replace(output)

@@ -82,6 +82,10 @@ python3 tools/ios/prepare_private_sources.py --iso '/path/to/user-owned/SCUS-971
 ```
 
 This prepares PRIVATE code, not MRP runtime assets or an IPA. Oracle and full game linking remain unrun.
+After a successful generation, add `--verify-existing` to attest the completed files at the current
+integration revision without rerunning extraction or codegen. It checks every upstream-listed
+file and the original upstream fingerprint, records private per-file hashes, and retains the old
+receipt. Missing/stale files fail; this option never rewrites the generated CMake manifest to pass.
 
 Use a readable user-owned SCUS-97199 input and upstream setup/codegen, privately. Do not put ISO,
 generated copyrighted source, dumps or extracted assets in this public fork/Actions artifacts.
