@@ -37,6 +37,8 @@ jobs:
           cmake --build build-device --parallel 2 2>&1 | tee evidence/device-build.log
           file build-device/librac1_apple_runtime.a | tee evidence/device-library.txt
           lipo -verify_arch arm64 build-device/librac1_apple_runtime.a
+          lipo -verify_arch arm64 build-device/librac1_metal_state.a
+          file build-device/librac1_metal_state.a | tee evidence/device-metal-state.txt
           xcrun ar -t build-device/librac1_apple_runtime.a | tee evidence/device-objects.txt
       - name: Compile Metal for device and run source-derived contracts on host GPU
         run: |
@@ -51,6 +53,11 @@ jobs:
           xcrun --sdk macosx metal -fno-fast-math -c src/game/render/metal/gs_fragment.metal -o build-apple/gs_fragment.air
           xcrun --sdk macosx metallib build-apple/gs_fragment.air -o build-apple/gs_fragment.metallib
           build-apple/rac1_metal_contract build-apple/gs_fragment.metallib 2>&1 | tee evidence/metal-tests.log
+          xcrun --sdk iphoneos metal -fno-fast-math -c tests/apple/gs_blend_fixture.metal -o build-device/gs_blend_fixture.air
+          xcrun --sdk iphoneos metallib build-device/gs_blend_fixture.air -o build-device/gs_blend_fixture.metallib
+          xcrun --sdk macosx metal -fno-fast-math -c tests/apple/gs_blend_fixture.metal -o build-apple/gs_blend_fixture.air
+          xcrun --sdk macosx metallib build-apple/gs_blend_fixture.air -o build-apple/gs_blend_fixture.metallib
+          build-apple/rac1_metal_blend_contract build-apple/gs_blend_fixture.metallib 2>&1 | tee evidence/metal-blend-tests.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:

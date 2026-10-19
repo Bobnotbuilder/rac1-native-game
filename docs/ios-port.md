@@ -25,6 +25,14 @@ This is NOT ReRAC. No changes to ReRAC or GameStudio engines are required.
 - A first Metal shader building block translated from the existing MRP: texture functions,
   alpha comparisons and two-pass alpha-fail decisions. Synthetic GPU tests compare with a CPU
   expression of the upstream rules. This is NOT yet a complete renderer or an image comparison.
+- Native Metal GS blend-state mapping, derived from the untouched OpenGL `blend_state` reference.
+  RGB add/subtract/reverse-subtract and factors are mapped to real pipeline state; alpha is
+  source-write-only as upstream. FIX changes use encoder state, not new pipeline compilation.
+  Known upstream approximations (`1+C`, FIX above 128) are explicitly flagged. A strict policy
+  rejects those states without changing the attachment; reference-compatible policy is explicit.
+  A disc-free CPU contract covers all register selectors and FIX boundaries. A GPU raster test
+  renders synthetic per-state pixels and checks readback against the upstream coefficient policy.
+  These tests are renderer-component evidence, not original-game screenshots or GS hardware proof.
 - Separate public, disc-free Apple runtime/Metal CI. It builds real iPhone runtime objects, not
   an import-screen app, and must never label these as a game IPA or an oracle pass.
 
