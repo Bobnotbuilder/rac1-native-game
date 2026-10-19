@@ -1,4 +1,7 @@
 // No game bytes: platform and floating-point contracts, NOT an oracle/gameplay substitute.
+#ifdef NDEBUG
+#error Runtime contracts require assertions enabled
+#endif
 #include <platform/platform.h>
 #include <runtime/ee/ee_thread.h>
 #include <runtime/ee/ps2_fpu.h>

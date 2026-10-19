@@ -56,8 +56,19 @@ The translated VU/game code and original renderer remain unchanged as the refere
 
 The public source alone cannot link the game. Roughly 140 C++ files must be generated from the
 user's disc. `RAC1_NO_GENERATED=ON` compiles libraries only and is NEVER a playable build.
-The inspected local `Game/Ratchet.iso` link points at a missing PAL file; no readable NTSC-U disc
-was found in the inspected Downloads/Game locations. Oracle and full game linking remain unrun.
+The inspected local `Game/Ratchet.iso` link points at a missing PAL file. A broader read-only
+search found the user's NTSC-U disc in Trash; it has not been moved, restored or uploaded.
+The new `tools/ios/prepare_private_sources.py` reuses upstream extraction/matching/codegen
+without needing desktop OpenGL, CMake or a desktop gameplay build. It validates NTSC-U identity,
+exact reference size and source revision, hashes the disc, uses one job by default, verifies
+the upstream source fingerprint and writes its receipt under ignored `assets/` only.
+
+```sh
+python3 tools/ios/prepare_private_sources.py --iso '/path/to/user-owned/SCUS-97199.iso' \
+  --source-revision '<exact checkout commit>' --jobs 1
+```
+
+This prepares PRIVATE code, not MRP runtime assets or an IPA. Oracle and full game linking remain unrun.
 
 Use a readable user-owned SCUS-97199 input and upstream setup/codegen, privately. Do not put ISO,
 generated copyrighted source, dumps or extracted assets in this public fork/Actions artifacts.

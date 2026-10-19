@@ -1,4 +1,7 @@
 // Synthetic, source-derived GS fragment contracts. No copyrighted assets or captured game data.
+#ifdef NDEBUG
+#error Metal contracts require assertions enabled
+#endif
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #include <simd/simd.h>

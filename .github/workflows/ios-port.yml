@@ -13,6 +13,8 @@ jobs:
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
+      - name: Private preparation metadata contracts (no disc)
+        run: python3 -m unittest discover -s tests/apple -p 'test_*.py' -v
       - name: Record source and SDK
         run: |
           mkdir -p evidence
@@ -35,6 +37,11 @@ jobs:
       - name: Compile Metal for device and run source-derived contracts on host GPU
         run: |
           xcodebuild -downloadComponent MetalToolchain
+          if xcrun --sdk iphoneos metal -c tests/apple/unsupported_fp64.metal -o build-device/unsupported.air > evidence/metal-fp64-negative.log 2>&1; then
+            echo "Metal FP64 support changed; review the tfrag capability gate"
+            exit 1
+          fi
+          grep -q "'double' is not supported in Metal" evidence/metal-fp64-negative.log
           xcrun --sdk iphoneos metal -fno-fast-math -c src/game/render/metal/gs_fragment.metal -o build-device/gs_fragment.air
           xcrun --sdk iphoneos metallib build-device/gs_fragment.air -o build-device/gs_fragment.metallib
           xcrun --sdk macosx metal -fno-fast-math -c src/game/render/metal/gs_fragment.metal -o build-apple/gs_fragment.air
