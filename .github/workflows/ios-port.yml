@@ -1,0 +1,44 @@
+name: iOS native port contracts
+on:
+  push:
+    branches: [ios/arm64-metal-port]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apple-runtime:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record source and SDK
+        run: |
+          mkdir -p evidence
+          git rev-parse HEAD | tee evidence/source.txt
+          uname -m | tee evidence/host-architecture.txt
+          xcodebuild -version | tee evidence/xcode.txt
+          xcrun --sdk iphoneos --show-sdk-version | tee evidence/device-sdk.txt
+      - name: Build and run native ARM64 coroutine and FP contracts
+        run: |
+          cmake -S ios/portability -B build-apple -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          cmake --build build-apple --parallel 2 2>&1 | tee evidence/apple-build.log
+          ctest --test-dir build-apple --output-on-failure 2>&1 | tee evidence/apple-tests.log
+      - name: Compile actual iPhone ARM64 runtime objects
+        run: |
+          cmake -S ios/portability -B build-device -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+          cmake --build build-device --parallel 2 2>&1 | tee evidence/device-build.log
+          file build-device/librac1_apple_runtime.a | tee evidence/device-library.txt
+          lipo -verify_arch arm64 build-device/librac1_apple_runtime.a
+          xcrun ar -t build-device/librac1_apple_runtime.a | tee evidence/device-objects.txt
+      - name: Compile Metal for device and run source-derived contracts on host GPU
+        run: |
+          xcrun --sdk iphoneos metal -fno-fast-math -c src/game/render/metal/gs_fragment.metal -o build-device/gs_fragment.air
+          xcrun --sdk iphoneos metallib build-device/gs_fragment.air -o build-device/gs_fragment.metallib
+          xcrun --sdk macosx metal -fno-fast-math -c src/game/render/metal/gs_fragment.metal -o build-apple/gs_fragment.air
+          xcrun --sdk macosx metallib build-apple/gs_fragment.air -o build-apple/gs_fragment.metallib
+          build-apple/rac1_metal_contract build-apple/gs_fragment.metallib 2>&1 | tee evidence/metal-tests.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: RAC1Native-Apple-port-contract-evidence
+          path: evidence/
+          if-no-files-found: error

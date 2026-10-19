@@ -1,0 +1,80 @@
+# Native iOS port: first implementation checkpoint
+
+Baseline: upstream 0.4.0, `3fd14c12e4dff2fd4b6661a6e54187faea3f76c8`.
+Development: `Bobnotbuilder/rac1-native-game`, branch `ios/arm64-metal-port`.
+This is NOT ReRAC. No changes to ReRAC or GameStudio engines are required.
+
+## Implemented in this checkpoint
+
+- The existing platform coroutine interface on Apple ARM64 without `ucontext`, Linux mmap
+  flags, extra threads, or executable memory. Guarded, demand-paged stack, Apple reserved x18
+  untouched, callee-saved GPR/FP registers and FPCR/FPSR retained. Plain arm64 only, not arm64e.
+- ARM64 FPCR flush-to-zero in the existing PS2 float setup, retaining toward-zero rounding.
+  Strict compiler flags and runtime tests are mandatory; an old compiler warning about unsupported
+  rounding must not be ignored as proof of fidelity.
+- The existing platform file interface on Apple, app-owned Documents saves and Application
+  Support settings, offset reads, maps, thread CPU diagnostics, explicit failure for subprocesses.
+- Apple GameController extended-gamepad snapshots into the existing `HostState`, including sticks,
+  triggers, face buttons, D-pad, Menu/Options and thumbstick presses. The existing remapping and
+  `to_packet` path remains authoritative. Physical Backbone behaviour is NOT yet tested.
+- A first Metal shader building block translated from the existing MRP: texture functions,
+  alpha comparisons and two-pass alpha-fail decisions. Synthetic GPU tests compare with a CPU
+  expression of the upstream rules. This is NOT yet a complete renderer or an image comparison.
+- Separate public, disc-free Apple runtime/Metal CI. It builds real iPhone runtime objects, not
+  an import-screen app, and must never label these as a game IPA or an oracle pass.
+
+## Reproduce public tests
+
+On an Apple ARM64 Mac with modern Xcode and CMake (or Actions `iOS native port contracts`):
+
+```sh
+cmake -S ios/portability -B build-apple -DCMAKE_OSX_ARCHITECTURES=arm64
+cmake --build build-apple --parallel 2
+ctest --test-dir build-apple --output-on-failure
+cmake -S ios/portability -B build-device -DCMAKE_SYSTEM_NAME=iOS \
+  -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0
+cmake --build build-device --parallel 2
+```
+
+The coroutine test uses the REAL `runtime/ee/ee_thread.cpp`, 10,000 yields with live stack state,
+per-context float rounding, exception propagation and reuse. No gameplay simulation or interpreter
+is substituted. Public CI preserves the original Linux/Windows workflow unchanged.
+
+## First unresolved integration work
+
+There is no playable iOS target yet. The desktop root build still requires OpenGL 4.6 and GLFW.
+The complete Metal MRP, GS 2D/target ordering, UIKit game host, miniaudio/CoreAudio lifecycle and
+game-data import are not yet integrated. Do not produce a misleading placeholder IPA.
+
+One important renderer constraint: `mrp_tfrag_gpu.cpp` uses GLSL `double` storage and arithmetic
+for world reconstruction. Do not narrow this to float silently. Initially use/verify the existing
+CPU reference for that stage, then test a Metal representation against captured upstream output.
+The translated VU/game code and original renderer remain unchanged as the reference.
+
+## Private game-code build gate
+
+The public source alone cannot link the game. Roughly 140 C++ files must be generated from the
+user's disc. `RAC1_NO_GENERATED=ON` compiles libraries only and is NEVER a playable build.
+The inspected local `Game/Ratchet.iso` link points at a missing PAL file; no readable NTSC-U disc
+was found in the inspected Downloads/Game locations. Oracle and full game linking remain unrun.
+
+Use a readable user-owned SCUS-97199 input and upstream setup/codegen, privately. Do not put ISO,
+generated copyrighted source, dumps or extracted assets in this public fork/Actions artifacts.
+Before a hosted full game build, establish a specifically authorised private code-generation/build
+pipeline. Merely adding a public Actions secret does not authorise distributing generated code.
+
+Future bundle identity must be distinct from ReRAC (proposed `io.github.bobnotbuilder.rac1native`).
+No app with that identity is packaged yet; existing ReRAC saves/data are untouched.
+
+## Acceptance still required
+
+1. Modern ARM64 runtime tests, then original oracle on private NTSC-U data.
+2. Wire the backend into the existing MRP; render original world/mobys/GS 2D with paired snapshots.
+3. Integrate UIKit, audio interruption/background handling, safe-area/fullscreen and game data import.
+4. Private full generated-game device link; package executable plus dSYM, exact revision and checksum.
+5. User physical iPhone tests: launch, original graphics, Backbone, sound, menus, first planet,
+   transitions/saves and campaign progress. No device/gameplay or thermal improvement claim yet.
+
+Classifications: PLATFORM_SPECIFIC / SHARED_ARM64 / SHARED_IOS / SHARED_METAL / SHARED_TESTING
+as review candidates only; nothing is automatically adopted into GameStudio Shared Core.

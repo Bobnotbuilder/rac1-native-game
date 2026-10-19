@@ -45,6 +45,14 @@ inline void enter_ee_rounding() {
     std::fesetround(FE_TOWARDZERO);
 #if defined(__SSE__) || defined(__x86_64__)
     _mm_setcsr(_mm_getcsr() | 0x8040u);  // MXCSR FTZ (bit 15) | DAZ (bit 6)
+#elif defined(__aarch64__)
+    // ARM64 FPCR.FZ flushes both input and output subnormals for ordinary FP32/FP64
+    // arithmetic. fesetround above sets RMode; preserve every unrelated control bit.
+    // Do not use fast-math: VU/EE operations must not be reassociated or contracted.
+    uint64_t fpcr;
+    __asm__ volatile("mrs %0, fpcr" : "=r"(fpcr));
+    fpcr |= uint64_t{1} << 24;
+    __asm__ volatile("msr fpcr, %0\n\tisb" : : "r"(fpcr) : "memory");
 #endif
     g_ee_chop = true;
 }
