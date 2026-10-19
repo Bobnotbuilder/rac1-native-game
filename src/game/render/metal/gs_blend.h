@@ -9,6 +9,11 @@ enum class BlendFactor : uint8_t {
     OneMinusSourceAlpha, OneMinusDestinationAlpha, OneMinusConstantAlpha
 };
 enum class BlendOperation : uint8_t { Add, Subtract, ReverseSubtract };
+enum BlendApproximation : uint8_t {
+    BlendExact = 0,
+    BlendOnePlusFactor = 1,
+    BlendFixedAlphaClamped = 2
+};
 struct GsBlendState {
     bool enabled = false;
     BlendFactor source = BlendFactor::One, destination = BlendFactor::Zero;
@@ -17,6 +22,7 @@ struct GsBlendState {
     // The upstream GL path approximates 1+C and clamps FIX above 128. Do not conceal these
     // limitations or call this PS2-hardware verification. A strict caller may reject them.
     bool reference_approximation = false;
+    uint8_t approximation_reasons = BlendExact;
 };
 inline GsBlendState gs_blend_state(uint64_t prim, uint64_t alpha) {
     GsBlendState out;
@@ -32,9 +38,9 @@ inline GsBlendState gs_blend_state(uint64_t prim, uint64_t alpha) {
         const int k0 = d == who ? 1 : 0;
         const int k1 = int(a == who) - int(b == who);
         if (!k1) { value = k0 ? BlendFactor::One : BlendFactor::Zero; return 1; }
-        if (c == 2 && fix > 128) out.reference_approximation = true;
+        if (c == 2 && fix > 128) out.approximation_reasons |= BlendFixedAlphaClamped;
         if (!k0) { value = f; return k1; }
-        if (k1 > 0) out.reference_approximation = true;
+        if (k1 > 0) out.approximation_reasons |= BlendOnePlusFactor;
         value = k1 < 0 ? inverse : BlendFactor::One;
         return 1;
     };
@@ -43,6 +49,7 @@ inline GsBlendState gs_blend_state(uint64_t prim, uint64_t alpha) {
     else if (source_sign < 0 && destination_sign >= 0) out.operation = BlendOperation::ReverseSubtract;
     else if (source_sign >= 0) out.operation = BlendOperation::Subtract;
     else out.source = out.destination = BlendFactor::Zero;
+    out.reference_approximation = out.approximation_reasons != BlendExact;
     return out;
 }
 } // namespace rac1::metal

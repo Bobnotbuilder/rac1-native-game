@@ -67,7 +67,7 @@ The translated VU/game code and original renderer remain unchanged as the refere
 
 ## Private game-code build gate
 
-The public source alone cannot link the game. Roughly 140 C++ files must be generated from the
+The public source alone cannot link the game. The pinned generators list 227 C++ files (103 units), generated from the
 user's disc. `RAC1_NO_GENERATED=ON` compiles libraries only and is NEVER a playable build.
 The inspected local `Game/Ratchet.iso` link points at a missing PAL file. A broader read-only
 search found the user's NTSC-U disc in Trash; it has not been moved, restored or uploaded.
@@ -90,6 +90,39 @@ pipeline. Merely adding a public Actions secret does not authorise distributing 
 
 Future bundle identity must be distinct from ReRAC (proposed `io.github.bobnotbuilder.rac1native`).
 No app with that identity is packaged yet; existing ReRAC saves/data are untouched.
+
+## Strict blend rejection investigation
+
+The 1,280 enabled synthetic register combinations in the fixed-function GPU contract include
+reserved selectors deliberately, to preserve the upstream GL reference behavior. Strict rejection
+remains enforced: 188 states are not directly factorable without the reference's approximations.
+The new reason bits and CPU audit distinguish 108 `1+C`-only cases, 68 FIX-clamp-only cases and
+12 with both; 88 use defined selectors and 100 also use reserved selectors. These are synthetic
+combinations, not evidence that the game exercises all of them.
+
+`gs_programmable_blend.metal` evaluates `(A-B)*C+D` without those two approximations.
+Its separate framebuffer-fetch contract uses three overlapping layers, destination readback,
+defined selectors only and raw FIX/128 including values over one. The old fixed-function tests
+and strict rejection policy are unchanged. This building block is not selected automatically by
+the game: target formats, raw-GS vs blend-domain alpha, dithering, COLCLAMP and alpha/depth tests
+must be integrated and compared against upstream images before claiming correct game pixels.
+Apple-family/raster-order support is checked before running the new GPU contract. A missing
+capability is SKIP (77), never PASS. No per-primitive render pass or texture copy is required.
+
+API reference: Apple's Metal Shading Language specification, programmable blending and raster
+order groups, https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf .
+No external shader implementation was copied.
+
+## Build warning audit
+
+The hosted modern strict C++ build produced no native compiler warnings. The ignored
+`CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED` option was removed from the static-library Makefiles
+configure command: it did not disable signing for an application, and no app was built there.
+GitHub action Node/punycode deprecation notices are infrastructure warnings, not shader or
+gameplay correctness evidence. Existing desktop third-party GLFW/glad diagnostics remain separate.
+Local Xcode 13 warns that ARM64 `-frounding-math` is unsupported: local generated-object success
+is compile-only evidence, not acceptable production PS2 floating-point verification. Do not
+suppress that warning and claim a full device build validated.
 
 ## Acceptance still required
 

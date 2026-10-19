@@ -33,7 +33,8 @@ jobs:
           grep -q 'VU0_SIMD_REFERENCE_DIGEST=806184f7d1d9edb5' evidence/vu0-neon-reference.log
       - name: Compile actual iPhone ARM64 runtime objects
         run: |
-          cmake -S ios/portability -B build-device -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+          # Makefiles compile static archives, not a signed Xcode app. Do not pass an ignored signing variable.
+          cmake -S ios/portability -B build-device -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 -DCMAKE_BUILD_TYPE=RelWithDebInfo
           cmake --build build-device --parallel 2 2>&1 | tee evidence/device-build.log
           file build-device/librac1_apple_runtime.a | tee evidence/device-library.txt
           lipo -verify_arch arm64 build-device/librac1_apple_runtime.a
@@ -58,6 +59,11 @@ jobs:
           xcrun --sdk macosx metal -fno-fast-math -c tests/apple/gs_blend_fixture.metal -o build-apple/gs_blend_fixture.air
           xcrun --sdk macosx metallib build-apple/gs_blend_fixture.air -o build-apple/gs_blend_fixture.metallib
           build-apple/rac1_metal_blend_contract build-apple/gs_blend_fixture.metallib 2>&1 | tee evidence/metal-blend-tests.log
+          xcrun --sdk iphoneos metal -fno-fast-math -c tests/apple/gs_programmable_fixture.metal -o build-device/gs_programmable.air
+          xcrun --sdk iphoneos metallib build-device/gs_programmable.air -o build-device/gs_programmable.metallib
+          xcrun --sdk macosx metal -fno-fast-math -c tests/apple/gs_programmable_fixture.metal -o build-apple/gs_programmable.air
+          xcrun --sdk macosx metallib build-apple/gs_programmable.air -o build-apple/gs_programmable.metallib
+          build-apple/rac1_programmable_blend_contract build-apple/gs_programmable.metallib 2>&1 | tee evidence/metal-programmable-tests.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:

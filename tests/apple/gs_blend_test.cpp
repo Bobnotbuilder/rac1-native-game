@@ -25,6 +25,7 @@ static float factor(BlendFactor f, float sa, float da, float k) {
 }
 int main() {
     size_t cases = 0;
+    size_t reasons[4] = {}, reserved_rejections = 0, legal_rejections = 0;
     for (unsigned a=0; a<4; ++a) for (unsigned b=0; b<4; ++b)
     for (unsigned c=0; c<4; ++c) for (unsigned d=0; d<4; ++d)
     for (unsigned fix : {0u, 64u, 128u, 192u, 255u}) {
@@ -32,6 +33,11 @@ int main() {
         assert(!gs_blend_state(0, alpha).enabled);
         const auto state = gs_blend_state(uint64_t{1}<<6, alpha);
         assert(state.enabled);
+        ++reasons[state.approximation_reasons];
+        if (state.reference_approximation) {
+            if (a==3 || b==3 || c==3 || d==3) ++reserved_rejections;
+            else ++legal_rejections;
+        }
         for (float sa : {0.f, .25f, 1.f}) for (float da : {0.f, .75f, 1.f}) {
             const float cs=.8f, cd=.3f, k=std::min(float(fix)/128,1.f);
             const float fc = c==2 ? k : c==1 ? da : sa;
@@ -54,4 +60,8 @@ int main() {
     assert(subtractive.operation==BlendOperation::ReverseSubtract);
     assert(subtractive.source==BlendFactor::ConstantAlpha && subtractive.destination==BlendFactor::ConstantAlpha);
     std::printf("PASS: %zu GS blend coefficient cases vs OpenGL reference\n",cases);
+    assert(reasons[1]+reasons[2]+reasons[3]==188);
+    std::printf("STRICT_BLEND_AUDIT total=188 one_plus_only=%zu fixed_clamp_only=%zu both=%zu legal=%zu reserved_selector=%zu\n",
+                reasons[1],reasons[2],reasons[3],legal_rejections,reserved_rejections);
+    std::puts("STRICT_REJECTIONS_REMAIN_ENFORCED=YES; PS2_HARDWARE_EQUIVALENCE=NOT_VERIFIED");
 }
