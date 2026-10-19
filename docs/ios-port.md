@@ -124,6 +124,18 @@ Local Xcode 13 warns that ARM64 `-frounding-math` is unsupported: local generate
 is compile-only evidence, not acceptable production PS2 floating-point verification. Do not
 suppress that warning and claim a full device build validated.
 
+## Existing audio backend: iOS compilation requirement
+
+The pinned miniaudio 0.11.25 source requires Objective-C for its iOS CoreAudio implementation
+(AVAudioSession route/interruption handling is already present). The device portability target now
+compiles the unchanged upstream SPU2/IOP queue and mixer adapter as Objective-C++, fetching only
+the same hash-pinned audio dependency, not GLFW/OpenGL. It explicitly requests Playback on iOS:
+the dependency's default tries PlayAndRecord, while this game never needs microphone capture.
+The desktop code path is unchanged. This is a real audio-adapter compilation gate, not a full
+audio link or proof that sound, interruptions or foreground/background behavior work in a game.
+The future UIKit host still must coordinate suspension with simulation and the IOP mirror.
+Reference: https://github.com/mackron/miniaudio/blob/0.11.25/miniaudio.h .
+
 ## Acceptance still required
 
 1. Modern ARM64 runtime tests, then original oracle on private NTSC-U data.

@@ -21,6 +21,25 @@ add_library(rac1_metal_state STATIC ${ROOT}/src/game/render/metal/gs_blend_metal
 target_include_directories(rac1_metal_state PUBLIC ${ROOT}/src)
 target_compile_options(rac1_metal_state PRIVATE -fobjc-arc)
 target_link_libraries(rac1_metal_state PUBLIC "-framework Foundation" "-framework Metal")
+if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # Same pinned miniaudio as the desktop build, without fetching GLFW/OpenGL.
+    # Compile the REAL SPU2/IOP output adapter, not a replacement/silent-success audio backend.
+    include(FetchContent)
+    if(POLICY CMP0135)
+        cmake_policy(SET CMP0135 NEW)
+    endif()
+    FetchContent_Declare(miniaudio
+        URL https://github.com/mackron/miniaudio/archive/refs/tags/0.11.25.tar.gz
+        URL_HASH SHA256=b900edcffe979816e2560a0580b9b1216d674b4f17fbadeca8f777a7f8ab0274
+        SOURCE_SUBDIR _no_cmake)
+    FetchContent_MakeAvailable(miniaudio)
+    # miniaudio's iOS CoreAudio backend contains AVAudioSession Objective-C code.
+    set_source_files_properties(${ROOT}/src/host/audio_out.cpp PROPERTIES LANGUAGE OBJCXX)
+    add_library(rac1_ios_audio_compile OBJECT ${ROOT}/src/host/audio_out.cpp)
+    target_include_directories(rac1_ios_audio_compile PRIVATE ${ROOT} ${ROOT}/src)
+    target_include_directories(rac1_ios_audio_compile SYSTEM PRIVATE ${miniaudio_SOURCE_DIR})
+    target_link_libraries(rac1_ios_audio_compile PRIVATE "-framework AVFoundation" "-framework AudioToolbox" "-framework CoreAudio")
+endif()
 add_library(rac1_vu0_device_contract OBJECT ${ROOT}/tests/apple/vu0_simd_test.cpp)
 target_link_libraries(rac1_vu0_device_contract PRIVATE rac1_apple_runtime)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")

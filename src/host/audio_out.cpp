@@ -44,6 +44,9 @@
 #define MA_NO_ENCODING
 #define MA_NO_GENERATION
 #include <miniaudio.h>
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
 
 #include "host_priority.h"
 
@@ -377,6 +380,11 @@ void iop_loop() {
 // orig: (host) the SPU2's output: the device opened
 bool audio_out_start() {
     ma_context_config cc = ma_context_config_init();
+#if defined(__APPLE__) && TARGET_OS_IOS
+    // Playback only. miniaudio 0.11.25's default tries PlayAndRecord first on iOS;
+    // the game neither records audio nor needs microphone permission.
+    cc.coreaudio.sessionCategory = ma_ios_session_category_playback;
+#endif
     cc.threadPriority = ma_thread_priority_realtime;  // (granted where the system allows it, else the default)
     // (testing) RAC1_AUDIO_DEVICE=null: miniaudio's null backend (a timer pulls the queue at 48 kHz, nothing is heard): a
     // headless run measures the queue, the IOP thread and the game's pacing as a player's would, without a sound device
