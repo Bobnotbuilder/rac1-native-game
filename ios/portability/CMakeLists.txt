@@ -7,14 +7,28 @@ endif()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_OBJCXX_STANDARD 20)
 set(ROOT "${CMAKE_CURRENT_LIST_DIR}/../..")
+include(FetchContent)
+if(POLICY CMP0135)
+    cmake_policy(SET CMP0135 NEW)
+endif()
+# HostState uses GLFW's public numeric input vocabulary, but never calls its window/input API.
+# Fetch just the existing pinned headers; no GLFW/OpenGL library enters the iOS target.
+FetchContent_Declare(glfw_input_headers
+    URL https://github.com/glfw/glfw/archive/refs/tags/3.4.tar.gz
+    URL_HASH SHA256=c038d34200234d071fae9345bc455e4a8f2f544ab60150765d7704e08f3dac01
+    SOURCE_SUBDIR _no_cmake)
+FetchContent_MakeAvailable(glfw_input_headers)
 add_compile_options("$<$<COMPILE_LANGUAGE:CXX,OBJCXX>:-Wall;-Wextra;-Werror;-frounding-math;-ffp-contract=off;-fno-strict-aliasing;-UNDEBUG>")
 add_library(rac1_apple_runtime STATIC
     ${ROOT}/src/platform/apple/platform_apple.mm
     ${ROOT}/src/platform/apple/coroutine_apple.cpp
     ${ROOT}/src/platform/apple/arm64_context.S
     ${ROOT}/src/platform/apple/game_controller.mm
+    ${ROOT}/src/host/host_input.cpp
     ${ROOT}/runtime/ee/ee_thread.cpp)
 target_include_directories(rac1_apple_runtime PUBLIC ${ROOT}/ios/simd ${ROOT} ${ROOT}/src)
+target_include_directories(rac1_apple_runtime SYSTEM PRIVATE ${glfw_input_headers_SOURCE_DIR}/include)
+target_compile_definitions(rac1_apple_runtime PRIVATE GLFW_INCLUDE_NONE)
 target_compile_options(rac1_apple_runtime PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
 target_link_libraries(rac1_apple_runtime PUBLIC "-framework Foundation" "-framework GameController")
 add_library(rac1_metal_state STATIC ${ROOT}/src/game/render/metal/gs_blend_metal.mm)
@@ -53,6 +67,10 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_executable(rac1_gs_blend_test ${ROOT}/tests/apple/gs_blend_test.cpp)
     target_link_libraries(rac1_gs_blend_test PRIVATE rac1_metal_state)
     add_test(NAME gs_blend COMMAND rac1_gs_blend_test)
+    add_executable(rac1_controller_contract ${ROOT}/tests/apple/controller_contract.mm)
+    target_compile_options(rac1_controller_contract PRIVATE -fobjc-arc)
+    target_link_libraries(rac1_controller_contract PRIVATE rac1_apple_runtime)
+    add_test(NAME game_controller_packet COMMAND rac1_controller_contract)
     add_executable(rac1_metal_blend_contract ${ROOT}/tests/apple/metal_blend_contract.mm)
     target_compile_options(rac1_metal_blend_contract PRIVATE -fobjc-arc)
     target_link_libraries(rac1_metal_blend_contract PRIVATE rac1_metal_state)

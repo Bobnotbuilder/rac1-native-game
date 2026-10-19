@@ -136,6 +136,13 @@ audio link or proof that sound, interruptions or foreground/background behavior 
 The future UIKit host still must coordinate suspension with simulation and the IOP mirror.
 Reference: https://github.com/mackron/miniaudio/blob/0.11.25/miniaudio.h .
 
+The controller contract now follows Apple framework snapshots through the original upstream
+`host_input.cpp` bindings and six-byte active-low PS2 packet encoder. It covers face/shoulder/menu
+buttons, both sticks, trigger polarity and neutral state after disconnect. GLFW is used only for
+its existing pinned numeric header constants (`GLFW_INCLUDE_NONE`); it is not linked and does not
+poll devices or create a window. Real GameController sampling uses the same snapshot decoder.
+Framework-backed synthetic inputs do not substitute for the user's physical Backbone test.
+
 ## Acceptance still required
 
 1. Modern ARM64 runtime tests, then original oracle on private NTSC-U data.

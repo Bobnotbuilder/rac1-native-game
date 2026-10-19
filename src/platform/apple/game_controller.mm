@@ -3,13 +3,9 @@
 #import <GameController/GameController.h>
 
 namespace rac1::platform::apple {
-host_input::HostState sample_controller() {
+host_input::HostState decode_controller_snapshot(GCExtendedGamepad* pad) {
     host_input::HostState state{}; // disconnect means a neutral packet, never stale held controls
     @autoreleasepool {
-        GCExtendedGamepad* pad = nil;
-        for (GCController* controller in [GCController controllers]) {
-            if (controller.extendedGamepad) { pad = [controller.extendedGamepad capture]; break; }
-        }
         if (!pad) return state;
         state.pad_present = true;
         // GLFW's public gamepad positions, the indices expected by HostState (not GLFW calls).
@@ -36,5 +32,14 @@ host_input::HostState sample_controller() {
         state.pad_axes[5] = 2.0f * pad.rightTrigger.value - 1.0f;
     }
     return state;
+}
+host_input::HostState sample_controller() {
+    @autoreleasepool {
+        for (GCController* controller in [GCController controllers]) {
+            if (controller.extendedGamepad)
+                return decode_controller_snapshot([controller.extendedGamepad capture]);
+        }
+        return decode_controller_snapshot(nil);
+    }
 }
 } // namespace rac1::platform::apple
