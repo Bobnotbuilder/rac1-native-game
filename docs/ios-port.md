@@ -161,6 +161,44 @@ as review candidates only; nothing is automatically adopted into GameStudio Shar
 
 ## 2026-10-20 private preparation and compiler checkpoint
 
+### UIKit / original GS stream integration continuation
+
+`ios/app` now contains an actual UIKit scene/MetalKit host and original boot/frame/level-exit
+adapter, not a stand-alone import-screen game substitute. These sources compile for iPhone
+ARM64 but the complete executable is NOT linked yet. The source-only CI compiles the host;
+it cannot link the disc-generated gameplay and must not package a misleading IPA.
+
+The app-owned package root is Documents/RAC1NativeData, containing the existing assets/
+layout (owned ISO, matching boot dump and converted MRP data). Paths escaping that root fail.
+Before game initialization, the host checks the input and each converted asset against the
+private build's input-identity resource and attested manifest. It never compiles a game from
+an imported ISO on the phone. Files sharing is enabled; no game data is embedded in public CI.
+The eventual private build must supply private-input-identity.json with disc_sha256 and
+runtime_manifest_sha256 from verified preparation. A missing identity fails closed.
+
+The new Metal scene consumer accepts the original gs::Primitive stream, preserving sprite
+geometry/second-vertex colours, captured draw-time textures, scissor, source-derived alpha
+tests and ordered programmable blending. It caches pipelines/samplers and immutable texture
+snapshots, with no synchronous GPU wait in production. Unsupported render targets, mip
+selection, split alpha/depth passes and extended fragment states are explicit errors before
+frame publication, NOT dropped primitives or silently successful frames. This is NOT a
+complete MRP renderer. Original-game images, widescreen reconstruction and gameplay remain
+unvalidated. The initial faithful host keeps a geometry-correct 4:3 view rather than stretch
+it and falsely claim native widescreen. The working ReRAC port is unchanged.
+
+A local-only dependency audit compiled 297 actual handwritten native game/runtime/format/
+sound/CPU-scene units. Combined with all 227 existing generated units it resolved 723 of
+the original 784 undefined dependency names. This remains an MH_OBJECT relocatable link,
+NOT a game executable or a measure of engine/game behaviour coverage. The subsequent real
+UIKit executable-link attempt fails on remaining renderer capture/readiness and audio-output
+dependencies; no dynamic_lookup, success stubs or undefined-symbol bypass was used.
+
+The VU0 driver's optional profiling clock contained an x86-only rdtsc intrinsic. It now
+retains the original x86 counter and uses monotonic nanoseconds on ARM64, correctly labelled;
+simulation timing/arithmetic are unchanged. A header dependency and clock contract guard it.
+Public dependencies are pinned to the original versions and verified by exact Git blob hashes
+in an ignored build cache, not installed or vendored into the game source.
+
 The earlier temporary materialization has been preserved in a durable, hash-checked worktree.
 The owned Downloads disc was verified from ISO9660, SYSTEM.CNF's `SCUS_971.99` BOOT2,
 the MIPS boot ELF and all nineteen level ranges. Its complete SHA-256 matches the prior

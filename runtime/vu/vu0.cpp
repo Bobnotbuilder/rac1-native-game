@@ -2,6 +2,7 @@
 
 #include <runtime/kernel/ee_memory.h>
 #include <runtime/vu/vu_prof.h>
+#include <platform/profiling_clock.hpp>
 
 #include <chrono>
 #include <cstdio>
@@ -296,9 +297,11 @@ void run_until_blocked() {
         const uint32_t before = v.run.pc();
         const bool stepped = [&] {
             if (!vuprof::enabled()) return v.run.step();
-            const uint64_t t0 = __builtin_ia32_rdtsc(), i0 = v.run.pipe().issued;
+            const uint64_t t0 = platform::profiling_ticks(), i0 = v.run.pipe().issued;
             const bool r = v.run.step();
-            vuprof::counter(3).ns += __builtin_ia32_rdtsc() - t0;  // (TSC ticks here)
+            vuprof::counter(3).ns += platform::profiling_ticks() - t0;
+            if constexpr (platform::profiling_ticks_are_nanoseconds)
+                vuprof::counter(3).name = "vu0 step() calls of run_until_blocked (ns)";
             ++vuprof::counter(3).runs;
             if (v.run.pipe().issued - i0 == 1) ++vuprof::counter(5).runs;  // (a call that ran one instruction: the exact step function)
             return r;
@@ -330,10 +333,12 @@ void call(uint32_t addr) {
     Vu0& v = global();
     drain();
     if (vuprof::enabled()) ++vuprof::starts()[addr];
-    const uint64_t t0 = vuprof::enabled() ? __builtin_ia32_rdtsc() : 0;
+    const uint64_t t0 = vuprof::enabled() ? platform::profiling_ticks() : 0;
     const VuNativeStep port = port_for(addr);
     if (vuprof::enabled()) {
-        vuprof::counter(4).ns += __builtin_ia32_rdtsc() - t0;
+        vuprof::counter(4).ns += platform::profiling_ticks() - t0;
+        if constexpr (platform::profiling_ticks_are_nanoseconds)
+            vuprof::counter(4).name = "vu0 call(): port_for (ns)";
         ++vuprof::counter(4).runs;
     }
     capture(v, addr);

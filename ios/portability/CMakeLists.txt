@@ -35,6 +35,7 @@ FetchContent_Declare(glfw_input_headers
 FetchContent_MakeAvailable(glfw_input_headers)
 add_compile_options("$<$<COMPILE_LANGUAGE:CXX,OBJCXX>:-Wall;-Wextra;-Werror;-frounding-math;-ffp-contract=off;-fno-strict-aliasing;-UNDEBUG>")
 add_library(rac1_apple_runtime STATIC
+    ${ROOT}/src/platform/apple/game_data.cpp
     ${ROOT}/src/platform/apple/platform_apple.mm
     ${ROOT}/src/platform/apple/coroutine_apple.cpp
     ${ROOT}/src/platform/apple/arm64_context.S
@@ -55,7 +56,23 @@ add_library(rac1_metal_texture STATIC ${ROOT}/src/game/render/metal/mrp_texture.
 target_include_directories(rac1_metal_texture PUBLIC ${ROOT}/src)
 target_compile_options(rac1_metal_texture PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
 target_link_libraries(rac1_metal_texture PUBLIC "-framework Foundation" "-framework Metal")
+add_library(rac1_metal_scene STATIC ${ROOT}/src/game/render/metal/gs_scene.cpp
+    ${ROOT}/src/game/render/metal/gs_scene_metal.mm)
+target_include_directories(rac1_metal_scene PUBLIC ${ROOT} ${ROOT}/src)
+target_compile_options(rac1_metal_scene PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
+target_link_libraries(rac1_metal_scene PUBLIC "-framework Foundation" "-framework Metal")
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # Same pinned GLM as the original game; headers only for the actual game-host adapter.
+    FetchContent_Declare(glm_ios_headers
+        URL https://github.com/g-truc/glm/archive/refs/tags/1.0.1.tar.gz
+        URL_HASH SHA256=9f3174561fd26904b23f0db5e560971cbf9b3cbda0b280f04d5c379d03bf234c
+        SOURCE_SUBDIR _no_cmake)
+    FetchContent_MakeAvailable(glm_ios_headers)
+    add_library(rac1_ios_host_compile OBJECT ${ROOT}/ios/app/main.mm ${ROOT}/ios/app/game_session.cpp)
+    target_link_libraries(rac1_ios_host_compile PRIVATE rac1_apple_runtime rac1_metal_scene)
+    target_include_directories(rac1_ios_host_compile SYSTEM PRIVATE ${glm_ios_headers_SOURCE_DIR})
+    target_compile_options(rac1_ios_host_compile PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
+    target_link_libraries(rac1_ios_host_compile PRIVATE "-framework UIKit" "-framework MetalKit" "-framework AVFAudio")
     # Same pinned miniaudio as the desktop build, without fetching GLFW/OpenGL.
     # Compile the REAL SPU2/IOP output adapter, not a replacement/silent-success audio backend.
     include(FetchContent)
@@ -76,8 +93,24 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
 endif()
 add_library(rac1_vu0_device_contract OBJECT ${ROOT}/tests/apple/vu0_simd_test.cpp)
 target_link_libraries(rac1_vu0_device_contract PRIVATE rac1_apple_runtime)
+# Compile the actual native VU0 driver too: a SIMD-only fixture did not exercise
+# its optional profiler's x86-only intrinsic. No generated game inputs are needed.
+add_library(rac1_vu0_driver_compile OBJECT ${ROOT}/runtime/vu/vu0.cpp)
+target_link_libraries(rac1_vu0_driver_compile PRIVATE rac1_apple_runtime)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     enable_testing()
+    add_executable(rac1_game_data_contract ${ROOT}/tests/apple/game_data_contract.cpp)
+    target_link_libraries(rac1_game_data_contract PRIVATE rac1_apple_runtime)
+    add_test(NAME game_data_paths COMMAND rac1_game_data_contract)
+    add_executable(rac1_gs_scene_contract ${ROOT}/tests/apple/gs_scene_contract.cpp)
+    target_link_libraries(rac1_gs_scene_contract PRIVATE rac1_metal_scene)
+    add_test(NAME gs_scene_packet_plan COMMAND rac1_gs_scene_contract)
+    add_executable(rac1_gs_scene_metal_contract ${ROOT}/tests/apple/gs_scene_metal_contract.mm)
+    target_compile_options(rac1_gs_scene_metal_contract PRIVATE -fobjc-arc)
+    target_link_libraries(rac1_gs_scene_metal_contract PRIVATE rac1_metal_scene)
+    add_executable(rac1_profiling_clock_contract ${ROOT}/tests/apple/profiling_clock_contract.cpp)
+    target_link_libraries(rac1_profiling_clock_contract PRIVATE rac1_apple_runtime)
+    add_test(NAME profiling_clock COMMAND rac1_profiling_clock_contract)
     add_executable(rac1_apple_runtime_test ${ROOT}/tests/apple/runtime_test.cpp)
     target_link_libraries(rac1_apple_runtime_test PRIVATE rac1_apple_runtime)
     add_test(NAME apple_runtime COMMAND rac1_apple_runtime_test)

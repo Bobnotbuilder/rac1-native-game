@@ -40,6 +40,7 @@ jobs:
           lipo -verify_arch arm64 build-device/librac1_apple_runtime.a
           lipo -verify_arch arm64 build-device/librac1_metal_state.a
           lipo -verify_arch arm64 build-device/librac1_metal_texture.a
+          lipo -verify_arch arm64 build-device/librac1_metal_scene.a
           file build-device/librac1_metal_state.a | tee evidence/device-metal-state.txt
           xcrun ar -t build-device/librac1_apple_runtime.a | tee evidence/device-objects.txt
       - name: Compile Metal for device and run source-derived contracts on host GPU
@@ -65,6 +66,11 @@ jobs:
           xcrun --sdk macosx metal -fno-fast-math -c tests/apple/gs_programmable_fixture.metal -o build-apple/gs_programmable.air
           xcrun --sdk macosx metallib build-apple/gs_programmable.air -o build-apple/gs_programmable.metallib
           build-apple/rac1_programmable_blend_contract build-apple/gs_programmable.metallib 2>&1 | tee evidence/metal-programmable-tests.log
+          xcrun --sdk iphoneos metal -fno-fast-math -c src/game/render/metal/gs_scene.metal -o build-device/gs_scene.air
+          xcrun --sdk iphoneos metallib build-device/gs_scene.air -o build-device/gs_scene.metallib
+          xcrun --sdk macosx metal -fno-fast-math -c src/game/render/metal/gs_scene.metal -o build-apple/gs_scene.air
+          xcrun --sdk macosx metallib build-apple/gs_scene.air -o build-apple/gs_scene.metallib
+          build-apple/rac1_gs_scene_metal_contract build-apple/gs_scene.metallib 2>&1 | tee evidence/metal-scene-tests.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
