@@ -17,7 +17,7 @@ private:
     void update();
     void vsync();
     static void blocking_vsync(int kind);
-    bool configured_=false,initialized_=false,exiting_=false,running_=true,paused_=true,audio_=false;
+    bool configured_=false,initialized_=false,exiting_=false,running_=true,paused_=true,audio_=false,audio_initialized_=false;
     uint32_t kicked_first_=0,kicked_end_=0;
     bool initialized_before_step_=false;
     host_input::Bindings bindings_=host_input::default_bindings();

@@ -275,3 +275,34 @@ Actual command cost, image correctness, full renderer integration and physical-d
 remain unmeasured. Existing strict blend rejections are unchanged.
 
 No Shared Core adoption, ReRAC changes or GameStudio engine changes were made.
+
+### Full game / UIKit integration investigation
+
+`compile_native_core.py` reuses generated objects and compiles the original game,
+runtime, format readers and sound implementation. Mixed CPU/GL renderer files retain
+their original capture/readiness functions; normal dead stripping removes the unused
+GL graph. No GL replacement symbols or undefined-symbol bypass are permitted.
+`attempt_game_application_link.py --experimental-local-investigation` performs a true
+UIKit MH_EXECUTE link with all generated units, the Metal GS stream encoder, original
+audio adapter, GameController and sandbox reader. A partial link is never accepted.
+
+The Apple scheduling adapter explicitly reports Linux RealtimeKit elevation unavailable;
+CoreAudio controls device scheduling. It does not claim QoS or realtime promotion.
+The profiling clock no longer uses an x86 intrinsic on ARM64; game clocks are unchanged.
+
+The UIKit host verifies the imported owned-disc identity and every converted asset hash,
+keeps saves in app-owned storage, pauses on lifecycle/audio interruption, and feeds the
+original game/VU GS primitive stream into Metal. Its retained framebuffer preserves
+Held fades; the drawable must have `framebufferOnly=NO` because presentation uses a blit.
+The current faithful presentation preserves 4:3 geometry; native widened projection is
+not yet implemented. Unsupported render-target/mip/alpha-depth/extended GS paths fail
+explicitly, rather than silently producing approximate graphics.
+
+`package_private_investigation.py --experimental-local-investigation` is **local only**.
+It checks full-link provenance, ARM64 MH_EXECUTE, system library dependencies, matching
+dSYM UUID, required resources and ZIP integrity before producing a private unsigned IPA.
+It bundles no ISO or assets, but its linked executable contains generated game code:
+**never upload this IPA, executable, dSYM or private identity to public CI/artifacts**.
+Signing and physical installation remain untested. Old local compiler experimental
+strict-FP output is investigation evidence, not production fidelity or a playable claim.
+Modern hosted public-source component tests do not validate the private full-game build.

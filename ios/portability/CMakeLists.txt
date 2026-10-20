@@ -35,6 +35,7 @@ FetchContent_Declare(glfw_input_headers
 FetchContent_MakeAvailable(glfw_input_headers)
 add_compile_options("$<$<COMPILE_LANGUAGE:CXX,OBJCXX>:-Wall;-Wextra;-Werror;-frounding-math;-ffp-contract=off;-fno-strict-aliasing;-UNDEBUG>")
 add_library(rac1_apple_runtime STATIC
+    ${ROOT}/src/platform/apple/host_priority_apple.cpp
     ${ROOT}/src/platform/apple/game_data.cpp
     ${ROOT}/src/platform/apple/platform_apple.mm
     ${ROOT}/src/platform/apple/coroutine_apple.cpp
@@ -108,6 +109,9 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_executable(rac1_gs_scene_metal_contract ${ROOT}/tests/apple/gs_scene_metal_contract.mm)
     target_compile_options(rac1_gs_scene_metal_contract PRIVATE -fobjc-arc)
     target_link_libraries(rac1_gs_scene_metal_contract PRIVATE rac1_metal_scene)
+    add_executable(rac1_host_priority_contract ${ROOT}/tests/apple/host_priority_contract.cpp)
+    target_link_libraries(rac1_host_priority_contract PRIVATE rac1_apple_runtime)
+    add_test(NAME host_priority COMMAND rac1_host_priority_contract)
     add_executable(rac1_profiling_clock_contract ${ROOT}/tests/apple/profiling_clock_contract.cpp)
     target_link_libraries(rac1_profiling_clock_contract PRIVATE rac1_apple_runtime)
     add_test(NAME profiling_clock COMMAND rac1_profiling_clock_contract)

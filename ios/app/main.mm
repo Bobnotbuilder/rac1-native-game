@@ -51,6 +51,9 @@ bool verified_data(const platform::apple::GameDataPaths& data,NSDictionary* iden
 - (void)viewDidLoad {
     [super viewDidLoad];self.view.backgroundColor=UIColor.blackColor;
     metal_=[[MTKView alloc]initWithFrame:CGRectZero device:MTLCreateSystemDefaultDevice()];
+    // This host explicitly blits its retained GS framebuffer into the drawable.
+    // Metal prohibits blit destinations on framebuffer-only drawable textures.
+    metal_.framebufferOnly=NO;
     metal_.colorPixelFormat=MTLPixelFormatBGRA8Unorm;metal_.autoResizeDrawable=NO;
     metal_.drawableSize=CGSizeMake(512,416);metal_.preferredFramesPerSecond=60;
     metal_.paused=YES;metal_.delegate=self;[self.view addSubview:metal_];

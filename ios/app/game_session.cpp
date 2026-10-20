@@ -23,6 +23,8 @@
 #include <game/ovl/vsync_callback.h>
 #include <game/render/render_toggles.h>
 #include <game/render/render_view.h>
+#include <game/render/mrp_scene.h>
+#include <game/render/mrp_world_scene.h>
 #include <host/host_language.h>
 #include <platform/apple/game_controller.h>
 #include <setup/iso_extract.h>
@@ -71,7 +73,7 @@ void GameSession::initialize() {
     if(disc_read_ee(cnf,0x121,1))save_names_init(cnf);
     ee_stack_free(0x800);card_lib_init();mc_card_insert(mc_default_card_dir());
     snd989_iop_start();stash_iop_start();sound_callbacks_register();
-    snd989_mirror_enable();audio_=audio_out_start();
+    snd989_mirror_enable();audio_=audio_out_start();audio_initialized_=audio_;
     if(!audio_)throw std::runtime_error("IOS_AUDIO_DEVICE_START_FAILED");
     ee_write<uint16_t>(0x1518d0,512);ee_write<uint16_t>(0x1518d2,416);display_environment();
     ee_thread_set_vsync_hook([](EeVsyncFrame kind){blocking_vsync(int(kind));});
@@ -119,9 +121,9 @@ bool GameSession::step(std::string& error) {
         const auto packet=host_input::compute(bindings_,state);
         host_input::to_packet(packet,g_host_pad_packet);
         if(initialized_)host_language::note(lwu(0x15ed88));
-        initialized_before_step_=initialized_;audio_out_step(true);
+        initialized_before_step_=initialized_;mrp_scene_begin_frame();mrpw::scene_begin_update();audio_out_step(true);
         const bool complete=ee_thread_run([this]{ps2fpu::enter_ee_rounding();if(!initialized_)initialize();else update();});
-        audio_out_step(false);
+        audio_out_step(false);mrp_scene_end_frame();
         if(complete && initialized_before_step_){ps2fpu::enter_ee_rounding();vsync();}
         if(!running_)throw std::runtime_error("ORIGINAL_LEVEL_TRANSITION_FAILED");
         error.clear();return true;
@@ -143,5 +145,5 @@ bool GameSession::scene(metal::SceneFrame& result,bool& clear,std::string& error
     return metal::prepare_gs_scene(gs.primitives(),view,result,error);
 }
 void GameSession::suspend(){paused_=true;audio_out_set_alone(false);if(audio_){audio_out_stop();audio_=false;}}
-bool GameSession::resume(std::string& error){if(initialized_ && !audio_){audio_=audio_out_start();if(!audio_){error="IOS_AUDIO_RESUME_FAILED";return false;}}paused_=false;error.clear();return true;}
+bool GameSession::resume(std::string& error){if(audio_initialized_ && !audio_){audio_=audio_out_start();if(!audio_){error="IOS_AUDIO_RESUME_FAILED";return false;}}paused_=false;error.clear();return true;}
 } // namespace rac1::ios

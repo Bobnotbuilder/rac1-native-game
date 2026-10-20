@@ -8,7 +8,20 @@ def load(name):
     spec=importlib.util.spec_from_file_location(name,ROOT/'tools/ios'/(name+'.py'))
     result=importlib.util.module_from_spec(spec);spec.loader.exec_module(result);return result
 cache=load('verify_dependency_cache');core=load('compile_native_core')
+package=load('package_private_investigation')
 class IosIntegrationContracts(unittest.TestCase):
+    def test_packaging_rejects_partial_link(self):
+        with self.assertRaises(ValueError):package.validate_link({'application_linked':False},Path('unused'))
+    def test_packaging_requires_all_generated_units(self):
+        with self.assertRaises(ValueError):package.validate_link({'application_linked':True,'exit_code':0,'generated_units':226},Path('unused'))
+    def test_package_identity_requires_matching_verified_disc(self):
+        audit={'iso_validated':True,'generated_verified':True,'converted_assets_verified':True,'iso':{'sha256':'synthetic'}}
+        self.assertEqual(package.identity_record(audit,{'iso_sha256':'synthetic','files_verified':True}),{'disc_sha256':'synthetic'})
+        with self.assertRaises(ValueError):package.identity_record(audit,{'iso_sha256':'other','files_verified':True})
+        audit['converted_assets_verified']=False
+        with self.assertRaises(ValueError):package.identity_record(audit,{'iso_sha256':'synthetic','files_verified':True})
+    def test_host_blit_drawable_not_framebuffer_only(self):
+        self.assertIn('metal_.framebufferOnly=NO;', (ROOT/'ios/app/main.mm').read_text())
     def test_exact_pinned_header(self):
         original=b'// synthetic public header\n'
         self.assertEqual(cache.checked_bytes(original,len(original),cache.blob_hash(original)),original)

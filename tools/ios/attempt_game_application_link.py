@@ -23,7 +23,8 @@ def main():
     names=['uikit-main-arm64.o','game-session-arm64.o','game-data-arm64.o',
         'gs-scene-arm64.o','gs-scene-metal-arm64.o','platform-apple-device.o',
         'game-controller-device.o','coroutine-apple-device.o','arm64-context-device.o',
-        'host-input-device.o','host-language-device.o','iso-extract-device.o']
+        'host-input-device.o','host-language-device.o','iso-extract-device.o','audio-out-device.o',
+        'host-priority-apple-device.o']
     objects=[core]+[ROOT/'build'/name for name in names]
     for obj in objects:
         subprocess.run(['xcrun','lipo',str(obj),'-verify_arch','arm64'],check=True)

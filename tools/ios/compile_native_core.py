@@ -44,6 +44,11 @@ def inventory():
     selected += ['src/game/render/'+s+'.cpp' for s in
                  ('render_view','mrp_scene','mrp_world_assets','mrp_world_check',
                   'mrp_world_scene','mrp_world_static','mrp_lod','mrp_title_view','texture_decode')]
+    # Preserve the original capture/readiness implementations in these mixed files.
+    # A final Metal application MUST dead-strip their unused GL rendering graph and
+    # link without any GL/GLFW implementation. No renderer callbacks are stubbed.
+    selected += ['src/game/render/'+s+'.cpp' for s in
+                 ('mrp_fx','mrp_moby_renderer','mrp_world_renderer','mrp_lighting','mrp_tfrag_gpu')]
     formats=[str(p.relative_to(ROOT)) for p in sorted((ROOT/'src/formats').glob('*.cpp'))]
     sound=[str(p.relative_to(ROOT)) for folder in ('game/sound/989snd','game/sound/common')
            for p in sorted((ROOT/'third_party/989snd'/folder).glob('*.cpp'))]
@@ -86,7 +91,15 @@ def main():
     for index,name in enumerate(units):
         if time.monotonic()-started>args.max_seconds: break
         source=ROOT/name
-        key=hashlib.sha256((digest(source)+context+compiler+json.dumps(command)+direct_hpp_context(source)).encode()).hexdigest()
+        unit_command=list(command)
+        if name in ['src/game/render/'+s+'.cpp' for s in
+                    ('mrp_fx','mrp_moby_renderer','mrp_world_renderer','mrp_lighting','mrp_tfrag_gpu')]:
+            glfw=ROOT/'build-public-dependencies/glfw-3.4'
+            pinned=json.loads((glfw/'provenance.json').read_text())
+            from verify_dependency_cache import checked_bytes
+            for item in pinned['files']:checked_bytes((glfw/item['path']).read_bytes(),item['size'],item['sha'])
+            unit_command += ['-DGLFW_INCLUDE_NONE','-I'+str(ROOT/'third_party/glad/include'),'-isystem',str(glfw/'include')]
+        key=hashlib.sha256((digest(source)+context+compiler+json.dumps(unit_command)+direct_hpp_context(source)).encode()).hexdigest()
         obj=directory/(name.replace('/','__')+'.o')
         previous=report['units'].get(name,{})
         if previous.get('key')==key and previous.get('exit_code')==0 and obj.exists() and digest(obj)==previous.get('object_sha256'):
@@ -94,7 +107,7 @@ def main():
         log=obj.with_suffix('.log'); part=obj.with_suffix('.o.part')
         print(f'CORE_COMPILE={index+1}/{len(units)} SOURCE={name}',flush=True)
         before=time.monotonic()
-        with log.open('w') as stream: rc=run_compiler(command+['-c',str(source),'-o',str(part)],ROOT,stream,args.unit_timeout)
+        with log.open('w') as stream: rc=run_compiler(unit_command+['-c',str(source),'-o',str(part)],ROOT,stream,args.unit_timeout)
         record={'key':key,'exit_code':rc,'log':str(log),'elapsed_seconds':time.monotonic()-before}
         if rc==0:
             subprocess.run(architecture_command(part),check=True)
