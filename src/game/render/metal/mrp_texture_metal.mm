@@ -20,7 +20,9 @@ id<MTLTexture> upload_texture_array(id<MTLDevice> device,
     descriptor.width=shape.width; descriptor.height=shape.height;
     descriptor.arrayLength=shape.layers; descriptor.mipmapLevelCount=shape.levels;
     descriptor.usage=MTLTextureUsageShaderRead;
-#if TARGET_OS_OSX
+#if TARGET_OS_OSX && !defined(__arm64__) && !defined(__aarch64__)
+    // Intel/discrete macOS still needs managed CPU upload storage. Do not name the
+    // deprecated managed enum in an Apple Silicon translation unit (Xcode 27).
     descriptor.storageMode=device.hasUnifiedMemory ? MTLStorageModeShared : MTLStorageModeManaged;
 #else
     descriptor.storageMode=MTLStorageModeShared;
