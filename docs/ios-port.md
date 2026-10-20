@@ -158,3 +158,82 @@ Framework-backed synthetic inputs do not substitute for the user's physical Back
 
 Classifications: PLATFORM_SPECIFIC / SHARED_ARM64 / SHARED_IOS / SHARED_METAL / SHARED_TESTING
 as review candidates only; nothing is automatically adopted into GameStudio Shared Core.
+
+## 2026-10-20 private preparation and compiler checkpoint
+
+The earlier temporary materialization has been preserved in a durable, hash-checked worktree.
+The owned Downloads disc was verified from ISO9660, SYSTEM.CNF's `SCUS_971.99` BOOT2,
+the MIPS boot ELF and all nineteen level ranges. Its complete SHA-256 matches the prior
+generation receipt. No game input was uploaded, and no matching generated file was regenerated.
+Exact paths and private hashes belong in the local progress/receipts, not public CI artifacts.
+
+The 227 generated translation units are complete and retain their original recorded hashes.
+`tools/ios/preparation` builds the original upstream setup controller, exporters and generated VU
+programs without the desktop OpenGL host. It completed the missing moby, world and flight stages.
+Original typed readers parsed all 3,493 outputs: 3,384 classes, 88 texture files and 21 worlds
+(levels 0–18, title and flight). This proves structural preparation, not game pixels or gameplay.
+`finalize_private_assets.py` records source/binary/content hashes and updates only genuinely
+completed setup-stage fingerprints; it does not forge the guided game's build-complete state.
+
+Reproduce or resume LOCAL preparation, never in public CI:
+
+```sh
+cmake -S tools/ios/preparation -B build-private-preparation -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake --build build-private-preparation --target rac1-private-asset-prep --parallel 1
+build-private-preparation/rac1-private-asset-prep --setup --iso '<verified owned ISO>' --check-iso
+# Run only a missing/stale data stage, never indiscriminately force already verified outputs:
+build-private-preparation/rac1-private-asset-prep --setup --iso '<verified owned ISO>' --step world
+build-private-preparation/rac1-private-asset-prep --verify-assets
+python3 tools/ios/audit_private_setup.py --iso '<verified owned ISO>'
+```
+
+The SDK's older libc++ lacks `std::bit_cast`. A narrow constexpr compiler-builtin fallback now
+preserves representations exactly; vecmath changes only those representation conversions.
+One million bit-pattern round trips and edge representations passed locally. A selected oracle
+loads the real owned-disc Veldin overlay into the upstream reference interpreter and compares
+four original functions with native vecmath: 1,024 bitwise comparisons passed on Intel. This is
+not full-game, ARM64, physical PS2 or device proof. The interpreter is a test reference only.
+
+The Apple portability configure now rejects a compiler without strict ARM64 FP support. Clang 13
+has a separately opt-in experimental constrained-FP path that emits `round.dynamic` and real
+ARM64 objects. Its generated-code compile audit is **investigation only**, not a release default
+or runtime-fidelity pass. Resume cached objects with:
+
+```sh
+python3 tools/ios/compile_generated_audit.py --experimental-clang13-investigation --max-seconds 900
+```
+
+Its local receipt explicitly records `full_game_linked=false` and
+`production_fidelity_verified=false`. Do not package these objects as a working IPA.
+
+The local O1 audit completed 214/227 objects before one 1 MB fast-VU source hit its
+600-second budget. The exact same source compiled at O0, separating source compatibility from
+that old compiler's optimization cost (not identifying a specific LLVM pass defect).
+`probe_remaining_generated.py --experimental-clang13-investigation` preserves those 214 objects
+and separately probes only remaining units. All 227 now have ARM64 objects: 214 O1 and 13 O0.
+They also passed a combined `ld -r` link into an ARM64 **MH_OBJECT**, retaining unresolved native,
+game and standard-library dependencies. This is NOT an application link, release-fidelity test,
+gameplay proof or IPA. All partial/probe artifacts remain private and excluded from Git.
+
+### Metal texture upload component
+
+The new native MRP texture-array uploader preserves the source's CSM1 palette indexing,
+linear RGBA8 representation and raw GS alpha. It validates dimensions, every requested mip
+and every layer before allocation; malformed inputs do not become zero-filled successful
+uploads. Loading does not create command buffers, generate replacement mipmaps or introduce
+per-frame texture copies. It is not yet integrated with scene rendering.
+
+CPU tests cover all 256 palette indices, raw alpha, multiple mips/layers and malformed input.
+The framework GPU contract reads both texture-array layers and three mips through Metal and
+checks every channel. No Metal device is SKIP 77, not PASS. A private actual-asset test explicitly
+counts entries excluded by the original GL bucket guard; those are never claimed decoded.
+It also compares the original dimension buckets: 269 total, with 57 requiring the upstream's
+explicit RGBA-zero initialization of absent upper mips (1,244 layer/mip images). The uploader's
+default `Reject` policy still rejects these. Opt-in `UpstreamZeroFill` reproduces that original
+initialization, with a count in the validated shape; it does not generate mips or accept a
+malformed present mip or missing base image. All 269 real buckets pass this source-derived
+policy. Neither the policy nor these CPU checks relax any strict GS blend rejection.
+Actual command cost, image correctness, full renderer integration and physical-device behavior
+remain unmeasured. Existing strict blend rejections are unchanged.
+
+No Shared Core adoption, ReRAC changes or GameStudio engine changes were made.

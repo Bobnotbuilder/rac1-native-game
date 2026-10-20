@@ -8,7 +8,7 @@
 #include <runtime/ee/ps2_fpu.h>
 
 #include <algorithm>
-#include <bit>
+#include <platform/bit_cast.h>
 #include <cfloat>
 #include <cmath>
 #include <cstring>
@@ -22,7 +22,7 @@ constexpr OvConst<0x00160760u> ADDR_ASIN_COEFFS{};   // $gp - 0x64a0, 4 floats
 constexpr OvConst<0x001c2420u> ADDR_ATAN_COEFFS{};   // 8 floats (t, t^3 .. t^15)
 constexpr OvConst<0x001c2440u> ADDR_ATAN_OCTANTS{};  // 8 x {scale, offset}
 
-constexpr float f32(uint32_t bits) { return std::bit_cast<float>(bits); }
+constexpr float f32(uint32_t bits) { return rac1::portable_bit_cast<float>(bits); }
 constexpr float PI = f32(0x40490fdb);
 constexpr float HALF_PI = f32(0x3fc90fdb);
 constexpr float QUARTER_PI = f32(0x3f490fdb);
@@ -222,8 +222,8 @@ float atan2_f(float y, float x) {
     if (hi <= 0.0f) return 0.0f;
     const float t = ps2fpu::div_nearest(lo - hi, lo + hi);  // DIV.S (to nearest)
 
-    const uint32_t idx = (std::bit_cast<uint32_t>(d0) >> 31) * 8 + (std::bit_cast<uint32_t>(x) >> 31) * 16 +
-                         (std::bit_cast<uint32_t>(y) >> 31) * 32;
+    const uint32_t idx = (rac1::portable_bit_cast<uint32_t>(d0) >> 31) * 8 + (rac1::portable_bit_cast<uint32_t>(x) >> 31) * 16 +
+                         (rac1::portable_bit_cast<uint32_t>(y) >> 31) * 32;
     const float scale = ee_read<float>(ADDR_ATAN_OCTANTS + idx);
     const float offset = ee_read<float>(ADDR_ATAN_OCTANTS + idx + 4);
     float c[8];
@@ -284,18 +284,18 @@ void vec_set_unit_z(Vec4& d) { d = Vec4{0.0f, 0.0f, 1.0f, 0.0f}; }  // vmr32 vf0
 namespace {
 // orig: (helper) a VU0 result: denormals become signed zero, Inf / NaN +-max
 inline float vu_result(float f) {
-    uint32_t u = std::bit_cast<uint32_t>(f);
+    uint32_t u = rac1::portable_bit_cast<uint32_t>(f);
     const uint32_t e = u & 0x7f800000u;
     if (e == 0) u &= 0x80000000u;
     else if (e == 0x7f800000u) u = (u & 0x80000000u) | 0x7f7fffffu;
-    return std::bit_cast<float>(u);
+    return rac1::portable_bit_cast<float>(u);
 }
 // orig: (helper) a VU0 operand: Inf / NaN is read as +-max, a denormal as a signed zero (so -denormal + 0 is +0, not -0; the Devastator's rocket)
 inline float vu_in(float f) {
-    uint32_t u = std::bit_cast<uint32_t>(f);
+    uint32_t u = rac1::portable_bit_cast<uint32_t>(f);
     if ((u & 0x7f800000u) == 0) u &= 0x80000000u;
     else if ((u & 0x7f800000u) == 0x7f800000u) u = (u & 0x80000000u) | 0x7f7fffffu;  // (exponent 255: read as +-max, as the VU0 / PCSX2's vuDouble do)
-    return std::bit_cast<float>(u);
+    return rac1::portable_bit_cast<float>(u);
 }
 }  // namespace
 
@@ -370,7 +370,7 @@ float vec2_distance(const Vec4& a, const Vec4& b) {
 // orig: 0x001ff500
 void vec3_set_length(Vec4& d, const Vec4& a, float len) {
     const float l2 = (a.x * a.x + a.y * a.y) + 1.0f * (a.z * a.z);
-    if (std::bit_cast<uint32_t>(l2) == 0) {
+    if (rac1::portable_bit_cast<uint32_t>(l2) == 0) {
         d = Vec4{0.0f, 0.0f, 0.0f, a.w};
         return;
     }
@@ -381,7 +381,7 @@ void vec3_set_length(Vec4& d, const Vec4& a, float len) {
 // orig: 0x001ff550
 void vec2_set_length(Vec4& d, const Vec4& a, float len) {
     const float l2 = a.x * a.x + a.y * a.y;
-    if (std::bit_cast<uint32_t>(l2) == 0) {
+    if (rac1::portable_bit_cast<uint32_t>(l2) == 0) {
         d = Vec4{0.0f, 0.0f, a.z, a.w};
         return;
     }
@@ -393,8 +393,8 @@ void vec2_set_length(Vec4& d, const Vec4& a, float len) {
 int32_t vec2_clamp_length(Vec4& d, const Vec4& a, float max_len) {
     const float len = 0.0f + std::sqrt(std::fabs(a.x * a.x + a.y * a.y));
     const float diff = max_len - len;
-    if (std::bit_cast<uint32_t>(len) == 0) return 0;
-    if (static_cast<int32_t>(std::bit_cast<uint32_t>(diff)) > 0) return 0;  // diff > +0
+    if (rac1::portable_bit_cast<uint32_t>(len) == 0) return 0;
+    if (static_cast<int32_t>(rac1::portable_bit_cast<uint32_t>(diff)) > 0) return 0;  // diff > +0
     const float q = vu_div(max_len, len);
     d = Vec4{a.x * q, a.y * q, a.z, a.w};
     return 1;
@@ -545,21 +545,21 @@ namespace {
 // VU MAX / MINI compare the float bit patterns as signed-magnitude integers.
 // orig: (helper) a VU result: Inf / NaN become +-max, denormals signed zero
 inline float vuclamp(float f) {
-    uint32_t u = std::bit_cast<uint32_t>(f);
+    uint32_t u = rac1::portable_bit_cast<uint32_t>(f);
     const uint32_t e = u & 0x7f800000u;
     if (e == 0) u &= 0x80000000u;
     else if (e == 0x7f800000u) u = (u & 0x80000000u) | 0x7f7fffffu;
-    return std::bit_cast<float>(u);
+    return rac1::portable_bit_cast<float>(u);
 }
 // orig: (helper) VU MAX semantics
 inline float vu_max(float a, float b) {
-    const int32_t x = std::bit_cast<int32_t>(a), y = std::bit_cast<int32_t>(b);
-    return std::bit_cast<float>((x < 0 && y < 0) ? std::min(x, y) : std::max(x, y));
+    const int32_t x = rac1::portable_bit_cast<int32_t>(a), y = rac1::portable_bit_cast<int32_t>(b);
+    return rac1::portable_bit_cast<float>((x < 0 && y < 0) ? std::min(x, y) : std::max(x, y));
 }
 // orig: (helper) VU MINI semantics
 inline float vu_min(float a, float b) {
-    const int32_t x = std::bit_cast<int32_t>(a), y = std::bit_cast<int32_t>(b);
-    return std::bit_cast<float>((x < 0 && y < 0) ? std::max(x, y) : std::min(x, y));
+    const int32_t x = rac1::portable_bit_cast<int32_t>(a), y = rac1::portable_bit_cast<int32_t>(b);
+    return rac1::portable_bit_cast<float>((x < 0 && y < 0) ? std::max(x, y) : std::min(x, y));
 }
 
 // VU0 micro program body shared by 0x190/0x192 and the Euler program's
@@ -665,17 +665,17 @@ void euler_to_mat4_fpu(Mat4& d, const Vec4& ang) {
         c = fpu_sin_kernel(a2);
     };
     float s, c;
-    if (std::bit_cast<uint32_t>(ang.z) != 0) {  // Z: written directly into rows 0 and 1
+    if (rac1::portable_bit_cast<uint32_t>(ang.z) != 0) {  // Z: written directly into rows 0 and 1
         sincos(ang.z, s, c);
         r0.x = 0.0f + c; r0.y = 0.0f + s;
         r1.y = 0.0f + c; r1.x = 0.0f - s;
     }
-    if (std::bit_cast<uint32_t>(ang.y) != 0) {
+    if (rac1::portable_bit_cast<uint32_t>(ang.y) != 0) {
         sincos(ang.y, s, c);
         const Vec4 m0{0.0f + c, 0.0f, 0.0f - s, 0.0f}, m1{0.0f, 0.0f + 1.0f, 0.0f, 0.0f}, m2{0.0f + s, 0.0f, 0.0f + c, 0.0f};
         r0 = rot_row(r0, m0, m1, m2); r1 = rot_row(r1, m0, m1, m2); r2 = rot_row(r2, m0, m1, m2);
     }
-    if (std::bit_cast<uint32_t>(ang.x) != 0) {
+    if (rac1::portable_bit_cast<uint32_t>(ang.x) != 0) {
         sincos(ang.x, s, c);
         const Vec4 m0{0.0f + 1.0f, 0.0f, 0.0f, 0.0f}, m1{0.0f, 0.0f + c, 0.0f + s, 0.0f}, m2{0.0f, 0.0f - s, 0.0f + c, 0.0f};
         r0 = rot_row(r0, m0, m1, m2); r1 = rot_row(r1, m0, m1, m2); r2 = rot_row(r2, m0, m1, m2);

@@ -39,6 +39,7 @@ jobs:
           file build-device/librac1_apple_runtime.a | tee evidence/device-library.txt
           lipo -verify_arch arm64 build-device/librac1_apple_runtime.a
           lipo -verify_arch arm64 build-device/librac1_metal_state.a
+          lipo -verify_arch arm64 build-device/librac1_metal_texture.a
           file build-device/librac1_metal_state.a | tee evidence/device-metal-state.txt
           xcrun ar -t build-device/librac1_apple_runtime.a | tee evidence/device-objects.txt
       - name: Compile Metal for device and run source-derived contracts on host GPU
